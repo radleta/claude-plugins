@@ -1,0 +1,17 @@
+{
+  "name": "plan-update",
+  "version": "1.0.1",
+  "description": "Plan progress update methodology for marking completed steps",
+  "author": {
+    "name": "Richard Adleta",
+    "email": "radleta@gmail.com",
+    "url": "https://github.com/radleta"
+  },
+  "repository": "https://github.com/radleta/claude-plugins",
+  "license": "MIT",
+  "keywords": [
+    "planning",
+    "progress",
+    "tracking"
+  ]
+}

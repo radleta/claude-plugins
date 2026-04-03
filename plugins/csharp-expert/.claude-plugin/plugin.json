@@ -1,0 +1,17 @@
+{
+  "name": "csharp-expert",
+  "version": "1.0.1",
+  "description": "C# and .NET patterns for async/await, dependency injection, LINQ, and resource management",
+  "author": {
+    "name": "Richard Adleta",
+    "email": "radleta@gmail.com",
+    "url": "https://github.com/radleta"
+  },
+  "repository": "https://github.com/radleta/claude-plugins",
+  "license": "MIT",
+  "keywords": [
+    "csharp",
+    "dotnet",
+    "async"
+  ]
+}

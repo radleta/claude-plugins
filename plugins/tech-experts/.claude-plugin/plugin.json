@@ -1,0 +1,16 @@
+{
+  "name": "tech-experts",
+  "version": "1.0.1",
+  "description": "All technology expert skills in one install",
+  "author": {
+    "name": "Richard Adleta",
+    "email": "radleta@gmail.com",
+    "url": "https://github.com/radleta"
+  },
+  "repository": "https://github.com/radleta/claude-plugins",
+  "license": "MIT",
+  "keywords": [
+    "experts",
+    "bundle"
+  ]
+}

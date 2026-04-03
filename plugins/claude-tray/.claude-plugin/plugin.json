@@ -1,0 +1,17 @@
+{
+  "name": "claude-tray",
+  "version": "1.0.1",
+  "description": "Windows system tray monitor for Claude Code sessions",
+  "author": {
+    "name": "Richard Adleta",
+    "email": "radleta@gmail.com",
+    "url": "https://github.com/radleta"
+  },
+  "repository": "https://github.com/radleta/claude-plugins",
+  "license": "MIT",
+  "keywords": [
+    "windows",
+    "tray",
+    "monitor"
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "name": "code-verification",
+  "version": "1.0.1",
+  "description": "Unified code quality and requirements verification with detection categories",
+  "author": {
+    "name": "Richard Adleta",
+    "email": "radleta@gmail.com",
+    "url": "https://github.com/radleta"
+  },
+  "repository": "https://github.com/radleta/claude-plugins",
+  "license": "MIT",
+  "keywords": [
+    "code-review",
+    "quality",
+    "verification"
+  ]
+}

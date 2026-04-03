@@ -1,0 +1,17 @@
+{
+  "name": "powershell-expert",
+  "version": "1.0.1",
+  "description": "PowerShell patterns for script analysis, .NET interop, and PS1-to-C# porting",
+  "author": {
+    "name": "Richard Adleta",
+    "email": "radleta@gmail.com",
+    "url": "https://github.com/radleta"
+  },
+  "repository": "https://github.com/radleta/claude-plugins",
+  "license": "MIT",
+  "keywords": [
+    "powershell",
+    "windows",
+    "scripting"
+  ]
+}

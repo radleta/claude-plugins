@@ -1,0 +1,17 @@
+{
+  "name": "commit-methodology",
+  "version": "1.0.1",
+  "description": "Comprehensive commit creation with adaptive analysis and conventional commit format",
+  "author": {
+    "name": "Richard Adleta",
+    "email": "radleta@gmail.com",
+    "url": "https://github.com/radleta"
+  },
+  "repository": "https://github.com/radleta/claude-plugins",
+  "license": "MIT",
+  "keywords": [
+    "git",
+    "commit",
+    "conventional-commits"
+  ]
+}

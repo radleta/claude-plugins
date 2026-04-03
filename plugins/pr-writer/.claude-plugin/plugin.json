@@ -1,0 +1,17 @@
+{
+  "name": "pr-writer",
+  "version": "1.0.1",
+  "description": "Framework for creating well-structured pull request descriptions",
+  "author": {
+    "name": "Richard Adleta",
+    "email": "radleta@gmail.com",
+    "url": "https://github.com/radleta"
+  },
+  "repository": "https://github.com/radleta/claude-plugins",
+  "license": "MIT",
+  "keywords": [
+    "git",
+    "pull-request",
+    "github"
+  ]
+}

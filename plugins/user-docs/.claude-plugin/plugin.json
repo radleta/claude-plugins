@@ -1,0 +1,17 @@
+{
+  "name": "user-docs",
+  "version": "1.0.1",
+  "description": "Validated patterns for creating end-user documentation",
+  "author": {
+    "name": "Richard Adleta",
+    "email": "radleta@gmail.com",
+    "url": "https://github.com/radleta"
+  },
+  "repository": "https://github.com/radleta/claude-plugins",
+  "license": "MIT",
+  "keywords": [
+    "documentation",
+    "user-guides",
+    "help"
+  ]
+}

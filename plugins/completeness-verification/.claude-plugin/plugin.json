@@ -1,0 +1,17 @@
+{
+  "name": "completeness-verification",
+  "version": "1.0.1",
+  "description": "Structural completeness methodology with named fingerprint detection",
+  "author": {
+    "name": "Richard Adleta",
+    "email": "radleta@gmail.com",
+    "url": "https://github.com/radleta"
+  },
+  "repository": "https://github.com/radleta/claude-plugins",
+  "license": "MIT",
+  "keywords": [
+    "completeness",
+    "verification",
+    "fingerprints"
+  ]
+}

@@ -1,0 +1,39 @@
+# Commit Message Template
+
+## Format: Conventional Commits
+
+type(scope): brief description (max 72 chars)
+
+Longer explanation of what changed and why.
+Explain the problem this solves and how it solves it.
+
+- Detail point 1
+- Detail point 2
+- Detail point 3
+
+BREAKING CHANGE: Description of breaking change and migration path
+(Only include if this is a breaking change)
+
+Refs: #issue-number
+
+## Types
+- feat: New feature
+- fix: Bug fix
+- docs: Documentation only
+- style: Formatting, missing semicolons, etc.
+- refactor: Code change that neither fixes a bug nor adds a feature
+- perf: Performance improvement
+- test: Adding missing tests
+- chore: Maintain, update dependencies, etc.
+
+## Example
+feat(auth): add OAuth2 support
+
+Implement OAuth2 authentication to support single sign-on
+with Google and GitHub providers.
+
+- Add OAuth2 client configuration
+- Create callback endpoints
+- Update user model to store provider info
+
+Refs: #123

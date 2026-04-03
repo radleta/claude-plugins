@@ -1,0 +1,17 @@
+{
+  "name": "api-docs",
+  "version": "1.0.1",
+  "description": "Industry-standard patterns for API documentation generation",
+  "author": {
+    "name": "Richard Adleta",
+    "email": "radleta@gmail.com",
+    "url": "https://github.com/radleta"
+  },
+  "repository": "https://github.com/radleta/claude-plugins",
+  "license": "MIT",
+  "keywords": [
+    "api",
+    "documentation",
+    "openapi"
+  ]
+}

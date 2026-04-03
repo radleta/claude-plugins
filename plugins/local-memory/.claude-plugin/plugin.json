@@ -1,0 +1,17 @@
+{
+  "name": "local-memory",
+  "version": "1.0.1",
+  "description": "Active Projects working memory management in CLAUDE.local.md",
+  "author": {
+    "name": "Richard Adleta",
+    "email": "radleta@gmail.com",
+    "url": "https://github.com/radleta"
+  },
+  "repository": "https://github.com/radleta/claude-plugins",
+  "license": "MIT",
+  "keywords": [
+    "memory",
+    "context",
+    "projects"
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "name": "claude-code-builders",
+  "version": "1.0.1",
+  "description": "Claude Code primitive builders: skills, commands, agents, plugins, hooks, and CLAUDE.md",
+  "author": {
+    "name": "Richard Adleta",
+    "email": "radleta@gmail.com",
+    "url": "https://github.com/radleta"
+  },
+  "repository": "https://github.com/radleta/claude-plugins",
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "builders",
+    "skills",
+    "commands",
+    "agents"
+  ]
+}

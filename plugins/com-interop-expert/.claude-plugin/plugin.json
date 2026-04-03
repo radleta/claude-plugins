@@ -1,0 +1,18 @@
+{
+  "name": "com-interop-expert",
+  "version": "1.0.1",
+  "description": "COM Interop patterns for C#/.NET including P/Invoke, RCW lifecycle, and STA threading",
+  "author": {
+    "name": "Richard Adleta",
+    "email": "radleta@gmail.com",
+    "url": "https://github.com/radleta"
+  },
+  "repository": "https://github.com/radleta/claude-plugins",
+  "license": "MIT",
+  "keywords": [
+    "com",
+    "interop",
+    "pinvoke",
+    "windows"
+  ]
+}

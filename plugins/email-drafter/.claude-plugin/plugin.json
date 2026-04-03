@@ -1,0 +1,17 @@
+{
+  "name": "email-drafter",
+  "version": "1.0.1",
+  "description": "Gmail draft management and label-gated email composition",
+  "author": {
+    "name": "Richard Adleta",
+    "email": "radleta@gmail.com",
+    "url": "https://github.com/radleta"
+  },
+  "repository": "https://github.com/radleta/claude-plugins",
+  "license": "MIT",
+  "keywords": [
+    "email",
+    "gmail",
+    "drafts"
+  ]
+}

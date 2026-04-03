@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# email-draft — publish a markdown file as a Gmail draft
+#
+# Usage:
+#   email-draft <markdown-file>
+#   echo "# Subject\nBody" | email-draft [--profile <name>]
+#   email-draft --profile work --subject "Custom Subject" <markdown-file>
+#
+# Config: ~/.config/email-drafter/config.env
+# Docs:   email-draft-expert skill (SKILL.md)
+
+set -euo pipefail
+
+# Resolve through symlinks (works on MSYS2/Git Bash where readlink -f may not exist)
+_resolve_script() {
+  local src="${BASH_SOURCE[0]}"
+  while [[ -L "$src" ]]; do
+    local dir="$(cd "$(dirname "$src")" && pwd)"
+    src="$(readlink "$src")"
+    [[ "$src" != /* ]] && src="$dir/$src"
+  done
+  cd "$(dirname "$src")" && pwd
+}
+SCRIPT_DIR="$(_resolve_script)"
+
+# Auto-install dependencies when package.json changes
+HASH_FILE="$SCRIPT_DIR/node_modules/.package-hash"
+CURRENT_HASH="$(sha256sum "$SCRIPT_DIR/package.json" | cut -d' ' -f1)"
+STORED_HASH="$(cat "$HASH_FILE" 2>/dev/null || true)"
+
+if [ "$CURRENT_HASH" != "$STORED_HASH" ]; then
+  echo "Installing dependencies..."
+  (cd "$SCRIPT_DIR" && npm install --silent)
+  echo "$CURRENT_HASH" > "$HASH_FILE"
+fi
+
+# Node 18+ required (top-level await, global fetch)
+NODE_MAJOR="$(node -e 'process.stdout.write(process.versions.node.split(".")[0])')"
+if [ "$NODE_MAJOR" -lt 18 ] 2>/dev/null; then
+  echo "ERROR: Node 18+ required (found Node $NODE_MAJOR)." >&2
+  echo "  top-level await and global fetch are not available in older versions." >&2
+  exit 1
+fi
+
+exec node "$SCRIPT_DIR/publish.mjs" "$@"

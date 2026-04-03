@@ -1,0 +1,17 @@
+{
+  "name": "completeness-expert",
+  "version": "1.0.1",
+  "description": "Enforces complete output and verification before declaring tasks done",
+  "author": {
+    "name": "Richard Adleta",
+    "email": "radleta@gmail.com",
+    "url": "https://github.com/radleta"
+  },
+  "repository": "https://github.com/radleta/claude-plugins",
+  "license": "MIT",
+  "keywords": [
+    "completeness",
+    "verification",
+    "quality"
+  ]
+}

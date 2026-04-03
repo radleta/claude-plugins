@@ -1,0 +1,17 @@
+{
+  "name": "estimation-expert",
+  "version": "1.0.1",
+  "description": "Calibrated effort estimation for AI-augmented development workflows",
+  "author": {
+    "name": "Richard Adleta",
+    "email": "radleta@gmail.com",
+    "url": "https://github.com/radleta"
+  },
+  "repository": "https://github.com/radleta/claude-plugins",
+  "license": "MIT",
+  "keywords": [
+    "estimation",
+    "planning",
+    "effort"
+  ]
+}

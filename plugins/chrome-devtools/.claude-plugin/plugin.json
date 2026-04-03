@@ -1,0 +1,17 @@
+{
+  "name": "chrome-devtools",
+  "version": "1.0.1",
+  "description": "Browser automation methodology for Chrome DevTools integration",
+  "author": {
+    "name": "Richard Adleta",
+    "email": "radleta@gmail.com",
+    "url": "https://github.com/radleta"
+  },
+  "repository": "https://github.com/radleta/claude-plugins",
+  "license": "MIT",
+  "keywords": [
+    "chrome",
+    "browser",
+    "devtools"
+  ]
+}

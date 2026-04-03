@@ -1,0 +1,17 @@
+{
+  "name": "visual-companion",
+  "version": "1.0.1",
+  "description": "Browser-based visual companion that serves HTML previews locally",
+  "author": {
+    "name": "Richard Adleta",
+    "email": "radleta@gmail.com",
+    "url": "https://github.com/radleta"
+  },
+  "repository": "https://github.com/radleta/claude-plugins",
+  "license": "MIT",
+  "keywords": [
+    "visual",
+    "preview",
+    "browser"
+  ]
+}

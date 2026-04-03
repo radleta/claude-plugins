@@ -1,0 +1,17 @@
+{
+  "name": "document-tools",
+  "version": "1.0.1",
+  "description": "Spreadsheet generation and Markdown-to-PDF conversion tools",
+  "author": {
+    "name": "Richard Adleta",
+    "email": "radleta@gmail.com",
+    "url": "https://github.com/radleta"
+  },
+  "repository": "https://github.com/radleta/claude-plugins",
+  "license": "MIT",
+  "keywords": [
+    "xlsx",
+    "pdf",
+    "documents"
+  ]
+}

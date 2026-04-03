@@ -1,0 +1,17 @@
+{
+  "name": "security-verification",
+  "version": "1.0.1",
+  "description": "OWASP Top 10 security verification methodology with detection patterns",
+  "author": {
+    "name": "Richard Adleta",
+    "email": "radleta@gmail.com",
+    "url": "https://github.com/radleta"
+  },
+  "repository": "https://github.com/radleta/claude-plugins",
+  "license": "MIT",
+  "keywords": [
+    "security",
+    "owasp",
+    "verification"
+  ]
+}

@@ -1,0 +1,33 @@
+# CHANGELOG Entry Template
+
+## Format: Keep a Changelog
+
+### [Version] - [YYYY-MM-DD]
+
+#### Added
+- New feature description [#issue]
+- Another new feature [#issue]
+
+#### Changed
+- Updated behavior description [#issue]
+- Another change [#issue]
+
+#### Fixed
+- Bug fix description [#issue]
+- Another fix [#issue]
+
+#### Deprecated
+- Feature to be removed, use alternative instead [#issue]
+  (Will be removed in vX.0.0)
+
+#### Removed
+- Removed feature (deprecated in vX.0.0) [#issue]
+
+#### Security
+- Security fix description [CVE-YYYY-XXXXX]
+
+## Notes
+- Use user-focused language
+- Highlight breaking changes
+- Include issue/PR references
+- Follow project CHANGELOG format

@@ -1,0 +1,292 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "radleta",
+  "version": "1.0.0",
+  "description": "Richard Adleta's Claude Code plugins",
+  "owner": {
+    "name": "Richard Adleta",
+    "url": "https://github.com/radleta"
+  },
+  "plugins": [
+    {
+      "name": "api-docs",
+      "description": "Industry-standard patterns for API documentation generation",
+      "source": "./plugins/api-docs",
+      "category": "documentation",
+      "version": "1.0.1"
+    },
+    {
+      "name": "chrome-devtools",
+      "description": "Browser automation methodology for Chrome DevTools integration",
+      "source": "./plugins/chrome-devtools",
+      "category": "development",
+      "version": "1.0.1"
+    },
+    {
+      "name": "claude-code-builders",
+      "description": "Claude Code primitive builders: skills, commands, agents, plugins, hooks, and CLAUDE.md",
+      "source": "./plugins/claude-code-builders",
+      "category": "development",
+      "version": "1.0.1"
+    },
+    {
+      "name": "claude-tray",
+      "description": "Windows system tray monitor for Claude Code sessions",
+      "source": "./plugins/claude-tray",
+      "category": "productivity",
+      "version": "1.0.1"
+    },
+    {
+      "name": "cli-expert",
+      "description": "Production-grade Unix-style CLI patterns with composable piping and structured output",
+      "source": "./plugins/cli-expert",
+      "category": "development",
+      "version": "1.0.1"
+    },
+    {
+      "name": "code-verification",
+      "description": "Unified code quality and requirements verification with detection categories",
+      "source": "./plugins/code-verification",
+      "category": "development",
+      "version": "1.0.1"
+    },
+    {
+      "name": "com-interop-expert",
+      "description": "COM Interop patterns for C#/.NET including P/Invoke, RCW lifecycle, and STA threading",
+      "source": "./plugins/com-interop-expert",
+      "category": "development",
+      "version": "1.0.1"
+    },
+    {
+      "name": "commit-methodology",
+      "description": "Comprehensive commit creation with adaptive analysis and conventional commit format",
+      "source": "./plugins/commit-methodology",
+      "category": "development",
+      "version": "1.0.1"
+    },
+    {
+      "name": "completeness-expert",
+      "description": "Enforces complete output and verification before declaring tasks done",
+      "source": "./plugins/completeness-expert",
+      "category": "development",
+      "version": "1.0.1"
+    },
+    {
+      "name": "completeness-verification",
+      "description": "Structural completeness methodology with named fingerprint detection",
+      "source": "./plugins/completeness-verification",
+      "category": "development",
+      "version": "1.0.1"
+    },
+    {
+      "name": "csharp-expert",
+      "description": "C# and .NET patterns for async/await, dependency injection, LINQ, and resource management",
+      "source": "./plugins/csharp-expert",
+      "category": "development",
+      "version": "1.0.1"
+    },
+    {
+      "name": "dev-workflow",
+      "description": "Complete development pipeline: planning, implementation, verification, and commit workflow",
+      "source": "./plugins/dev-workflow",
+      "category": "development",
+      "version": "1.0.2"
+    },
+    {
+      "name": "doc-update",
+      "description": "Accuracy-driven documentation update methodology for code changes",
+      "source": "./plugins/doc-update",
+      "category": "documentation",
+      "version": "1.0.1"
+    },
+    {
+      "name": "document-tools",
+      "description": "Spreadsheet generation and Markdown-to-PDF conversion tools",
+      "source": "./plugins/document-tools",
+      "category": "productivity",
+      "version": "1.0.1"
+    },
+    {
+      "name": "dynamodb-expert",
+      "description": "DynamoDB patterns for .NET/C#: single-table design, GSI overloading, and batch operations",
+      "source": "./plugins/dynamodb-expert",
+      "category": "development",
+      "version": "1.0.1"
+    },
+    {
+      "name": "email-drafter",
+      "description": "Gmail draft management and label-gated email composition",
+      "source": "./plugins/email-drafter",
+      "category": "productivity",
+      "version": "1.0.1"
+    },
+    {
+      "name": "estimation-expert",
+      "description": "Calibrated effort estimation for AI-augmented development workflows",
+      "source": "./plugins/estimation-expert",
+      "category": "development",
+      "version": "1.0.1"
+    },
+    {
+      "name": "gcp-expert",
+      "description": "Google Cloud Platform patterns for .NET/C# authentication, service accounts, and API config",
+      "source": "./plugins/gcp-expert",
+      "category": "development",
+      "version": "1.0.1"
+    },
+    {
+      "name": "gemini-tools",
+      "description": "Gemini CLI integration for text and image generation",
+      "source": "./plugins/gemini-tools",
+      "category": "development",
+      "version": "1.0.1"
+    },
+    {
+      "name": "github-actions-expert",
+      "description": "GitHub Actions CI/CD patterns for workflows, permissions, matrix builds, and releases",
+      "source": "./plugins/github-actions-expert",
+      "category": "devops",
+      "version": "1.0.1"
+    },
+    {
+      "name": "google-sheets-expert",
+      "description": "Google Sheets API v4 patterns for .NET/C# including service account auth and batch operations",
+      "source": "./plugins/google-sheets-expert",
+      "category": "integration",
+      "version": "1.0.1"
+    },
+    {
+      "name": "local-memory",
+      "description": "Active Projects working memory management in CLAUDE.local.md",
+      "source": "./plugins/local-memory",
+      "category": "productivity",
+      "version": "1.0.1"
+    },
+    {
+      "name": "plan-update",
+      "description": "Plan progress update methodology for marking completed steps",
+      "source": "./plugins/plan-update",
+      "category": "development",
+      "version": "1.0.1"
+    },
+    {
+      "name": "powershell-expert",
+      "description": "PowerShell patterns for script analysis, .NET interop, and PS1-to-C# porting",
+      "source": "./plugins/powershell-expert",
+      "category": "development",
+      "version": "1.0.1"
+    },
+    {
+      "name": "pr-writer",
+      "description": "Framework for creating well-structured pull request descriptions",
+      "source": "./plugins/pr-writer",
+      "category": "development",
+      "version": "1.0.1"
+    },
+    {
+      "name": "project-update",
+      "description": "Business-facing project status updates from git history",
+      "source": "./plugins/project-update",
+      "category": "development",
+      "version": "1.0.1"
+    },
+    {
+      "name": "qa-expert",
+      "description": "Comprehensive testing and QA expertise with framework-specific patterns",
+      "source": "./plugins/qa-expert",
+      "category": "development",
+      "version": "1.0.1"
+    },
+    {
+      "name": "react-expert",
+      "description": "React 18+ component architecture, performance, and testing patterns",
+      "source": "./plugins/react-expert",
+      "category": "development",
+      "version": "1.0.1"
+    },
+    {
+      "name": "scratch-management",
+      "description": "Scratch folder lifecycle management for plans and temp files",
+      "source": "./plugins/scratch-management",
+      "category": "productivity",
+      "version": "1.0.1"
+    },
+    {
+      "name": "scripts-expert",
+      "description": "Portable shell and Node.js script patterns with install.sh and Windows/MSYS compatibility",
+      "source": "./plugins/scripts-expert",
+      "category": "development",
+      "version": "1.0.1"
+    },
+    {
+      "name": "security-verification",
+      "description": "OWASP Top 10 security verification methodology with detection patterns",
+      "source": "./plugins/security-verification",
+      "category": "security",
+      "version": "1.0.1"
+    },
+    {
+      "name": "svg-toolkit",
+      "description": "SVG optimization, raster-to-vector tracing, and animation techniques",
+      "source": "./plugins/svg-toolkit",
+      "category": "development",
+      "version": "1.0.1"
+    },
+    {
+      "name": "team-lead-expert",
+      "description": "Patterns for orchestrating Claude Code agent teams and task coordination",
+      "source": "./plugins/team-lead-expert",
+      "category": "development",
+      "version": "1.0.1"
+    },
+    {
+      "name": "tech-experts",
+      "description": "All technology expert skills in one install",
+      "source": "./plugins/tech-experts",
+      "category": "development",
+      "version": "1.0.1"
+    },
+    {
+      "name": "test-verification",
+      "description": "Test quality verification methodology with shallow test detection",
+      "source": "./plugins/test-verification",
+      "category": "development",
+      "version": "1.0.1"
+    },
+    {
+      "name": "typescript-expert",
+      "description": "TypeScript type system mastery, architectural patterns, and compiler optimization",
+      "source": "./plugins/typescript-expert",
+      "category": "development",
+      "version": "1.0.1"
+    },
+    {
+      "name": "user-docs",
+      "description": "Validated patterns for creating end-user documentation",
+      "source": "./plugins/user-docs",
+      "category": "documentation",
+      "version": "1.0.1"
+    },
+    {
+      "name": "visual-companion",
+      "description": "Browser-based visual companion that serves HTML previews locally",
+      "source": "./plugins/visual-companion",
+      "category": "development",
+      "version": "1.0.1"
+    },
+    {
+      "name": "web-scraper",
+      "description": "Systematic web scraping methodology with escalating strategies",
+      "source": "./plugins/web-scraper",
+      "category": "development",
+      "version": "1.0.1"
+    },
+    {
+      "name": "winforms-expert",
+      "description": "Windows Forms patterns for NotifyIcon tray apps, GDI+ rendering, and message pumps",
+      "source": "./plugins/winforms-expert",
+      "category": "development",
+      "version": "1.0.1"
+    }
+  ]
+}
