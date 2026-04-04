@@ -229,6 +229,24 @@ Start: What operations are needed?
 
 ---
 
+### Category 11: File I/O & FileSystemWatcher
+
+**Keywords**: "FileSystemWatcher", "FSW", "file monitoring", "File.Move", "atomic write", "file change detection", "File.WriteAllBytes", "ReadDirectoryChangesW", "file watcher not firing"
+
+**Signals**:
+- User working with FileSystemWatcher for file change detection
+- Atomic write pattern (temp + rename) with FSW monitoring
+- FSW events not firing or missing updates
+- High latency in file change detection
+- JSON deserialization producing null for properties with default initializers
+
+**Load**:
+- @rules/file-io-rules.md → FSW + atomic write incompatibility, buffer overflow, deduplication, JSON null override
+
+**Decision**: File monitoring or FSW issues? Load file I/O rules (Critical priority — silent failure, no errors).
+
+---
+
 ## Multi-Category Requests
 
 Some requests span multiple categories. Load all relevant files:

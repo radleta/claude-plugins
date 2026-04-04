@@ -1,6 +1,6 @@
 {
   "name": "csharp-expert",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "C# and .NET patterns for async/await, dependency injection, LINQ, and resource management",
   "author": {
     "name": "Richard Adleta",

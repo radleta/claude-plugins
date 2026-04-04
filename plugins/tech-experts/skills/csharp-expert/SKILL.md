@@ -261,6 +261,7 @@ Based on user request and investigation, identify which guidance to load:
 - LINQ performance → Load @rules/linq-best-practices.md
 - Null safety → Load @rules/null-safety.md
 - Naming issues → Load @rules/naming-conventions.md
+- File I/O / FileSystemWatcher → Load @rules/file-io-rules.md
 
 **Can't determine pattern?** → Load @DETECTION.md for complete keyword-to-file mapping
 
@@ -299,7 +300,7 @@ Use templates and rules from loaded files:
 **Core files** (root): SKILL.md, DETECTION.md
 
 **Guidance folders** (load on-demand):
-- **@rules/** - Hard constraints (async-await, IDisposable, null safety, naming, DI, LINQ) - 6-8 rule files
+- **@rules/** - Hard constraints (async-await, IDisposable, null safety, naming, DI, LINQ, file I/O) - 7 rule files
 - **@decision-trees/** - Choice guidance (async vs sync, collection types, DI lifetimes, ConfigureAwait) - 4 decision trees
 - **@templates/** - Working C# code (async methods, DI registration, LINQ, IDisposable, etc.) - 18 templates
 - **@investigation/** - Project detection protocols (project type, .NET version, packages, patterns) - 4 protocols
