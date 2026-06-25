@@ -85,6 +85,12 @@ AI-generated code frequently introduces security vulnerabilities:
 - Missing correlation IDs for request tracing
 - Log injection via unsanitized user input in log messages (use structured logging parameters, not string interpolation)
 
+**security-invariants-honored** (CRITICAL): Security-relevant spec invariants have no enforcement
+- For each invariant in `## Invariants` containing security keywords (PII, token, secret, credential, expire, audit, log, permission, role, deny), verify the invariant is honored across all code paths
+- Examples: "no PII logged" → check all logger call sites; "tokens expire within N seconds" → check token creation + validation TTL; "admin actions audit-logged" → check all admin handlers
+- Conditional: runs only when `## Invariants` is present, non-empty, and contains security-relevant keywords
+- Anti-pattern: security invariants documented in spec but no code path enforces them
+
 ## Out of Scope
 
 - Completeness verification (use /verify-todo)

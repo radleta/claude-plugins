@@ -1,3 +1,8 @@
+---
+summary: Hard constraints for coverage interpretation — avoids 100% coverage trap, defines branch vs line coverage thresholds, and includes mutation testing guidance.
+tags: [qa-expert/rules]
+---
+
 # Coverage and Quality Metrics Rules
 
 Code coverage metrics are essential tools for assessing test suite completeness, but they are frequently misunderstood and misapplied. Coverage measures whether code is executed during tests, not whether tests are effective at detecting bugs. High coverage does not guarantee good tests, and chasing 100% coverage often wastes effort on trivial code while missing critical quality issues.

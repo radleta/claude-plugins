@@ -1,3 +1,8 @@
+---
+tags: [react-expert/decision-trees]
+summary: "Decision tree for choosing state location: local state, context, useReducer, or external store"
+---
+
 # State Management Decision Tree
 
 ## When to Use This Tree
@@ -689,3 +694,9 @@ function MouseX() {
 - `@templates/component-with-state.tsx` - useState examples
 - `@templates/component-with-reducer.tsx` - useReducer examples
 - `@decision-trees/performance.md` - When state choices affect performance
+
+## Related
+
+- [State Management Detection](../investigation/state-management-detection.md) — protocol for detecting which state management library is already in use
+- [Example: Counter Component](../examples/counter-component.md) — end-to-end workflow example applying this decision tree
+- [Rules: Immutable Updates](../rules/immutable-updates.md) — hard rules for updating state correctly once a location is chosen

@@ -1,3 +1,8 @@
+---
+tags: [react-expert/rules]
+summary: "Index of hard constraint rules for React: hooks rules, dependency arrays, key props, performance, immutability"
+---
+
 # React Rules Reference
 
 This directory contains **hard constraints** that break React applications if violated. These are not best practices or style preferences - these are the rules that, when broken, cause bugs, crashes, infinite loops, and production incidents.
@@ -184,3 +189,12 @@ Common patterns that cause unnecessary re-renders and how to avoid them without 
 These aren't guidelines - these are **rules**. Following them isn't about writing "good" React code, it's about writing **working** React code.
 
 Every rule in this directory exists because violating it causes bugs in production.
+
+## Pages
+
+- [hooks-rules.md](hooks-rules.md) — Rules of Hooks: call only at top level, only in React functions, hook call order invariant
+- [dependency-arrays.md](dependency-arrays.md) — Dependency array rules for useEffect/useMemo/useCallback: exhaustive deps, avoid omissions
+- [immutable-updates.md](immutable-updates.md) — Immutable state update rules: spread operator, map/filter, never mutate state directly
+- [key-prop-requirements.md](key-prop-requirements.md) — Key prop requirements: unique stable keys for lists, never use index as key for reorderable lists
+- [typescript-essentials.md](typescript-essentials.md) — TypeScript patterns for React: prop types, event handlers, generics, strict mode
+- [performance-traps.md](performance-traps.md) — React performance traps: object/function re-creation in render, missing memo/useMemo/useCallback

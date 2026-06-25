@@ -71,10 +71,54 @@
       align-items: center;
       border-bottom: 1px solid var(--border);
       flex-shrink: 0;
+      min-height: 2.5rem;
     }
-    .header h1 { font-size: 0.85rem; font-weight: 500; color: var(--text-secondary); }
-    .header .status { font-size: 0.7rem; color: var(--success); display: flex; align-items: center; gap: 0.4rem; }
+    .header .status { font-size: 0.7rem; color: var(--success); display: flex; align-items: center; gap: 0.4rem; flex-shrink: 0; }
     .header .status::before { content: ''; width: 6px; height: 6px; background: var(--success); border-radius: 50%; }
+
+    /* ===== BREADCRUMBS ===== */
+    nav.breadcrumbs {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      font-size: 0.82rem;
+      min-width: 0;
+      overflow: hidden;
+    }
+    nav.breadcrumbs .bc-segment {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      min-width: 0;
+    }
+    nav.breadcrumbs a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-weight: 500;
+      white-space: nowrap;
+      padding: 0.15rem 0.3rem;
+      border-radius: 4px;
+      transition: color 0.12s, background 0.12s;
+    }
+    nav.breadcrumbs a:hover {
+      color: var(--accent);
+      background: var(--selected-bg);
+    }
+    nav.breadcrumbs .bc-sep {
+      color: var(--text-tertiary);
+      padding: 0 0.15rem;
+      font-size: 0.75rem;
+      user-select: none;
+      flex-shrink: 0;
+    }
+    nav.breadcrumbs .bc-current {
+      color: var(--text-primary);
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      padding: 0.15rem 0.3rem;
+    }
 
     .main { flex: 1; overflow-y: auto; }
     #claude-content { padding: 2rem; min-height: 100%; }
@@ -283,7 +327,7 @@
 </head>
 <body>
   <div class="header">
-    <h1>Visual Companion</h1>
+    <nav class="breadcrumbs"><!-- BREADCRUMBS --></nav>
     <div class="status">Connected</div>
   </div>
 

@@ -47,6 +47,7 @@ export async function parseDraftState(raw) {
     from: formatAddresses(email.from),
     to: formatAddresses(email.to),
     cc: formatAddresses(email.cc),
+    bcc: formatAddresses(email.bcc),
     subject: email.subject || '',
     inReplyTo: '',
     references: '',
@@ -79,6 +80,21 @@ function sanitizeHeader(val) {
 }
 
 /**
+ * Parse a comma-separated address string into an array of {addr, name} objects
+ * for mimetext. Handles "Name <addr>" and bare "addr" formats.
+ */
+function parseAddressList(str) {
+  if (!str) return [];
+  // Split on commas that are outside angle brackets
+  const parts = str.split(/,(?![^<]*>)/).map(s => s.trim()).filter(Boolean);
+  return parts.map(part => {
+    const match = part.match(/^(.+?)\s*<([^>]+)>$/);
+    if (match) return { name: match[1].trim(), addr: match[2].trim() };
+    return { addr: part.trim() };
+  });
+}
+
+/**
  * Build a complete RFC 2822 MIME message from a GAS-shaped draft state object.
  * Handles all 4 structure variants:
  *   1. Simple HTML (no attachments)
@@ -101,8 +117,18 @@ export function buildMime(state) {
   const msg = createMimeMessage();
 
   if (state.from) msg.setSender(sanitizeHeader(state.from));
-  if (state.to) msg.setRecipient(sanitizeHeader(state.to));
-  if (state.cc) msg.setCc(sanitizeHeader(state.cc));
+  if (state.to) {
+    const toAddrs = parseAddressList(sanitizeHeader(state.to));
+    msg.setRecipient(toAddrs.length === 1 ? toAddrs[0] : toAddrs);
+  }
+  if (state.cc) {
+    const ccAddrs = parseAddressList(sanitizeHeader(state.cc));
+    msg.setCc(ccAddrs.length === 1 ? ccAddrs[0] : ccAddrs);
+  }
+  if (state.bcc) {
+    const bccAddrs = parseAddressList(sanitizeHeader(state.bcc));
+    msg.setBcc(bccAddrs.length === 1 ? bccAddrs[0] : bccAddrs);
+  }
   msg.setSubject(sanitizeHeader(state.subject || ''));
 
   // Threading headers

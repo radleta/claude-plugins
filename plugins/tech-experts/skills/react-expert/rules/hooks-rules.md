@@ -1,3 +1,8 @@
+---
+tags: [react-expert/rules]
+summary: "Rules of Hooks: call only at top level, only in React functions, hook call order invariant"
+---
+
 # Rules of Hooks
 
 React Hooks have strict rules about how they must be called. These rules exist because React tracks hooks by their **call order** - React doesn't use hook names or any other identifier. Breaking these rules causes React to lose track of which state belongs to which hook, leading to crashes and state corruption.

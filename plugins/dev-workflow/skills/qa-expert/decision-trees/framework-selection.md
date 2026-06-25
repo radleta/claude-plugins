@@ -1,3 +1,8 @@
+---
+summary: Decision tree for choosing a testing framework by language and platform — Jest, Pytest, JUnit, Mocha, RSpec, and Vitest selection criteria.
+tags: [qa-expert/decision-trees]
+---
+
 # Testing Framework Selection Decision Tree
 
 ## When to Use This Tree

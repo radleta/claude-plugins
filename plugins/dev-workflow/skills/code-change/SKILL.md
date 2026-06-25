@@ -242,6 +242,10 @@ Final checks before completion:
 - ✅ **Validate before completion** - All checks must pass
 - ✅ **Follow project conventions** - Adapt to discovered patterns
 
+**Consult artifacts before changing:** Before modifying a method, class, or state handler, read the spec's Method Contracts and State Matrix for that component. The Contract's `requires`/`ensures`/`throws` are the source of truth for what the method must do — not the current implementation. Anti-pattern: refactoring a method's internals to satisfy current tests while violating a `requires` or `ensures` clause the tests don't cover.
+
+**Spec-update-before-code for State Machine changes:** If a change adds, removes, or renames a state or transition, update the spec's `## State & Transition Matrix` first, then update the code. The matrix is the artifact — code derives from it. Anti-pattern: adding a new state in code and leaving the spec matrix stale.
+
 ### NEVER:
 - ❌ Skip investigation phase
 - ❌ Forget to write tests

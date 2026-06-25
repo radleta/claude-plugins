@@ -1,3 +1,8 @@
+---
+summary: Protocol for detecting CI/CD test execution setup — parallelization, failure handling, and pipeline alignment for all major CI platforms.
+tags: [qa-expert/investigation]
+---
+
 # CI/CD Test Integration Investigation
 
 ## Purpose

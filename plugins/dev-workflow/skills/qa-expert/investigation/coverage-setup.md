@@ -1,3 +1,8 @@
+---
+summary: Protocol for discovering project coverage configuration, tools, thresholds, and enforcement — ensures new tests integrate with existing measurement infrastructure.
+tags: [qa-expert/investigation]
+---
+
 # Coverage Setup Investigation
 
 ## Purpose

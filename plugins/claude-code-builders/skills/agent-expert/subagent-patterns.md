@@ -1,3 +1,8 @@
+---
+tags: [agent-expert/subagent]
+summary: "Subagent dispatch methodology: context crafting, model selection, status handling, prompt templates, and anti-patterns"
+---
+
 # Subagent Dispatch Patterns
 
 ## Overview
@@ -68,6 +73,8 @@ Read the changed files and verify:
 
 "You construct exactly what they need. They should never inherit your session's context or history." Subagents are fresh agents with isolated context windows — treat their prompt like an API contract.
 
+**For caching and context-budget mechanics that determine optimal context size:** see [token-turn-optimization.md](token-turn-optimization.md).
+
 ## Prompt Template Anatomy
 
 Standard structure for subagent dispatch:
@@ -115,6 +122,8 @@ Match model capability to task complexity. Using the most powerful model for eve
 - Task touches 5+ files with integration concerns → standard minimum
 - Task requires design judgment or broad codebase understanding → most capable
 - Task failed with cheaper model → re-dispatch with next tier up
+
+**For deeper model-tier delegation cost analysis:** see [token-turn-optimization.md § Sub-Agent Dispatch as Token Strategy](token-turn-optimization.md).
 
 ## Status Handling
 

@@ -1,13 +1,14 @@
 ---
 name: ux-verifier
 description: "Visual-first UX, accessibility, and design quality verification combining code analysis with screenshot evidence at multiple viewport breakpoints. Use when reviewing UI changes for polish, accessibility, responsiveness, or user experience — even for small component changes."
-tools: Read, Glob, Grep, Bash
+tools: Read, Glob, Grep, Bash, Skill
 skills:
   - ux-verification
-  - chrome-devtools-agent
+  - chrome-devtools-expert
 mcpServers:
   - chrome-devtools
-model: inherit
+model: sonnet
+effort: high
 memory: user
 ---
 
@@ -20,7 +21,7 @@ changed, what was implemented, and any relevant plan or task file paths.
 
 ## Instructions
 
-1. Read project instruction files: CLAUDE.md, .claude/CLAUDE.md, .claude/rules/*.md
+1. Read project instruction files: CLAUDE.md, .claude/CLAUDE.md, .claude/rules/\*.md
 2. Read the session summary to understand what changed and which pages are affected
 3. Follow the ux-verification methodology loaded in your skills — it contains your
    complete detection categories, dual-mode workflow, and output format

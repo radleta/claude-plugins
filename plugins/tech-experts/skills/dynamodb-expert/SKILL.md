@@ -71,44 +71,6 @@ Follow established project conventions over defaults in this skill.
 | 6 | **Singleton Clients** | `AmazonDynamoDBClient` and `DynamoDBContext` are thread-safe, cache connections — create once, reuse |
 | 7 | **Catch Specific, Not General** | `catch (Exception)` swallows throttling signals — catch `ProvisionedThroughputExceededException` explicitly |
 
-## Data Modeling Patterns
-
-### Partition Key Design
-
-| Pattern | When to Use | Example |
-|---------|-------------|---------|
-| **High-cardinality natural key** | Unique entity lookups | `UserId`, `OrderId`, `SessionId` |
-| **Composite key** | Access patterns need PK+SK | PK=`CustomerId`, SK=`Order#2024-01-15` |
-| **Write-sharding** | Hot write partition (counters) | `MetricName#shard-{0..N}` |
-| **Time-based partition** | Time-series with even distribution | `SensorId#2024-01-15` |
-
-```
-❌ Low cardinality: PK = "StatusActive" (all active items on one partition)
-✅ High cardinality: PK = UserId or OrderId (uniform distribution)
-✅ Composite: PK = TenantId, SK = "Order#" + OrderId (access pattern aligned)
-```
-
-### Single-Table vs Multi-Table
-
-| Approach | Pros | Cons | When |
-|----------|------|------|------|
-| **Single-table** | Fewer round-trips, transaction scope | Complex queries, harder to understand | Transactional entity groups |
-| **Multi-table** | Simpler modeling, independent scaling | More API calls, cross-table joins impossible | Independent entities, different access patterns |
-
-**Decision rule**: Use single-table when entities are frequently accessed together in transactions. Use multi-table when entities have independent lifecycles, different throughput profiles, or different TTL requirements.
-
-### GSI Design
-
-| Strategy | Description | Trade-off |
-|----------|-------------|-----------|
-| **Sparse index** | Only items with the GSI attribute appear | Efficient for filtering subsets |
-| **Overloaded GSI** | `GSI1PK`/`GSI1SK` carry different entity types | Maximizes index reuse, complex to read |
-| **Inverted index** | GSI swaps PK↔SK from base table | Enables reverse lookups |
-| **Projection: KEYS_ONLY** | Only key attributes projected | Lowest cost, requires `GetItem` for details |
-| **Projection: ALL** | All attributes projected | Highest cost, no extra reads |
-
-Use Read tool on [MODELING.md](MODELING.md) for item collection patterns, composite sort key design, TTL strategies, capacity planning, and reserved words.
-
 ## .NET SDK Quick Reference
 
 | Level | Class | When to Use |
@@ -129,7 +91,7 @@ Use Read tool on [MODELING.md](MODELING.md) for item collection patterns, compos
 | **Transactions** | Up to 100 items via `TransactWriteItems`. Use `ClientRequestToken` for idempotency (10min window) |
 | **SaveAsync behavior** | Uses `UpdateItem` by default (not `PutItem`) — mock both in tests |
 
-Use Read tool on [DOTNET-PATTERNS.md](DOTNET-PATTERNS.md) for code examples, DynamoDBContext config, transactions, pagination, expression syntax, optimistic locking, testing mocks (including TestDynamo in-memory testing), error handling reference, and the 50-item service checklist.
+For code examples, DynamoDBContext config, transactions, pagination, expression syntax, optimistic locking, testing mocks, and the 43-item service checklist, see [DOTNET-PATTERNS.md](DOTNET-PATTERNS.md).
 
 ## Cost Optimization
 
@@ -155,25 +117,13 @@ Use Read tool on [DOTNET-PATTERNS.md](DOTNET-PATTERNS.md) for code examples, Dyn
 | **Lambda trigger** | Event source mapping, batches of 1-10000 records |
 | **Idempotency** | Use `eventID` or natural key dedup to handle replays |
 
-## Anti-Patterns
+## Pages
 
-| Anti-Pattern | Problem | Fix |
-|-------------|---------|-----|
-| Scan for queries | Reads entire table, O(N) cost | Design GSI for access pattern |
-| Large items (>400KB) | Approaching limit, high RCU/WCU | Store blobs in S3, reference by key |
-| Hot partition | Single PK gets all traffic | Write-sharding or redesign key |
-| Missing UnprocessedItems retry | Silent data loss on batch writes | Always retry unprocessed items |
-| `catch (Exception)` on DynamoDB | Swallows throttling signals | Catch specific exceptions |
-| No CancellationToken | Caller can't cancel | Propagate to all SDK calls |
-| FilterExpression for heavy filtering | Wastes RCU (reads then discards) | Move filter to KeyConditionExpression via GSI |
-| Unbounded Query | Returns up to 1MB, timeout risk | Use Limit + pagination |
-| `ScanCondition` with `(int)` enum cast | `InvalidCastException: Unable to cast Int32 to Enum` | Pass enum value directly: `ScanOperator.Equal, MyEnum.Value` |
-| `DynamoDBContext.QueryAsync` on GSI with custom converter | SDK misroutes table hash key converter (e.g., ShortGuid) to GSI query value | Use `Table.Query` (Document Model) + `FromDocuments<T>` — see DOTNET-PATTERNS.md |
+- [Data Modeling Patterns](data-modeling.md) — Partition key design, single-table vs multi-table decisions, and GSI design strategies.
+- [Anti-Patterns](anti-patterns.md) — Common DynamoDB anti-patterns and their fixes — scan abuse, hot partitions, missing retry logic, unbounded queries, and GSI misuse.
+- [Data Modeling Deep Dive](MODELING.md) — Access patterns, composite sort keys, item collections, GSI overloading, TTL strategies, capacity planning, and reserved words.
+- [.NET SDK Patterns Deep Dive](DOTNET-PATTERNS.md) — DynamoDBContext config, transactions, pagination, expressions, optimistic locking, testing mocks, TestDynamo, error handling, and 43-item checklist.
 
-## File Loading Protocol
-
-| File | Load When |
-|------|-----------|
-| SKILL.md (this file) | Always loaded — principles, modeling patterns, quick reference tables |
-| [MODELING.md](MODELING.md) | Designing tables, planning GSIs, item collections, TTL, capacity planning |
-| [DOTNET-PATTERNS.md](DOTNET-PATTERNS.md) | Writing .NET services, code examples, transactions, testing mocks, 48-item checklist |
+## Meta
+- [Operations Log](log.md) — Timestamped wiki operations log (ingest, lint, query filings)
+- [Schema](schema.md) — Wiki conventions and page-type definitions

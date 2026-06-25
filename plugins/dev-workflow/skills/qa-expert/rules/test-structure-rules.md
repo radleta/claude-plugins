@@ -1,3 +1,8 @@
+---
+summary: Hard constraints for test structure — AAA pattern, naming conventions, test isolation, speed targets, and setup complexity limits across all frameworks.
+tags: [qa-expert/rules]
+---
+
 # Test Structure Rules
 
 Effective test structure is the foundation of maintainable test suites. Well-structured tests are easy to read, debug, and maintain. Poorly structured tests become technical debt that slows development and obscures bugs. These rules provide a comprehensive framework for writing clear, reliable tests across all testing frameworks.

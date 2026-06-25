@@ -1,3 +1,8 @@
+---
+summary: Quick reference table for selecting the right RSpec template by testing scenario — unit, integration, async, mock, and parametrized with line counts and complexity.
+tags: [qa-expert/templates]
+---
+
 # RSpec Templates Quick Reference
 
 ## Template Selection Guide

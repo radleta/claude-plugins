@@ -1,3 +1,8 @@
+---
+tags: [email-draft-expert/troubleshooting]
+summary: "Diagnostic guide for common issues: PATH verification, API errors, cache problems, MIME failures."
+---
+
 # Email Drafter — Troubleshooting
 
 ## Checking that the CLI is on PATH

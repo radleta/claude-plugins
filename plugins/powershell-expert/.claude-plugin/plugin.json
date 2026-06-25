@@ -1,6 +1,6 @@
 {
   "name": "powershell-expert",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "PowerShell patterns for script analysis, .NET interop, and PS1-to-C# porting",
   "author": {
     "name": "Richard Adleta",

@@ -1,3 +1,8 @@
+---
+tags: [react-expert/validation]
+summary: "Post-generation checklist for catching the Top 10 React agent mistakes before code is submitted"
+---
+
 # React Expert Validation Checklist
 
 **Purpose**: Comprehensive post-generation checklist to catch the Top 10 agent mistakes when working with React.

@@ -1,3 +1,8 @@
+---
+tags: [csharp-expert/decision-trees]
+summary: "Decision tree for null handling: nullable annotations, null-forgiving operators, throw patterns"
+---
+
 # Decision Tree: Null Handling Strategy
 
 **Purpose**: Decide how to handle nullable values in C# 8+ with Nullable Reference Types.
@@ -223,3 +228,10 @@ public string? GetName() // BAD: Always returns name, never null
 **Null-conditional**: `?.` for safe navigation
 **Null-coalescing**: `??` for default values
 **Null-forgiving**: `!` only when compiler can't infer (rare)
+
+## Related
+
+- [Rules: Null Safety](../rules/null-safety.md) — hard rules for nullable reference types and NRT migration
+- [Decision Tree: Async vs Sync](async-vs-sync.md) — async patterns for nullable Task return types
+- [Decision Tree: Collection Types](collection-types.md) — collection type selection with nullable element handling
+- [Decision Tree: DI Lifetimes](di-lifetimes.md) — DI patterns for nullable injected dependencies

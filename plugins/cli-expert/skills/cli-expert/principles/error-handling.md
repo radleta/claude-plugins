@@ -1,3 +1,8 @@
+---
+tags: [cli-expert/errors]
+summary: "Global exception safety net, SIGINT cancellation handling, structured logging patterns, custom exception hierarchy, and per-command error handling for CLI tools"
+---
+
 # Error Handling, Cancellation, and Structured Logging
 
 ## Global Exception Safety Net

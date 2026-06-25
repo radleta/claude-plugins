@@ -1,3 +1,8 @@
+---
+summary: Performance optimization guide, common issues and solutions, module system guidance, declaration files, edge cases, debugging techniques, and quick CLI commands.
+tags: [typescript-expert/reference]
+---
+
 # TypeScript Reference - Performance & Troubleshooting
 
 Quick reference for performance optimization, common issues, and edge cases.

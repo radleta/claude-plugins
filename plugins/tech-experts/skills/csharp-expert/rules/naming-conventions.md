@@ -1,3 +1,8 @@
+---
+tags: [csharp-expert/rules]
+summary: "C# naming rules: PascalCase classes/methods, I-prefix interfaces, _camelCase fields, Async suffix"
+---
+
 # C# Naming Conventions
 
 C# has strict naming conventions enforced by the compiler, Roslyn analyzers, and community standards. Violating naming conventions causes **compilation errors** (I-prefix missing on interface), **analyzer warnings**, **readability issues**, and **broken IntelliSense**.

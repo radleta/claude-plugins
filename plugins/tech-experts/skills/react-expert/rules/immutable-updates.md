@@ -1,3 +1,8 @@
+---
+tags: [react-expert/rules]
+summary: "Immutable state update rules: spread operator, map/filter, never mutate state directly"
+---
+
 # Immutable State Updates
 
 React detects state changes by comparing the old state reference to the new state reference. If you mutate state directly (modify the existing object/array), React doesn't see a change and won't re-render. Your changes are lost.
@@ -671,3 +676,7 @@ React detects changes by reference, not by value. To ensure React sees your stat
 5. **Avoid mutating methods** (push, splice, sort, direct assignment)
 
 When in doubt, create a new object/array. Immutability is non-negotiable in React.
+
+## Related
+
+- [Decision Tree: State Management](../decision-trees/state-management.md) — decision tree for where to put state that will be updated with these patterns

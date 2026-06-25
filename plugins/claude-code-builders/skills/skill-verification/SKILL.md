@@ -99,11 +99,8 @@ Auto-detect skill type from content, then validate type-specific requirements:
 - Before/after examples
 - Progressive disclosure guidance
 
-**For full type-specific checklists**, Read the canonical validation files:
-- `.claude/skills/claude-skill-builder/validation/README.md` (universal + type checklists)
-- `.claude/skills/claude-skill-builder/expert/README.md` (expert-specific)
-- `.claude/skills/claude-skill-builder/cli/README.md` (CLI-specific)
-- `.claude/skills/claude-skill-builder/writer/README.md` (writer-specific)
+**For full type-specific checklists**, Read the consolidated patterns page (absorbed from claude-skill-builder during Phase 2 consolidation):
+- `.claude/skills/claude-code-expert/builders/skill-patterns.md` (universal + type checklists — all types consolidated)
 
 ## Workflow
 
@@ -112,7 +109,7 @@ Auto-detect skill type from content, then validate type-specific requirements:
 1. Read the skill file(s) specified in the session summary or $ARGUMENTS
 2. If a directory is specified, read the main SKILL.md first
 3. Identify skill type (expert, CLI, writer, hybrid) from content
-4. Read the canonical checklists from claude-skill-builder for the detected type
+4. Read the canonical checklists from `claude-code-expert/builders/skill-patterns.md` for the detected type
 5. List all files in the skill directory to check structure
 
 ### Step 2: Analyze

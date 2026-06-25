@@ -17,13 +17,24 @@
   </critical-behavior>
 
   <execution>
+    <step order="0">
+      <action>Pre-archive knowledge gate</action>
+      <command>learned-check status scratch/{FOLDER}/learned/</command>
+      <gate>
+        If learned/ directory does not exist → skip gate, proceed to step 1.
+        If exit code 0 → proceed to step 1 (archive).
+        If exit code 1 → dispatch knowledge-ingestor agent for learned/, then re-run this check (max 2 retries). If still exit code 1 after max retries → escalate to user (same as exit code 2).
+        If exit code 2 → present escalated items to user, wait for resolution before proceeding.
+      </gate>
+    </step>
+
     <step order="1">
       <action>Execute archive command</action>
       <command>scratch archive {FOLDER}</command>
       <expected-output>[OK] Folder archived successfully</expected-output>
     </step>
 
-    <step order="3">
+    <step order="2">
       <action>Verify archive completed</action>
       <verify>Folder no longer in scratch/ directory: ls scratch/</verify>
       <verify>Folder appears in archived list: scratch archived</verify>

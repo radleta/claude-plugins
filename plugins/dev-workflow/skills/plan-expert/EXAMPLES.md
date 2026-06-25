@@ -1,3 +1,8 @@
+---
+summary: "Annotated before/after examples of steps, decisions, investigations, risk assessments, CDD phasing, and complete plans — graded Good vs Bad with explanations."
+tags: [plan-expert/examples]
+---
+
 # Plan Examples: Good vs Bad
 
 Annotated examples showing the difference between effective and ineffective plan elements.
@@ -538,3 +543,62 @@ Fix typo: "recieved" → "received" in src/api/errors.ts:42
 ```
 
 **Planning is for changes where the approach isn't obvious.** If you can describe the diff in one sentence, skip the plan.
+
+---
+
+## Example 8: References Table (Source Duplication vs Apply: Rx)
+
+### BAD: Step inlines pattern code from a wiki page
+
+```markdown
+### Step 2: Add NinjectModule dependency to ResourceThumbnailController
+**Files:** `Akn.Web.Site.V1/Controllers/ResourceThumbnailController.cs`
+**Actions:**
+- Add `IResourceService` dependency using Ninject property injection:
+  ```csharp
+  [Inject]
+  public IResourceService ResourceService { get; set; }
+  ```
+- Do NOT use constructor injection — V1 controllers use property injection via Ninject attributes.
+**Acceptance Criteria:**
+- [ ] Property compiles; `[Inject]` attribute resolves from `Ninject` namespace
+- [ ] `dotnet build` → exit 0
+```
+
+**Why this fails:**
+- The `[Inject]` attribute pattern is documented in `.claude/skills/akn-expert/backend/gotchas.md` — the step duplicates that wiki content directly into the step body.
+- If the pattern changes or has a nuance (e.g., required namespace, version-specific gotcha), the step body diverges silently from the authoritative source.
+- Reviewers can't trace which source the step is grounded in.
+
+---
+
+### GOOD: Same step rewritten with Apply: Rx + References table
+
+**References table (always at the top of `references.md` or the references section of README.md, sibling to Decision Table):**
+
+```markdown
+## References
+
+| ID | Source | Applies To |
+|----|--------|------------|
+| R1 | `.claude/skills/akn-expert/backend/gotchas.md#ninject-property-injection` | All new service deps in V1 controllers |
+```
+
+**Step:**
+
+```markdown
+### Step 2: Add NinjectModule dependency to ResourceThumbnailController
+**Apply:** R1
+**Files:** `Akn.Web.Site.V1/Controllers/ResourceThumbnailController.cs`
+**Actions:**
+- Add `IResourceService` as a Ninject property-injected dependency (see R1 for attribute and namespace).
+**Acceptance Criteria:**
+- [ ] Property compiles; `[Inject]` attribute resolves correctly
+- [ ] `dotnet build` → exit 0
+```
+
+**Why this works:**
+- Step body describes the workstream-specific application (which controller, which interface) — not the pattern itself.
+- The pattern lives in the wiki where it belongs; the step points to it via R1.
+- If the gotcha doc is updated, every step that cites R1 picks up the correction automatically.
+- Grade: A

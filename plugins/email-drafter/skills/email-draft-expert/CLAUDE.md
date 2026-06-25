@@ -1,3 +1,8 @@
+---
+tags: [email-draft-expert/developer-context]
+summary: "Developer context: file layout, testing commands, architecture decisions, gotchas, and dependencies."
+---
+
 # CLAUDE.md — email-draft-expert developer context
 
 ## File Layout

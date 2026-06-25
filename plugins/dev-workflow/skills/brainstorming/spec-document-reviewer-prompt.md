@@ -1,55 +1,29 @@
-# Spec Document Reviewer Prompt Template
+# Spec Document Reviewer Dispatch Prompt
 
-Use this template when dispatching a spec document reviewer subagent.
+Dispatched via the `idea-doc-reviewer` agent — same thin agent serves both idea and spec document-quality checks, with `phase` distinguishing them. Read-only; persists its verdict through `mcp__scratch-memory__write_review`.
 
-**Purpose:** Verify the spec is complete, consistent, faithful to the idea doc, and ready for implementation planning.
-
-**Dispatch after:** Spec document is written to scratch/{project}/spec.md
+**Parameters:**
+- `{PROJECT_NAME}` — scratch subdir slug
+- `{ITER}` — 1-based iteration number within the spec review loop
+- `{SPEC_PATH}` — absolute path to `scratch/{project}/spec.md`
 
 ```
-Agent tool:
-  subagent_type: general-purpose
-  description: "Review spec document"
+Agent({
+  subagent_type: "idea-doc-reviewer",
+  description: "Spec doc review iter-{ITER}",
   prompt: |
-    You are a spec document reviewer. Verify this spec is complete and ready for planning.
+    Agent's system prompt holds the contract — do not duplicate it here.
 
-    **Step 1:** Use the Read tool to read the spec in full:
-    [SPEC_FILE_PATH]
+    ## Inputs
+    - phase: spec
+    - artifact_path: {SPEC_PATH}
+    - project: {PROJECT_NAME}
+    - iteration: {ITER}
 
-    **Step 2:** Check the following:
-
-    | Category | What to Look For |
-    |----------|------------------|
-    | Completeness | TODOs, placeholders, "TBD", incomplete sections |
-    | Consistency | Internal contradictions, conflicting requirements |
-    | Clarity | Requirements ambiguous enough to cause someone to build the wrong thing |
-    | Scope | Focused enough for a single plan — not covering multiple independent subsystems |
-    | YAGNI | Unrequested features, over-engineering |
-
-    ## Calibration
-
-    **Only flag issues that would cause real problems during implementation planning.**
-    A missing section, a contradiction, or a requirement so ambiguous it could be
-    interpreted two different ways — those are issues. Minor wording improvements,
-    stylistic preferences, and "sections less detailed than others" are not.
-
-    Do NOT check traceability, scope match, or success criteria alignment with
-    idea.md — the decision-traceability reviewer handles those.
-    Do NOT check codebase alignment or domain patterns — other reviewers handle those.
-
-    Approve unless there are serious gaps that would lead to a flawed plan.
-
-    ## Output Format
-
-    ## Spec Review
-
-    **Status:** Approved | Issues Found
-
-    **Issues (if any):**
-    - [Section X]: [specific issue] - [why it matters for planning]
-
-    **Recommendations (advisory, do not block approval):**
-    - [suggestions for improvement]
+    ## Your Prior Verdicts (iteration 2+ only — read these first)
+    {one bullet per path in PRIOR_DOC_PATHS, in iteration order}
+    (Omit this block entirely on iter 1 — no prior verdicts exist.)
+})
 ```
 
-**Reviewer returns:** Status, Issues (if any), Recommendations
+**Reviewer returns (to main session):** two lines — `Wrote:` and `Status:`.

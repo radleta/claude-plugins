@@ -1,3 +1,8 @@
+---
+summary: TypeScript 5.x feature guidance (const type parameters, satisfies, using, NoInfer, inferred predicates) and 12 core principles for type system mastery, generics, domain modeling, and compiler optimization.
+tags: [typescript-expert/principles]
+---
+
 # TypeScript Principles & Best Practices
 
 Comprehensive guidance for TypeScript 5.x excellence: type system mastery, modern features, and best practices.

@@ -1,3 +1,8 @@
+---
+tags: [email-draft-expert/setup]
+summary: "First-time setup: Apps Script deployment, Script Properties configuration, and local config.env."
+---
+
 # Email Drafter — Setup Guide
 
 ## Architecture

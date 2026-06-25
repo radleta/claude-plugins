@@ -1,6 +1,6 @@
 {
   "name": "google-sheets-expert",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Google Sheets API v4 patterns for .NET/C# including service account auth and batch operations",
   "author": {
     "name": "Richard Adleta",

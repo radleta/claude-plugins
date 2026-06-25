@@ -1,3 +1,8 @@
+---
+tags: [csharp-expert/rules]
+summary: "Hard rules for async/await: no async void, no .Result/.Wait(), proper ConfigureAwait usage"
+---
+
 # Async/Await Rules
 
 Async/await in C# has strict rules about how it must be used. These rules exist because improper async usage causes **deadlocks**, **application crashes**, **race conditions**, and **performance issues**. Breaking these rules can hang your entire application or crash it with unhandled exceptions.

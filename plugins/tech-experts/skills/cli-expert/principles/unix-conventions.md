@@ -1,3 +1,8 @@
+---
+tags: [cli-expert/principles]
+summary: "Core Unix CLI conventions: stdout/stderr split, stdin via dash, filter pattern, exit codes, signal handling, argument conventions, and line buffering"
+---
+
 # Unix CLI Conventions
 
 Core conventions from the Unix philosophy that make CLI tools composable, scriptable, and predictable.
@@ -143,3 +148,35 @@ Most modern runtimes (Node.js, .NET, Go) flush stdout after each write when conn
 - **Go**: `os.Stdout` is unbuffered — no action needed
 
 Test by piping to `head -1` — if the command hangs, it's block-buffering.
+
+## Composable Piping Pattern
+
+A well-designed CLI enables multi-stage pipes:
+
+```bash
+# Generate → validate → submit (3-stage pipe)
+cmd template worksheet | cmd validate - | cmd submit - --notes "auto"
+
+# Filter pattern: validate echoes valid input to stdout
+cmd validate resource.json | jq .typeId
+
+# Quiet mode for scripting
+cmd validate resource.json -q && echo "Valid" || echo "Invalid"
+```
+
+For this to work:
+1. `validate -` reads stdin, echoes valid input to stdout (filter pattern)
+2. `submit -` reads stdin
+3. Success/info messages go to stderr only — never pollute stdout data
+4. `--quiet` suppresses even stderr diagnostics for clean pipe chains
+
+## Exit Code Named Constants
+
+Define as named constants, not magic numbers. Share across CLI projects:
+
+| Constant | Code | Meaning | When |
+|----------|------|---------|------|
+| `SUCCESS` | 0 | Command completed normally | Validation passed, submission accepted |
+| `USER_ERROR` | 1 | User/input error | Bad args, validation failure, not found (4xx) |
+| `INFRA_ERROR` | 2 | Infrastructure error | Config missing, auth failed, server error (5xx) |
+| `CANCELLED` | 130 | Cancelled | SIGINT / Ctrl+C (128 + signal 2) |

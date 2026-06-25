@@ -1,3 +1,8 @@
+---
+summary: Signal-to-pattern mapping rules, decision trees, and context signals for selecting the correct TypeScript pattern from user requests and project investigation.
+tags: [typescript-expert/detection]
+---
+
 # Pattern Detection Rules
 
 How to detect which TypeScript pattern to generate based on context signals.

@@ -1,3 +1,8 @@
+---
+summary: 190+ verification items across 8 categories — type safety, architecture, compiler config, performance, framework detection, migration, documentation, and testing.
+tags: [typescript-expert/checklists]
+---
+
 # TypeScript Quality Checklists
 
 Comprehensive verification checklists for TypeScript code quality, type safety, and performance.

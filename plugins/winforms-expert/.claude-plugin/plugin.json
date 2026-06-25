@@ -1,6 +1,6 @@
 {
   "name": "winforms-expert",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Windows Forms patterns for NotifyIcon tray apps, GDI+ rendering, and message pumps",
   "author": {
     "name": "Richard Adleta",

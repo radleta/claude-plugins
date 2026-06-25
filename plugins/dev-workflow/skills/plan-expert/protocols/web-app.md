@@ -1,3 +1,8 @@
+---
+summary: "Web app planning protocol: 3-tier testing strategy (unit/integration/e2e with chrome-browser), story requirements, visual verification, and 10 web-app-specific checklist items. Load when APP_TYPE = web-app."
+tags: [plan-expert/protocols]
+---
+
 # Web App Planning Protocol
 
 When a plan involves a web application (React, Vue, Svelte, Next.js, or similar), apply these additional requirements on top of the standard planning workflow and CDD phasing.
@@ -10,10 +15,10 @@ This protocol shapes the **plan** — what testing tiers, story requirements, an
 |-------|-----------|
 | **react-expert** | Component architecture, hooks, performance patterns (React projects) |
 | **frontend-design** | High-quality UI implementation with creative, polished code |
-| **chrome-devtools-agent** | E2e browser testing, screenshots, visual verification via chrome-browser agent |
+| **chrome-devtools-expert** | E2e browser testing, screenshots, visual verification via chrome-browser agent |
 | **qa-expert** | Test strategy, framework-specific test patterns |
 
-Recommend in the plan: "Load react-expert (or framework equivalent) and chrome-devtools-agent during implementation steps."
+Recommend in the plan: "Load react-expert (or framework equivalent) and chrome-devtools-expert during implementation steps."
 
 ## Testing Strategy
 
@@ -164,6 +169,10 @@ These items are **mandatory** when APP_TYPE = web-app. A web app plan scoring < 
 - [ ] Story phase review gates include visual verification (screenshots at 3 breakpoints)
 - [ ] Accessibility verified in stories (contrast, keyboard nav, ARIA, touch targets)
 - [ ] Story tool setup included if project lacks one
+
+## See Also
+
+- [CLI App Planning Protocol](cli.md) — Sibling protocol for CLI tools; covers exit codes, piping, output formats, and 8 CLI-specific checklist items.
 
 ## Investigation Additions for Web Apps
 

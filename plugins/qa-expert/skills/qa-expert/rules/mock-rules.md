@@ -1,3 +1,8 @@
+---
+summary: Hard constraints for mock usage — when to mock, anti-patterns (over-mocking, mocking internals), and cleanup rules across Jest, Sinon, Mockito, and pytest-mock.
+tags: [qa-expert/rules]
+---
+
 # Mock and Test Double Rules
 
 Test doubles are objects that stand in for real dependencies during testing. Understanding the taxonomy of test doubles - and when to use each type - is crucial for writing effective, maintainable tests. These patterns come from Gerard Meszaros's authoritative work "xUnit Test Patterns" and Martin Fowler's seminal article "Mocks Aren't Stubs."

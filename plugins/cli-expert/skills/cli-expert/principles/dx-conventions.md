@@ -1,3 +1,8 @@
+---
+tags: [cli-expert/dx]
+summary: "CLI developer experience conventions: help text, version info, command structure, argument parsing, idempotency, configuration priority chain, error messages, dx.sh pattern, and progressive output"
+---
+
 # Developer Experience Conventions
 
 Modern CLI conventions that make tools pleasant to use, discoverable, and composable. Sourced from [clig.dev](https://clig.dev/), [no-color.org](https://no-color.org/), and established Unix patterns.

@@ -1,3 +1,8 @@
+---
+summary: CSS hue-rotate filter implementation for applying uniform color shifts to traced artwork with hundreds of color variations.
+tags: [svg-expert/color]
+---
+
 # CSS Color Customization Workflow
 
 Apply color customization to traced artwork using CSS hue-rotate filter.

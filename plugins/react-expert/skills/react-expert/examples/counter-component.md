@@ -1,3 +1,8 @@
+---
+tags: [react-expert/examples]
+summary: "End-to-end example: generating a counter component with useState through all 4 workflow steps"
+---
+
 # Example: Generating a Component with State
 
 This example demonstrates the complete 4-step workflow for generating a React component with state management.
@@ -123,3 +128,7 @@ export function Counter({ initialValue = 0 }: CounterProps) {
 ---
 
 **See other examples**: Load @examples/ for more workflow examples
+
+## Related
+
+- [Decision Tree: State Management](../decision-trees/state-management.md) — decision tree used in Step 2 to confirm useState is appropriate for this component

@@ -1,3 +1,8 @@
+---
+summary: "WinForms patterns for PowerShell scripts: NotifyIcon, timers, context menus, GDI+ icon generation, balloon notifications, and message pump lifecycle."
+tags: [powershell-expert/winforms]
+---
+
 # WinForms Patterns in PowerShell
 
 Detailed patterns for PowerShell scripts that use Windows Forms — system tray icons, timers, context menus, GDI+ rendering, and the message pump.

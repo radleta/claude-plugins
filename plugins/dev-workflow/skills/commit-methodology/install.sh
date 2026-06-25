@@ -1,11 +1,29 @@
 #!/usr/bin/env bash
 # install.sh — Install commit-methodology scripts to ~/.local/bin/ as symlinks
 #
-# Usage: bash install.sh
+# Usage: bash install.sh [--check]
 # Requires: elevated/admin terminal on Windows (only when symlinks need creating)
 # Idempotent: safe to re-run anytime. No elevation needed if symlinks already correct.
 
 set -euo pipefail
+
+# Parse arguments before anything else
+case "${1:-}" in
+  -h|--help)
+    echo "Usage: bash install.sh [--check]"
+    echo ""
+    echo "Creates symlinks at ~/.local/bin/ for commit-methodology scripts:"
+    echo "  git-state       — git state snapshot script"
+    echo "  git-status-all  — multi-repo status script"
+    echo ""
+    echo "Options:"
+    echo "  --check   Report drift status of installed symlinks (read-only, exits 0 always)"
+    exit 0
+    ;;
+  --check) _DO_CHECK=true ;;
+  -*) echo "ERROR: unknown option: $1" >&2; exit 1 ;;
+  *) _DO_CHECK=false ;;
+esac
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BIN_DIR="$HOME/.local/bin"
@@ -77,6 +95,43 @@ declare -A SCRIPTS=(
   ["git-state.sh"]="git-state"
   ["git-status-all.sh"]="git-status-all"
 )
+
+# --- Check mode: report drift status of each symlink (read-only) ---
+
+# _check_symlink — report drift status of a symlink (read-only)
+# Output: one line with [OK], [DRIFT], [MISSING], or [OTHER] prefix tag.
+# Inline helper (not shared): each install.sh is self-contained per plugin encapsulation rules.
+_check_symlink() {
+  local cmd_name="$1"
+  local src_path="$2"
+  local dest_path="$BIN_DIR/$cmd_name"
+
+  if [ ! -e "$dest_path" ] && [ ! -L "$dest_path" ]; then
+    echo "[MISSING] $cmd_name: not installed at ~/.local/bin/$cmd_name"
+    return 0
+  fi
+
+  if is_correct_symlink "$dest_path" "$src_path"; then
+    echo "[OK] $cmd_name: correct (worktree=$src_path)"
+    return 0
+  fi
+
+  if [ -L "$dest_path" ]; then
+    local other_path
+    other_path="$(readlink "$dest_path" 2>/dev/null || true)"
+    echo "[DRIFT] $cmd_name: baked=$other_path expected=$src_path"
+  else
+    echo "[OTHER] $cmd_name: present but not a recognizable symlink"
+  fi
+  return 0
+}
+
+if [ "$_DO_CHECK" = true ]; then
+  for src_file in "${!SCRIPTS[@]}"; do
+    _check_symlink "${SCRIPTS[$src_file]}" "$SCRIPT_DIR/$src_file"
+  done
+  exit 0
+fi
 
 # --- Pre-check: are all symlinks already correct? ---
 

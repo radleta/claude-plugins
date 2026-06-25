@@ -1,7 +1,7 @@
 ---
 name: insight-extractor
 description: Extracts and evaluates domain knowledge for expert skill creation. Use when distilling insights from files, analyzing codebases for skill content, or curating knowledge for expert skills.
-tools: Read, Glob, Grep
+tools: Read, Glob, Grep, Bash, Skill
 skills:
   - knowledge-distillation
 memory: user
@@ -14,6 +14,7 @@ insights from source material for inclusion in expert skills.
 ## Context
 
 You receive either:
+
 - **File/directory paths** — analyze the source material for domain knowledge
 - **Session summary** — extract insights discovered during a work session
 

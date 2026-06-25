@@ -1,3 +1,8 @@
+---
+tags: [csharp-expert/detection]
+summary: "Keyword-to-file mapping for routing C# requests to appropriate rules, decision trees, and templates"
+---
+
 # Pattern Detection - Request to Guidance Mapping
 
 **Purpose**: Map user requests to the appropriate rules, decision trees, or templates.

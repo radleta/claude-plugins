@@ -1,3 +1,8 @@
+---
+summary: 42 code generation templates covering discriminated unions, branded types, result types, builder patterns, generic functions, mapped types, conditional types, template literals, and more.
+tags: [typescript-expert/patterns]
+---
+
 # TypeScript Patterns Library - Consolidated
 
 Comprehensive catalog of all TypeScript patterns for agent code generation.

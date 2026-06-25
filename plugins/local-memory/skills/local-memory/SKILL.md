@@ -1,6 +1,6 @@
 ---
 name: local-memory
-description: "Manages Active Projects working memory in CLAUDE.local.md — a minimal-token index that survives context compaction and session boundaries. Use when starting a session, completing a plan step, changing direction, forking into sub-tasks, or wrapping up — even for quick status updates between steps, even if no one asked you to."
+description: "Manages Active Projects working memory in CLAUDE.local.md — a minimal-token index that survives context compaction and session boundaries. Use when starting a session, completing a plan step, changing direction, forking into sub-tasks, or wrapping up — even for quick status updates between steps."
 user-invocable: true
 argument-hint: "[push|pop|defer|sync|show] [project-name]"
 ---
@@ -26,13 +26,13 @@ argument-hint: "[push|pop|defer|sync|show] [project-name]"
 
 Parse `$ARGUMENTS` to determine operation:
 
-| Command | Action |
-|---------|--------|
+| Command           | Action                                                                |
+| ----------------- | --------------------------------------------------------------------- |
 | `sync` or no args | Read scratch/ plans, git log, update Active Projects to current state |
-| `push <name>` | Add a new project or fork entry to the stack |
-| `pop` | Complete current top-of-stack item, return to parent |
-| `defer <reason>` | Park current work with a note, pop to parent |
-| `show` | Display current Active Projects state (no changes) |
+| `push <name>`     | Add a new project or fork entry to the stack                          |
+| `pop`             | Complete current top-of-stack item, return to parent                  |
+| `defer <reason>`  | Park current work with a note, pop to parent                          |
+| `show`            | Display current Active Projects state (no changes)                    |
 
 ## Sync Protocol
 
@@ -41,7 +41,7 @@ When syncing (default operation):
 1. **Read** current CLAUDE.local.md
 2. **Scan** scratch/ for plan files matching `scratch/*/plan.md` and `scratch/*/impl-*.md` — look for `✅ COMPLETED` phase headers, `- [x]`/`- [ ]` checkboxes, and `## Step N:` progress
 3. **Check** recent git log (last 10 commits) for changes touching files in active project scratch/ paths or since the last-updated date
-4. **Update** the Active Projects section inside the `<local-memory>` tags
+4. **Update** all three sections inside the `<local-memory>` tags — move projects between Active/Deferred/Completed as status warrants
 5. **Preserve** everything outside the `<local-memory>` tags (instance config, etc.)
 6. If no `<local-memory>` tags exist, append the section after existing content
 
@@ -61,6 +61,7 @@ Each project entry is 6-8 lines max — detail lives in scratch/.
 ```
 
 **Key fields**:
+
 - **Stack** — the focus chain. After compaction, Claude reads "I was debugging X which is part of step Y which is part of project Z."
 - **Direction** — the thing most likely to be lost: architectural decisions, approach changes made mid-conversation.
 - **Skills** — which skills to load for this work, preventing re-discovery overhead.
@@ -86,7 +87,7 @@ Each project entry is 6-8 lines max — detail lives in scratch/.
 
 - Remove top of Stack for current project
 - If one item left: project is at root task
-- If popping completes the project: move to Deferred with "Completed" or remove
+- If popping completes the project: move to `## Completed Projects` section (keep `###` heading, strip Stack/Decisions/Skills fields, keep Status/Direction/Plans/Last updated)
 
 ### Defer (park work with context)
 
@@ -94,24 +95,30 @@ Each project entry is 6-8 lines max — detail lives in scratch/.
 /local-memory defer "waiting on design review"
 ```
 
-- Move to `### Deferred` section (last subsection inside `<local-memory>`, after all active entries) with `####` heading level
+- Move project entry from `## Active Projects` to `## Deferred Projects` section (keep `###` heading level)
 - Add `Deferred` field with reason and trigger condition for resuming
 - Preserve all other fields (Status, Direction, Stack, Plans, Skills, Decisions, Last updated)
-- Resume = move back to Active (promote `####` to `###`), remove `Deferred` field
+- Resume = move entry back to `## Active Projects`, remove `Deferred` field
 
 ## Data Format
 
-Wrap the Active Projects section in `<local-memory>` tags. Place the opening tag before `## Active Projects` and the closing tag after the last entry (including deferred).
+Wrap everything in `<local-memory>` tags. Inside, use three `##` sections in this order:
 
-Deferred entries use the same full format as active entries, plus a `Deferred` field with reason and trigger condition for resuming.
+1. `## Active Projects` — work in progress
+2. `## Deferred Projects` — parked with reason and resume trigger
+3. `## Completed Projects` — shipped work (minimal: Status set to "Committed ({hash})" or "Completed", Direction, Plans, Last updated)
+
+All projects use `###` headings regardless of section. Deferred entries keep the full active format plus a `Deferred` field. Completed entries drop Stack, Skills, Decisions, and Deferred fields.
 
 ### Legacy Format Migration
 
 If CLAUDE.local.md uses the old format (blockquote instructions, `<!-- BEGIN/END_ACTIVE_PROJECTS -->` HTML comment markers, flat one-line deferred entries), upgrade it during the next sync:
+
 1. Remove `<!-- BEGIN_ACTIVE_PROJECTS -->` and `<!-- END_ACTIVE_PROJECTS -->` markers
 2. Remove the blockquote instruction block (`> **Claude: You MUST...`)
 3. Wrap the section in `<local-memory>` tags
 4. Convert flat deferred entries to full-format with `Deferred` field
+5. Add `## Deferred Projects` and `## Completed Projects` sections; move entries to their correct section
 
 ## Example: Complete Active Projects Section
 
@@ -128,9 +135,9 @@ If CLAUDE.local.md uses the old format (blockquote instructions, `<!-- BEGIN/END
 - **Decisions this session**: E6: dialog is standalone | Drive-like rework after Phase 5
 - **Last updated**: 2026-03-13
 
-### Deferred
+## Deferred Projects
 
-#### tier-pricing-page (`scratch/tier-pricing/`)
+### tier-pricing-page (`scratch/tier-pricing/`)
 - **Status**: Spec complete, awaiting content
 - **Direction**: Three-tier pricing with annual discount
 - **Deferred**: Waiting on marketing copy from Bill
@@ -139,5 +146,13 @@ If CLAUDE.local.md uses the old format (blockquote instructions, `<!-- BEGIN/END
 - **Skills**: frontend-design, react-expert
 - **Decisions this session**: D1-D5 in idea.md
 - **Last updated**: 2026-03-28
+
+## Completed Projects
+
+### Skill-Builder Wiki Pattern (`scratch/skill-builder-wiki/`)
+- **Status**: Committed (c414b48)
+- **Direction**: Wiki-backed as file structure pattern in claude-skill-builder
+- **Plans**: `scratch/skill-builder-wiki/README.md`
+- **Last updated**: 2026-04-08
 </local-memory>
 ```

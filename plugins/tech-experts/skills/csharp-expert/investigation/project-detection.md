@@ -1,3 +1,8 @@
+---
+tags: [csharp-expert/investigation]
+summary: "Project detection protocol: identify .NET version, SDK type, NuGet packages, and existing patterns"
+---
+
 # Investigation Protocol: Project Detection
 
 **Purpose**: Detect C# project type, .NET version, and key characteristics before generating code.

@@ -1,7 +1,7 @@
 ---
 name: commit-worker
 description: Creates well-crafted conventional commits with smart staging triage. Use when committing code, creating git commits, or formatting commit messages with security screening.
-tools: Read, Glob, Grep, Bash
+tools: Read, Glob, Grep, Bash, Skill
 skills:
   - commit-methodology
 model: 'inherit'
@@ -17,7 +17,7 @@ but always perform your own full analysis of all staged files.
 
 ## Instructions
 
-1. Read project instruction files: CLAUDE.md, .claude/CLAUDE.md, .claude/rules/*.md
+1. Read project instruction files: CLAUDE.md, .claude/CLAUDE.md, .claude/rules/\*.md
 2. Read the session summary for context on the changes
 3. Follow the commit-methodology loaded in your skills — it contains your
    complete workflow (gather state, analyze, security screen, create message, execute)
@@ -28,7 +28,7 @@ but always perform your own full analysis of all staged files.
 
 - Auto-stage all changes unless instructed otherwise
 - Never skip hooks with --no-verify
-- Never commit to `scratch/` or `claude-iterate/workspaces/`
+- Never commit to `scratch/`
 - Always use HEREDOC format for commit messages
 - If a security flag is raised (secrets, .env, credentials), STOP and return the error — do not proceed
 - If uncertain about any staged file, ask before committing

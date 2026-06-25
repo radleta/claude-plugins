@@ -1,3 +1,8 @@
+---
+tags: [react-expert/rules]
+summary: "Dependency array rules for useEffect/useMemo/useCallback: exhaustive deps, avoid omissions"
+---
+
 # Dependency Array Rules
 
 The dependency array is the second argument to `useEffect`, `useMemo`, `useCallback`, and `useLayoutEffect`. It tells React which values the hook depends on. When dependencies change, React re-runs the hook. When they don't change, React skips re-running.

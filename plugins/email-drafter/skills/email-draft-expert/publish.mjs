@@ -88,6 +88,7 @@ let subjectOverride = null;
 let profileOverride = null;
 let toOverride = null;
 let ccOverride = null;
+let bccOverride = null;
 let targetId = null;
 let replySenderOnly = false;
 let outputDir = null;
@@ -117,6 +118,8 @@ for (let i = argStart; i < args.length; i++) {
     toOverride = args[++i];
   } else if (args[i] === '--cc' && args[i + 1] !== undefined) {
     ccOverride = args[++i];
+  } else if (args[i] === '--bcc' && args[i + 1] !== undefined) {
+    bccOverride = args[++i];
   } else if ((args[i] === '--id' || args[i] === '--message-id' || args[i] === '--thread-id' || args[i] === '--draft-id') && args[i + 1]) {
     targetId = args[++i];
   } else if ((args[i] === '-o' || args[i] === '--output') && args[i + 1]) {
@@ -151,19 +154,19 @@ for (let i = argStart; i < args.length; i++) {
 
 function printUsage() {
   console.log(`Usage:
-  email-draft [draft] --profile <name> [--subject "..."] [--to "..."] [--cc "..."] <file>
+  email-draft [draft] --profile <name> [--subject "..."] [--to "..."] [--cc "..."] [--bcc "..."] <file>
   echo "markdown" | email-draft [draft] --profile <name>
   email-draft list --profile <name>
   email-draft thread --profile <name> --id <threadId> [--refresh]
   email-draft read --profile <name> --id <messageId>
-  email-draft reply --profile <name> --id <messageId> [--reply-sender-only] <file>
+  email-draft reply --profile <name> --id <messageId> [--reply-sender-only] [--bcc "..."] <file>
   email-draft download --profile <name> --id <messageId> [-o <dir>] [--refresh]
   email-draft list-drafts --profile <name>
   email-draft read-draft --profile <name> --id <draftId>
-  email-draft edit --profile <name> --id <draftId> [--dry-run] [--subject "..."] [--to "..."] [--cc "..."] [body.md]
+  email-draft edit --profile <name> --id <draftId> [--dry-run] [--subject "..."] [--to "..."] [--cc "..."] [--bcc "..."] [body.md]
   email-draft attach --profile <name> --id <draftId> [--dry-run] [--content-id <cid>] <file> [<file2> ...]
   email-draft detach --profile <name> --id <draftId> [--dry-run] --filename <name>
-  email-draft configure --profile <name> [--to "..."] [--cc "..."] [--max-results N] [--default-subject "..."]
+  email-draft configure --profile <name> [--to "..."] [--cc "..."] [--bcc "..."] [--max-results N] [--default-subject "..."]
   email-draft update --profile <name>
 
 Actions:
@@ -576,6 +579,11 @@ function printDryRunSummary(action, beforeState, afterState) {
     console.error(`  Cc: "${beforeState.cc || ''}" → "${afterState.cc || ''}"`);
   }
 
+  // Bcc
+  if (beforeState.bcc !== afterState.bcc) {
+    console.error(`  Bcc: "${beforeState.bcc || ''}" → "${afterState.bcc || ''}"`);
+  }
+
   // Body
   const beforeLen = (beforeState.htmlBody || '').length;
   const afterLen = (afterState.htmlBody || '').length;
@@ -640,6 +648,7 @@ async function doDraft() {
 
   const to = toOverride || frontmatter.to || null;
   const cc = ccOverride || frontmatter.cc || null;
+  const bcc = bccOverride || frontmatter.bcc || null;
   const subject = subjectOverride || fmSubject || 'Draft';
 
   console.error(`Publishing${profileLabel}: "${subject}"`);
@@ -657,7 +666,7 @@ async function doDraft() {
 
   const result = await postGateway({
     action: 'draft', subject, html,
-    ...(to && { to }), ...(cc && { cc }),
+    ...(to && { to }), ...(cc && { cc }), ...(bcc && { bcc }),
     ...(inlineImages.length > 0 && { inlineImages }),
   });
 
@@ -760,6 +769,7 @@ async function doReply() {
     replyAll: !replySenderOnly,
   };
   if (ccOverride) payload.cc = ccOverride;
+  if (bccOverride) payload.bcc = bccOverride;
 
   const result = await postGateway(payload);
 
@@ -883,8 +893,8 @@ async function doEdit() {
   }
 
   // Validate: at least one field to update
-  if (!subjectOverride && !toOverride && ccOverride === null && !html) {
-    console.error('edit requires at least one update: --subject, --to, --cc, or a body file');
+  if (!subjectOverride && !toOverride && ccOverride === null && bccOverride === null && !html) {
+    console.error('edit requires at least one update: --subject, --to, --cc, --bcc, or a body file');
     process.exit(1);
   }
 
@@ -901,6 +911,7 @@ async function doEdit() {
     if (subjectOverride) state.subject = subjectOverride;
     if (toOverride) state.to = toOverride;
     if (ccOverride !== null) state.cc = ccOverride;
+    if (bccOverride !== null) state.bcc = bccOverride;
     if (html) state.htmlBody = html;
 
     // Add inline images as CID attachments if body was updated
@@ -929,6 +940,7 @@ async function doEdit() {
     if (subjectOverride) payload.subject = subjectOverride;
     if (toOverride) payload.to = toOverride;
     if (ccOverride !== null) payload.cc = ccOverride;
+    if (bccOverride !== null) payload.bcc = bccOverride;
     if (html) payload.html = html;
 
     const result = await postGateway(payload);
@@ -1079,6 +1091,7 @@ async function doConfigure() {
 
   if (toOverride !== null) payload.to = toOverride;
   if (ccOverride !== null) payload.cc = ccOverride;
+  if (bccOverride !== null) payload.bcc = bccOverride;
   if (maxResultsOverride !== null) payload.maxResults = maxResultsOverride;
   if (defaultSubjectOverride !== null) payload.defaultSubject = defaultSubjectOverride;
 

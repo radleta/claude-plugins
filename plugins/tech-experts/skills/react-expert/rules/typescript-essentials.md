@@ -1,3 +1,8 @@
+---
+tags: [react-expert/rules]
+summary: "TypeScript patterns for React: prop types, event handlers, generics, strict mode"
+---
+
 # TypeScript Essentials for React
 
 React and TypeScript together require specific type patterns for props, events, children, and generic components. Using the wrong types leads to build errors, runtime crashes, and loss of type safety.
@@ -770,3 +775,7 @@ TypeScript with React requires specific type patterns:
 4. **Always define Props interfaces** - never use inline types or implicit any
 
 These patterns ensure type safety, better autocomplete, and catch errors at build time instead of runtime.
+
+## Related
+
+- [Templates Index](../templates/README.md) — production-ready React + TypeScript templates applying these type patterns in working code

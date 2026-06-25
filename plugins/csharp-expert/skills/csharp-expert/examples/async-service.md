@@ -1,3 +1,8 @@
+---
+tags: [csharp-expert/examples]
+summary: "Complete async service implementation with cancellation support, DI registration, and ILogger"
+---
+
 # Example: Async Service with Cancellation Support
 
 **User Request**: "Create a service that fetches user data from an API with cancellation support and dependency injection"
@@ -264,3 +269,7 @@ dotnet build /warnaserror
 4. **Verification catches issues**: Checklist confirmed all Top 10 mistakes prevented
 
 **This workflow prevents the 6 most critical C# mistakes in a single example!**
+
+## Related
+
+- [Templates Index](../templates/README.md) — working C# code templates used in this workflow: async patterns, DI registration, IDisposable

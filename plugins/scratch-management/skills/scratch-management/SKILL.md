@@ -21,6 +21,8 @@ description: "Scratch folder lifecycle management using scratch.mjs script and a
 
 **Rule:** Archive completed folders to hide them from agents while preserving in git.
 
+**Session-scoped folders (`scratch/S-{slug-or-session-id}/`)**: Folders prefixed with `S-` are session-scoped handoff artifacts written by the `handoff-methodology` skill and the `scratch-memory handoff` CLI (via the `/handoff` slash command). The suffix is the session slug when the session has been named (e.g. `S-my-feature`) or the bare session UUID otherwise (e.g. `S-abc123`). They follow the same save/archive lifecycle as project-scoped folders. Agents that enumerate project-scoped work should filter out `S-*/` entries (they are per-session snapshots, not projects).
+
 ## Script Location
 
 The `scratch` command is installed to `~/.local/bin/` via `install.sh` in this skill directory. Run `bash install.sh` if not yet installed.

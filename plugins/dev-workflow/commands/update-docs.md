@@ -111,20 +111,7 @@ argument-hint: [list of changed files and summary of changes]
     </acceptance-criteria>
   </step>
 
-  <step id="3-sync-memory" order="third">
-    <description>Sync local-memory to reflect doc changes</description>
-
-    <actions>
-      <action priority="high">If CLAUDE.local.md Active Projects tracks the current work:
-        Edit directly to update Status with doc update completion and any Direction
-        changes if the documentation revealed approach shifts. This keeps local-memory
-        consistent with the actual state of the work across all dimensions (code, docs, plans).</action>
-    </actions>
-
-    <skip-condition>Skip if no Active Projects entry exists for the current work.</skip-condition>
-  </step>
-
-  <step id="4-report" order="last">
+  <step id="3-report" order="last">
     <description>Report what was updated</description>
 
     <actions>

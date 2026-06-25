@@ -50,8 +50,8 @@ argument-hint: <project-name> [focus areas or context]
         - All template sections present and populated
         - Decisions table format current
         - Open Questions resolved or carried forward</action>
-      <action>Run the idea-document-reviewer prompt against the current idea.md (dispatch as subagent). Collect findings.</action>
-      <action>Run codebase-alignment-reviewer against idea.md (depth: light). Collect findings.</action>
+      <action>Run the idea-document-reviewer prompt against the current idea.md (dispatch as subagent, default `model: sonnet`). Collect findings.</action>
+      <action>Run codebase-alignment-reviewer against idea.md (depth: light, default `model: sonnet`). Collect findings.</action>
       <action>If Skill Coverage section exists or was added, run skill coverage detection against the technologies listed. Report any new gaps.</action>
       <action>Present ALL findings to user in a single summary:
         - Structural gaps (missing/outdated sections)
@@ -73,9 +73,9 @@ argument-hint: <project-name> [focus areas or context]
         - Skill Coverage carried forward from idea.md
         - All template sections present
         - Spec decisions traceable to idea decisions</action>
-      <action>Run the spec-document-reviewer prompt against spec.md. Collect findings.</action>
-      <action>Run decision-traceability-reviewer against idea.md + spec.md. Collect findings.</action>
-      <action>Run codebase-alignment-reviewer against spec.md (depth: thorough). Collect findings.</action>
+      <action>Run the spec-document-reviewer prompt against spec.md (default `model: sonnet`). Collect findings.</action>
+      <action>Run decision-traceability-reviewer against idea.md + spec.md (default `model: sonnet`). Collect findings.</action>
+      <action>Run codebase-alignment-reviewer against spec.md (depth: thorough, default `model: sonnet`). Collect findings.</action>
       <action>Present ALL findings to user:
         - Structural gaps
         - Document quality issues
@@ -107,8 +107,8 @@ argument-hint: <project-name> [focus areas or context]
       <action>Check decisions.md for completeness:
         - Each decision has context, options, choice, rationale
         - Decisions align with current codebase state</action>
-      <action>Run step-quality-reviewer prompt against plan steps. Collect findings.</action>
-      <action>Run investigation-quality-reviewer prompt against research.md. Collect findings.</action>
+      <action>Run step-quality-reviewer prompt against plan steps (default `model: sonnet`). Collect findings.</action>
+      <action>Run investigation-quality-reviewer prompt against research.md (default `model: sonnet`). Collect findings.</action>
       <action>Run PLAN-QUALITY grading (from plan-expert skill) to produce a letter grade.</action>
       <action>Present ALL findings to user:
         - Current grade and target grade

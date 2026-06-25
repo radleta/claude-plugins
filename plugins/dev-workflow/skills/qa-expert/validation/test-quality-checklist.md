@@ -1,3 +1,8 @@
+---
+summary: Comprehensive 30-40 item post-generation checklist for catching the Top 10 testing anti-patterns across Jest, Pytest, JUnit, Mocha, and RSpec.
+tags: [qa-expert/validation]
+---
+
 # Test Quality Validation Checklist
 
 **Purpose**: Comprehensive post-generation checklist to catch the Top 10 testing anti-patterns and ensure test quality across all major frameworks (Jest, Pytest, JUnit, Mocha, RSpec).

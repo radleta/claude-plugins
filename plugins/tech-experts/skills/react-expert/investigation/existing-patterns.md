@@ -1,3 +1,8 @@
+---
+tags: [react-expert/investigation]
+summary: "Protocol for detecting existing React patterns, hook conventions, and component structures in a codebase"
+---
+
 # Existing Patterns Investigation
 
 ## Purpose

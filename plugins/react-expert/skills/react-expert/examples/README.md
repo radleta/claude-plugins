@@ -1,3 +1,8 @@
+---
+tags: [react-expert/examples]
+summary: "Index of complete React workflow examples demonstrating the 4-step investigate-detect-generate-verify process"
+---
+
 # React Expert Examples
 
 Complete workflow examples demonstrating the 4-step process: Investigate → Detect → Generate → Verify
@@ -64,3 +69,7 @@ Complete workflow examples demonstrating the 4-step process: Investigate → Det
 ---
 
 **Examples complement, don't replace, the core guidance in @rules/, @templates/, and @decision-trees/**
+
+## Pages
+
+- [counter-component.md](counter-component.md) — End-to-end example: generating a counter component with useState through all 4 workflow steps

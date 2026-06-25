@@ -1,3 +1,8 @@
+---
+tags: [agent-expert/transformation]
+summary: "10+ transformation patterns with before/after examples, quick reference table, and common anti-patterns"
+---
+
 # Agent-Optimization Transformation Patterns
 
 ## Overview
@@ -629,3 +634,92 @@ model: haiku  # Mechanical pattern grep — cheapest model works
 **For validation:** Use Read tool on validation.md when need quality grading rubric
 **For full examples:** Use Read tool on examples.md when need complete transformations
 **For subagent patterns:** Use Read tool on subagent-patterns.md when dispatching agents or designing multi-agent workflows
+
+---
+
+## Common Transformation Patterns (Quick Reference)
+
+### Pattern: Vague → Specific
+
+```markdown
+❌ "Add appropriate tests"
+✅ "Create tests for:
+    - Each public method
+    - Edge cases (null, empty, invalid inputs)
+    - Error conditions
+    - Achieve coverage ≥80%"
+```
+
+### Pattern: Implicit → Explicit Dependencies
+
+```xml
+❌ "1. Create component, 2. Add tests"
+
+✅ <step id="1">Create component <blocks>2</blocks></step>
+    <step id="2" depends-on="1">
+      Add tests
+      <prerequisite>Component exists and compiles</prerequisite>
+    </step>
+```
+
+### Pattern: Prose → Structured XML
+
+**When:** Complex workflows (3+ steps, dependencies)
+
+**Use:** XML structure with `<workflow>`, `<step>`, `<dependencies>`, `<acceptance-criteria>`
+
+---
+
+## Writing Future-Proof Instructions
+
+When specifying how agents should interact with codebases and systems, focus on **capabilities** rather than **specific tools**:
+
+### The Problem with Tool-Specific Instructions
+
+❌ **Don't:** Hard-code tool names
+```xml
+<action>Use Glob to find files</action>
+<action>Run Grep to search patterns</action>
+<action>Use Read to examine implementation</action>
+```
+
+**Why this is problematic:**
+- Tools evolve (today: Glob/Grep/Read → future: semantic search, AI-assisted finding)
+- New, better tools may become available
+- Instructions become outdated and require rewrites
+- Can't automatically benefit from improved tooling
+
+### Capability-Based Approach
+
+✅ **Do:** Specify capabilities and requirements
+```xml
+<action>Find files matching pattern **/*Component*.tsx</action>
+<action>Search for pattern "use[A-Z]\\w+" in codebase</action>
+<action>Read file contents to examine implementation</action>
+```
+
+**Benefits:**
+- Instructions remain valid as tooling improves
+- Agent selects best available capability for the task
+- Automatically benefits from better tools as they become available
+- Focus on WHAT is needed, not HOW to do it
+
+### Common Capabilities
+
+| Capability | Description | Example Specification |
+|------------|-------------|----------------------|
+| **File Finding** | Locate files by name/pattern | `Find files matching pattern **/*.test.ts` |
+| **Pattern Search** | Search for code patterns | `Search for pattern "interface\\s+\\w+" in src/` |
+| **File Reading** | Read file contents | `Read file contents to examine structure` |
+| **File Writing** | Create/update files | `Create file at [path] with [content]` |
+| **Code Analysis** | Understand code structure | `Analyze component structure to identify patterns` |
+
+### When Tool Names Are Acceptable
+
+Tool-specific references ARE appropriate for:
+
+1. **Meta-navigation** within skill documentation (e.g., "Use Read tool on examples.md")
+2. **User-facing commands** where tool is part of the interface
+3. **Troubleshooting guides** for specific tools
+
+But avoid them in example workflows that teach agents how to write instructions.

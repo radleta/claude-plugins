@@ -1,3 +1,8 @@
+---
+tags: [csharp-expert/decision-trees]
+summary: "Decision tree for DI lifetime selection: Transient vs Scoped vs Singleton and captive dependency rules"
+---
+
 # Decision Tree: Dependency Injection Lifetimes
 
 **Purpose**: Choose correct DI lifetime (Transient, Scoped, Singleton) for services.
@@ -174,3 +179,9 @@ public class CacheService // Singleton
 **Safest**: Scoped (avoids captive dependencies)
 **Performance**: Singleton (if thread-safe and stateless)
 **Default choice**: When in doubt, use Scoped
+
+## Related Decision Trees
+
+- [Decision Tree: Async vs Sync](async-vs-sync.md) — async patterns for background services and scoped resolution
+- [Decision Tree: Collection Types](collection-types.md) — collection type selection including IDisposable lifetime considerations
+- [Decision Tree: Null Handling](null-handling.md) — null handling for injected service dependencies

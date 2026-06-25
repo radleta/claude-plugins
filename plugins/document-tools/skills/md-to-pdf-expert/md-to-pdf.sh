@@ -3,10 +3,10 @@
 #
 # Usage:
 #   md-to-pdf input.md                              # Default template (clean)
-#   md-to-pdf input.md -t akn                       # AKN branded template
-#   md-to-pdf input.md -t akn --cover               # With branded cover page
-#   md-to-pdf input.md -t akn --cover --toc         # Cover + table of contents
-#   md-to-pdf input.md -t akn --cover --confidential  # Cover + confidential marking
+#   md-to-pdf input.md -t default                   # Accent-branded template
+#   md-to-pdf input.md -t default --cover           # With branded cover page
+#   md-to-pdf input.md -t default --cover --toc     # Cover + table of contents
+#   md-to-pdf input.md -t default --cover --confidential  # Cover + confidential marking
 #   md-to-pdf input.md --title "My Doc"             # Override title (default: first H1)
 #   md-to-pdf input.md --subtitle "For Client X"    # Subtitle on cover page
 #   md-to-pdf input.md --numbered                   # Numbered sections

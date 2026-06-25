@@ -1,3 +1,8 @@
+---
+summary: "Dispatch template for the investigation-quality reviewer subagent: evidence quality, existing code discovery, and assumption detection checklists (~15 items)."
+tags: [plan-expert/reviewer-prompts]
+---
+
 # Investigation-Quality Reviewer Prompt Template
 
 Use this template when dispatching an investigation-quality reviewer subagent during plan validation (Phase 4).

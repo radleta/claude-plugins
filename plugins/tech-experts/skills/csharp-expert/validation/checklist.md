@@ -1,3 +1,8 @@
+---
+tags: [csharp-expert/validation]
+summary: "30-item post-generation checklist: async void, .Result/.Wait(), IDisposable, null handling, naming conventions"
+---
+
 # C# Code Generation Validation Checklist
 
 **Purpose**: Verify generated C# code prevents Top 10 mistakes and follows best practices.

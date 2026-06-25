@@ -1,3 +1,8 @@
+---
+summary: Full vtracer/potrace tracing pipeline with settings, WSL2 setup, color consolidation, background removal, and visual fidelity verification.
+tags: [svg-expert/tracing]
+---
+
 # Raster-to-Vector Tracing Pipeline
 
 Convert PNG/raster images to optimized multi-color SVG using vtracer + SVGO + manual color consolidation.

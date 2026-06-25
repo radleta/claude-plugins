@@ -1,3 +1,8 @@
+---
+summary: "5 quality dimensions, 77-item base checklist (+5 CDD, +10 web-app, +8 CLI items), grading rubric A/B/C/D, and verification cap rules for plan quality assessment."
+tags: [plan-expert/quality]
+---
+
 # Plan Quality: Assessment and Improvement
 
 ## The 5 Quality Dimensions
@@ -99,7 +104,7 @@ Can someone understand the plan's structure and find any detail quickly?
 
 ---
 
-## Quality Checklist (70 Items + 5 CDD Items + App-Type Items)
+## Quality Checklist (77 Items + 5 CDD Items + App-Type Items)
 
 ### Investigation Quality (10 items)
 
@@ -132,7 +137,7 @@ Can someone understand the plan's structure and find any detail quickly?
 - [ ] Each step lists specific files to create or modify (exact paths)
 - [ ] Each step has measurable acceptance criteria (yes/no verifiable)
 - [ ] Each step states dependencies on other steps
-- [ ] Each step includes verification method (test command, build check, etc.)
+- [ ] Each step includes verification method (HARD — see Calibration) — every implementation step must have ≥1 concrete verification command in Acceptance Criteria (see Verification Tier Table below)
 - [ ] Steps don't bundle unrelated changes
 - [ ] No vague language ("appropriate", "as needed", "properly")
 - [ ] No step requires human judgment to complete
@@ -234,6 +239,32 @@ Can someone understand the plan's structure and find any detail quickly?
 - [ ] Rollback approach exists for high-risk changes
 - [ ] Performance impact assessed for data-heavy changes
 
+### Artifact Coverage (7 items)
+
+- [ ] If the spec includes stateful behavior, the spec contains a State & Transition Matrix
+- [ ] If the spec is a resumable orchestrator, the spec contains a Resumability State Matrix
+- [ ] If the spec includes 3+ independent boolean conditions driving a decision, the spec contains a Decision Table
+- [ ] If the spec introduces new public methods, each has a Contract block (requires/ensures/invariants/throws)
+- [ ] If the spec introduces new public methods, each has 3+ Concrete Examples (happy path + boundary + error)
+- [ ] The spec has an Invariants section (even if empty with explicit "None — pure-function")
+- [ ] If the spec includes a multi-component flow or async boundaries, the spec contains a Mermaid Sequence Diagram
+
+Artifact Coverage in this checklist governs **spec-phase artifacts** validated by `combinatorial-completeness-reviewer`. **Plan-step artifacts** are governed separately by `step-quality-reviewer` per the `## Artifact: <type>` heading convention in plan-expert/SKILL.md §8 (and the signal list in `plan-expert/SIGNALS.md`). Both share artifact vocabulary but are validated by different reviewers; do not conflate.
+
+---
+
+### Verification Tier Table (canonical source of truth)
+
+Every implementation step's Acceptance Criteria must include ≥1 concrete verification command from this table. Non-code steps may use the Lightweight tier.
+
+| Tier | Verification Type | Example |
+|------|------------------|---------|
+| 1 (strongest) | Automated tests | `npm test -- --grep "auth"` → 3 tests pass |
+| 2 | Build/compile | `npm run build` → exit 0 |
+| 3 | CLI commands | `curl localhost:3000/health` → 200 OK |
+| 4 | Visual confirmation | Screenshot via chrome-browser → expected layout |
+| Lightweight | File/config checks | `test -f path/to/file` → exists; `git status` → expected changes |
+
 ---
 
 ## Grading Rubric
@@ -245,6 +276,12 @@ Can someone understand the plan's structure and find any detail quickly?
 **Web App Cap:** If APP_TYPE = web-app and web app checklist scores < 7/10, the plan is capped at Grade C. A web app plan without proper testing strategy and visual verification will ship untested UI.
 
 **CLI Cap:** If APP_TYPE = cli and CLI checklist scores < 6/8, the plan is capped at Grade C. A CLI plan without proper exit codes, output handling, and testing will produce a tool that can't be composed with other tools.
+
+**Verification Cap:** Per-step binary evaluation (not an aggregate score). Each implementation step is individually checked for ≥1 concrete verification command in Acceptance Criteria. If ANY step lacks one, the plan is capped at Grade C. Zero-tolerance: a plan with 9/10 verified steps and 1 unverified step is still capped. This differs from existing caps (which use aggregate sub-checklist scores) because verification is a per-step property, not an aggregate one. Plans with unverifiable steps cannot guarantee correctness regardless of other quality dimensions.
+
+**Artifact Coverage Cap:** If the plan's spec is missing required artifact sections (per the 7-item Artifact Coverage checklist above), the plan is capped at Grade C, regardless of step quality. This cap applies to plans created after this project lands — existing in-flight plans are not retroactively affected.
+
+**References Resolution Cap:** Per-reference binary evaluation. Each local file path in the References table must resolve at plan-write time (file exists). Anchors (e.g., `#section-name`) must exist in the target file. Code anchors with line ranges (`file.ts:12-45`) require the file to exist and contain at least that many lines. External URLs are permitted but flagged — they are not validated by HTTP fetch. If ANY local path or anchor fails to resolve, the plan is capped at Grade C. Additionally, any step citing `Apply: Rx` where Rx is absent from the References table (Orphan Reference anti-pattern) caps the plan at Grade C regardless of other quality dimensions. This cap is evaluated outside the per-section item count — per-reference binary evaluation, regardless of other quality dimensions.
 
 ### Grade A: Agent-Ready
 

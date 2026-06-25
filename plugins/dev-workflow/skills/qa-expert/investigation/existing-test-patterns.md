@@ -1,3 +1,8 @@
+---
+summary: Protocol for discovering project testing conventions, naming patterns, and assertion styles from existing tests — ensures new tests match established patterns.
+tags: [qa-expert/investigation]
+---
+
 # Existing Test Patterns Investigation
 
 ## Purpose

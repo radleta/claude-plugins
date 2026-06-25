@@ -1,3 +1,8 @@
+---
+summary: 12 tool-specific investigation protocols for TypeScript project analysis — tsconfig detection, version, patterns, ID types, state management, error handling, build tools, and more.
+tags: [typescript-expert/investigation]
+---
+
 # Investigation Protocols - Agent-Executable
 
 Tool-specific investigation protocols for TypeScript projects.

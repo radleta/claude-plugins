@@ -1,6 +1,6 @@
 {
   "name": "document-tools",
-  "version": "1.0.1",
+  "version": "1.0.4",
   "description": "Spreadsheet generation and Markdown-to-PDF conversion tools",
   "author": {
     "name": "Richard Adleta",

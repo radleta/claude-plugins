@@ -15,10 +15,10 @@ description: >-
 
 ```bash
 md-to-pdf input.md                              # Clean PDF (no template)
-md-to-pdf input.md -t akn                       # AKN branded
-md-to-pdf input.md -t akn --cover               # With cover page
-md-to-pdf input.md -t akn --cover --toc         # Cover + table of contents
-md-to-pdf input.md -t akn --cover --confidential  # Confidential marking
+md-to-pdf input.md -t default                   # Accent-branded
+md-to-pdf input.md -t default --cover           # With cover page
+md-to-pdf input.md -t default --cover --toc     # Cover + table of contents
+md-to-pdf input.md -t default --cover --confidential  # Confidential marking
 md-to-pdf input.md --numbered                   # Auto-numbered sections
 md-to-pdf input.md --title "My Doc"             # Override title (default: first H1)
 md-to-pdf input.md --subtitle "Draft v2"        # Subtitle on cover page
@@ -31,7 +31,7 @@ md-to-pdf --list-templates                       # Show available templates
 
 | Template | Description |
 |----------|-------------|
-| `akn` | All Kids Network branded — green accents, AKN logo, professional layout |
+| `default` | Generic branded — accent color, optional logo (`--logo`), cover page support |
 | *(none)* | Clean defaults — Segoe UI, blue links, 0.8in margins |
 
 ## Flags
@@ -65,7 +65,7 @@ The script checks for these on every run and shows install instructions if missi
 3. Add any assets (logos, fonts) in the same folder
 4. Template is immediately available via `-t <name>`
 
-See `templates/akn/template.tex` as a reference.
+See `templates/default/template.tex` as a reference.
 
 ## Setup
 

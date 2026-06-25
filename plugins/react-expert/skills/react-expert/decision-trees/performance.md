@@ -1,3 +1,8 @@
+---
+tags: [react-expert/decision-trees]
+summary: "Decision tree for React performance: when to use memo, useMemo, useCallback, or virtualization"
+---
+
 # Performance Optimization Decision Tree
 
 ## When to Use This Tree
@@ -681,3 +686,7 @@ Sometimes the problem isn't optimization, it's architecture:
 - `@rules/performance-traps.md` - Common performance mistakes
 - `@decision-trees/state-management.md` - Choosing the right state approach
 - `@rules/dependency-arrays.md` - useMemo and useCallback dependencies
+
+## Related
+
+- [Rules: Performance Traps](../rules/performance-traps.md) — hard rules for avoiding common React performance pitfalls

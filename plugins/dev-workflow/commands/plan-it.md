@@ -77,6 +77,26 @@ argument-hint: <project-name> <request description>
   - README.md files inside step folders (use step-name.md files directly)
 </output-structure>
 
+<edit-delegation-protocol>
+  All writes to plan files (`README.md`, `research.md`, `decisions.md`, `steps/*.md`) go through a foreground sub-agent. Main session NEVER opens Write/Edit on plan files and NEVER pre-summarizes spec content into dispatch prompts — pass file paths, not content. The sub-agent reads `spec.md` (and `idea.md` if present) directly.
+
+  **Why:** Plan writing pulls the spec, decisions, research, and N step files into main session — keeping that bloat off main keeps every downstream step (especially `/implement-code`) lean.
+
+  **Tier:** Sonnet for trivial scaffolds or single-section writes; Opus when the spec requires translation/decomposition (research synthesis, decisions table, steps generation, README authoring) — most plan-writing falls here. All dispatches are foreground because the next step (validation, re-review, user approval) depends on the file being on disk.
+
+  **Dispatch shape:**
+  ```
+  Agent({
+    subagent_type: "general-purpose",
+    model: "opus",   // sonnet for trivial cases
+    description: "Write {file} for {project}",
+    prompt: "Read scratch/{project}/spec.md (and any idea.md present) directly. Write scratch/{project}/{file}. {what to produce, scoped to this file}. Do not return file contents — return a one-line summary."
+  })
+  ```
+
+  See the `plan-expert` skill's `## Edit Delegation Protocol` and `## Anti-Patterns: The Inline-Edit Plan-Writing Trap` for the canonical pattern.
+</edit-delegation-protocol>
+
 <workflow type="sequential">
   <step id="1-initialize">
     <description>Initialize project and load skills</description>
@@ -85,20 +105,14 @@ argument-hint: <project-name> <request description>
       <action>Validate project name (kebab-case, 20 chars or less)</action>
       <action>Check scratch/[project]/ does not exist</action>
       <action>Create minimal directory: mkdir -p scratch/[project]/steps</action>
+      <action priority="critical">Load the plan-expert skill via the Skill tool. This is MANDATORY and must happen BEFORE any other skill loading — the plan-expert framework governs all subsequent planning output (dimensions, checklist, anti-patterns).</action>
       <action>Identify domain from description (frontend, backend, database, etc.)</action>
-      <action>Load 2-4 relevant skills using Skill tool</action>
-      <action priority="high">Push project to local-memory:
-        Invoke /local-memory push [project-name] to register this plan in Active Projects.
-        If CLAUDE.local.md doesn't exist or has no Active Projects section, /local-memory
-        initializes it (creates the file, adds markers and inline instructions).
-        This pushes the new project to the TOP of the active list — existing tracked
-        projects remain in place so all work-in-progress is visible. If the project
-        already exists in local-memory, this updates its Stack to reflect the new planning focus.</action>
+      <action>Load 2-4 additional domain skills using the Skill tool</action>
+      <action>Run learned-check init scratch/[project]/learned/ to create the learned directory with format README</action>
     </actions>
     <acceptance-criteria>
       <criterion>scratch/[project]/ directory created with steps/ subfolder</criterion>
       <criterion>Skills loaded or gracefully skipped</criterion>
-      <criterion>Project registered in CLAUDE.local.md Active Projects (push operation)</criterion>
     </acceptance-criteria>
   </step>
 
@@ -118,7 +132,7 @@ argument-hint: <project-name> <request description>
   </step>
 
   <step id="3-investigate">
-    <description>Investigate codebase directly</description>
+    <description>Investigate codebase via researcher, then fill gaps with direct inspection</description>
 
     <investigation-topics>
       <topic name="architecture">
@@ -150,9 +164,24 @@ argument-hint: <project-name> <request description>
     </investigation-topics>
 
     <actions>
-      <action>Investigate architecture, patterns, and examples using Glob/Grep/Read</action>
-      <action>Write research.md with all findings organized by section</action>
-      <action>If combined findings exceed 200 lines: split into research/ folder with separate files per topic</action>
+      <action>Load knowledge-capture skill via Skill tool</action>
+      <action priority="critical">Dispatch `researcher` (foreground) BEFORE direct investigation. This grounds the plan in wiki-accumulated knowledge, surfaces drift, and persists new findings for future sessions. Prompt MUST include dispatcher identity `/plan-it` and project name (resolved via `git config --get remote.origin.url` parse, fallback: `basename $(git rev-parse --show-toplevel)`). Source context: `planning/investigation`.
+
+Researcher dispatch shape:
+```
+Agent({
+  subagent_type: "researcher",
+  description: "Investigate codebase context for /plan-it",
+  prompt: "Dispatcher: /plan-it. Project: {PROJECT_NAME}. Question: What are the architecture patterns, conventions, and relevant existing implementations for this project, particularly relevant to: {REQUEST_DESCRIPTION}? Focus on what a plan author needs to stay aligned with existing patterns. Source: planning/investigation."
+})
+```
+
+CLARIFICATION_REQUIRED gate: if researcher's response starts with `^CLARIFICATION_REQUIRED:`, halt and ask the user to supply the project name before proceeding.</action>
+      <action>Investigate architecture, patterns, and examples using Glob/Grep/Read (fills gaps not covered by researcher)</action>
+      <action priority="critical">Per `<edit-delegation-protocol>` above: dispatch a foreground Opus sub-agent to write `scratch/[project]/research.md`. The sub-agent reads `scratch/[project]/spec.md` directly (and any pre-existing investigation notes in scratch/[project]/learned/). Main session does NOT pre-summarize spec content into the prompt. Pass the dispatch a checklist of investigation areas and any file:line evidence already gathered — the sub-agent organizes findings into research-file-format below.</action>
+      <action>If combined findings exceed 200 lines: instruct the sub-agent to split into research/ folder with separate files per topic</action>
+      <action>After investigation, write research findings that pass the capture heuristic to scratch/[project]/learned/research-*.md (learned files are scratch capture, not delegated — they are not plan files)</action>
+      <action>Apply the Discovery Checkpoint protocol (the `## Discovery Checkpoint` section in knowledge-capture, already loaded above).</action>
     </actions>
 
     <research-file-format>
@@ -190,11 +219,11 @@ argument-hint: <project-name> <request description>
   <step id="4-design">
     <description>Design implementation approach</description>
     <actions>
-      <action>Define primary strategy with rationale</action>
+      <action>Define primary strategy with rationale (held in main-session reasoning, not written inline)</action>
       <action>Break into implementation steps (typically 4-8, adjust as needed)</action>
       <action>Identify dependencies between steps</action>
       <action>Assess risks and mitigations</action>
-      <action>Document key decisions in decisions.md</action>
+      <action priority="critical">Per `<edit-delegation-protocol>` above: dispatch a foreground Opus sub-agent to write `scratch/[project]/decisions.md`. The sub-agent reads `scratch/[project]/spec.md` and `scratch/[project]/research.md` directly. Main session passes the list of decisions to document (names + chosen options + rationale points) — not the full decision bodies. The sub-agent expands each into the decision-format below.</action>
     </actions>
     <decision-format>
       Each decision in decisions.md follows this structure:
@@ -224,10 +253,11 @@ argument-hint: <project-name> <request description>
   </step>
 
   <step id="5-generate-steps">
-    <description>Generate step files</description>
+    <description>Generate step files (and README.md — combined dispatch)</description>
     <actions>
-      <action>For each implementation step, create steps/NN-step-name.md (NN = 01, 02, etc. zero-padded)</action>
-      <action>Each step file contains: description, actions, acceptance criteria, dependencies, affected files</action>
+      <action priority="critical">Per `<edit-delegation-protocol>` above: dispatch a single foreground Opus sub-agent to write BOTH the step files (`steps/NN-step-name.md`) AND the master `README.md`. The sub-agent reads `scratch/[project]/spec.md`, `research.md`, and `decisions.md` directly. Main session passes only the step-decomposition outline (names + dependency chain + 1-line description per step) plus any source-document tracking paths — not full step bodies, not the spec text, not decision rationale. The sub-agent translates the spec + research + decisions into per-step files using the step-template below and the readme-template in step 6, plus the Risk Assessment from step 4's main-session reasoning.</action>
+      <action>Each step file must contain: description, actions, acceptance criteria, dependencies, affected files (per step-template below)</action>
+      <action priority="high">If the plan originates from a tracked document (issue file in scratch/issues/, todos.md, task tracker, planning doc, or external reference), include in the dispatch prompt a directive to append a FINAL step whose actions update that source document by absolute path — e.g., "Update scratch/issues/foo.md — mark completed items, note partial progress, add discovered follow-up items." List the specific file paths in the dispatch so they survive into the step file.</action>
     </actions>
     <step-template>
       ```markdown
@@ -258,9 +288,10 @@ argument-hint: <project-name> <request description>
   </step>
 
   <step id="6-generate-readme">
-    <description>Generate master README.md with navigation, objective, and progress tracking</description>
+    <description>Generate master README.md with navigation, objective, and progress tracking — included in the step-5 sub-agent dispatch. This step exists as a documentation/template anchor, not a separate dispatch.</description>
     <actions>
-      <action>Create README.md combining navigation, objective, risk assessment, and progress tracking</action>
+      <action>The README.md is written by the same sub-agent dispatched in step 5 — this step is NOT a separate dispatch. The readme-template below is the template the step-5 dispatch follows.</action>
+      <action>Main session does NOT open Edit/Write on README.md — even for the progress table. If post-dispatch corrections are needed, dispatch a Sonnet sub-agent (foreground) per `<edit-delegation-protocol>`.</action>
     </actions>
     <readme-template>
       ```markdown
@@ -308,20 +339,14 @@ argument-hint: <project-name> <request description>
   </step>
 
   <step id="7-validate">
-    <description>Validate structure, update local-memory, and output completion</description>
+    <description>Validate structure and output completion</description>
     <actions>
       <action>Verify all step files exist and have required sections</action>
       <action>Verify research.md (or research/) exists with findings</action>
       <action>Verify decisions.md (or decisions/) exists with at least 1 decision</action>
       <action>Verify README.md has progress table matching actual steps</action>
       <action>Verify no unnecessary depth (no folders where files suffice)</action>
-      <action priority="high">Update local-memory with plan details:
-        Edit CLAUDE.local.md directly to set:
-        - Status: "Plan created — awaiting approval"
-        - Direction: key approach/strategy from decisions
-        - Plans: scratch/[project]/README.md, scratch/[project]/steps/
-        - Skills: skills loaded during planning
-        - Decisions this session: key decisions from decisions.md</action>
+      <action>Dispatch knowledge-ingestor agent via Agent tool for scratch/[project]/learned/ to ingest captured knowledge into wiki-memory</action>
     </actions>
     <completion-output>
       ```

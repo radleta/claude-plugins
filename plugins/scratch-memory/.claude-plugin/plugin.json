@@ -1,0 +1,24 @@
+{
+  "name": "scratch-memory",
+  "version": "1.3.1",
+  "description": "Project-scoped scratch-memory: MCP tools (write_report, write_review, write_issue) for sub-agent verdicts plus scratch-memory CLI (handoff, pickup, register with opt-in PostToolUse hook) for session state persistence and ownership transfer across Claude Code sessions, plus the commit-session verb for per-session file validation and the handoff-manager agent for HANDOFF.md synthesis and resume briefs",
+  "author": {
+    "name": "Richard Adleta",
+    "email": "radleta@gmail.com",
+    "url": "https://github.com/radleta"
+  },
+  "repository": "https://github.com/radleta/claude-plugins",
+  "license": "MIT",
+  "keywords": [
+    "scratch",
+    "mcp",
+    "memory",
+    "cli",
+    "handoff",
+    "pickup",
+    "session",
+    "rename",
+    "validate",
+    "hook"
+  ]
+}

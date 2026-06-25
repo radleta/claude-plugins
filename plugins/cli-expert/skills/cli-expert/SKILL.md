@@ -29,79 +29,6 @@ description: "Validated patterns for building production-grade, Unix-style CLI t
   </scope>
 </role>
 
-## The 10 CLI Commandments
-
-These principles define a well-behaved, composable Unix CLI tool:
-
-| # | Principle | Rule |
-|---|-----------|------|
-| 1 | **Data to stdout, diagnostics to stderr** | Never mix data output with status messages |
-| 2 | **Exit codes are your API** | 0=success, 1=user error, 2=infra error, 130=cancelled |
-| 3 | **Accept stdin via `-`** | `cmd validate -` reads from pipe; `cmd template \| cmd validate -` composes |
-| 4 | **Respect `NO_COLOR`** | Check env var + `--no-color` flag + TTY auto-detect |
-| 5 | **Support `--quiet` and `--verbose`** | `--quiet` suppresses non-essential stderr; `--verbose` enables diagnostics |
-| 6 | **Handle Ctrl+C gracefully** | Catch SIGINT, clean up, exit 130 — never show stack trace |
-| 7 | **UTF-8 everywhere** | Set output encoding explicitly on platforms that default to legacy codepage |
-| 8 | **Global exception safety net** | Wrap entry point in try-catch; clean message + exit code, never raw stack trace |
-| 9 | **`--json` for machine consumption** | Structured output to stdout when `--json` active; suppress human formatting |
-| 10 | **Version and help for free** | `--version` from build metadata; `--help` auto-generated from command definitions |
-
-## Output Mode Matrix
-
-| Output type | Normal | `--quiet` | `--json` | `--verbose` |
-|-------------|--------|-----------|----------|-------------|
-| Data (stdout) | Yes | Yes | JSON result | Yes |
-| Success messages (stderr) | Yes | **No** | No | Yes |
-| Info/warnings (stderr) | Yes | **No** | No | Yes |
-| Errors (stderr) | Yes | Yes | Yes | Yes |
-| Debug diagnostics (stderr) | No | No | No | **Yes** |
-
-`--quiet` and `--verbose` are mutually exclusive — validate at parse time.
-
-## Composable Piping Pattern
-
-A well-designed CLI enables multi-stage pipes:
-
-```bash
-# Generate → validate → submit (3-stage pipe)
-cmd template worksheet | cmd validate - | cmd submit - --notes "auto"
-
-# Filter pattern: validate echoes valid input to stdout
-cmd validate resource.json | jq .typeId
-
-# Quiet mode for scripting
-cmd validate resource.json -q && echo "Valid" || echo "Invalid"
-```
-
-For this to work:
-1. `validate -` reads stdin, echoes valid input to stdout (filter pattern)
-2. `submit -` reads stdin
-3. Success/info messages go to stderr only — never pollute stdout data
-4. `--quiet` suppresses even stderr diagnostics for clean pipe chains
-
-## Exit Code Convention
-
-| Code | Meaning | When | Example |
-|------|---------|------|---------|
-| 0 | Success | Command completed normally | Validation passed, submission accepted |
-| 1 | User/input error | Bad args, validation failure, not found (4xx) | Missing required field, file not found |
-| 2 | Infrastructure error | Config missing, auth failed, server error (5xx) | No API key, connection refused, 500 |
-| 130 | Cancelled | SIGINT / Ctrl+C (128 + signal 2) | User pressed Ctrl+C during operation |
-
-Define as named constants, not magic numbers. Share across CLI projects.
-
-## Color Handling Priority
-
-Resolve color support in this order (first match wins):
-
-1. `--no-color` flag (explicit disable, highest priority)
-2. `NO_COLOR` env var (any non-empty value disables — https://no-color.org/)
-3. `TERM=dumb` env var (no terminal capabilities)
-4. TTY auto-detection (if stderr redirected → no color)
-5. Default: color enabled
-
-Apply color only to stderr output (success=green, error=red, info=cyan). Never color stdout data.
-
 ## File Loading Protocol
 
 <loading-decision>
@@ -153,3 +80,19 @@ When starting a new CLI project or hardening an existing one:
 6. **Verify signals** — Does Ctrl+C produce clean output or stack trace?
 7. **Check color** — Does `NO_COLOR=1 cmd ...` suppress ANSI codes?
 8. **Platform check** — Load the relevant `platforms/*.md` file for language-specific patterns
+
+## Pages
+
+- [The 10 CLI Commandments](ten-commandments.md) — Universal 10-rule summary table defining a well-behaved, composable Unix CLI tool
+- [Unix Conventions](principles/unix-conventions.md) — Core Unix CLI conventions: stdout/stderr split, stdin via dash, filter pattern, exit codes, signal handling, argument conventions, and line buffering
+- [Output Modes](principles/output-modes.md) — Output mode design matrix (normal/quiet/json/verbose), color handling priority chain, TTY detection, and global options architecture for CLI tools
+- [Error Handling](principles/error-handling.md) — Global exception safety net, SIGINT cancellation handling, structured logging patterns, custom exception hierarchy, and per-command error handling for CLI tools
+- [DX Conventions](principles/dx-conventions.md) — CLI developer experience conventions: help text, version info, command structure, argument parsing, idempotency, configuration priority chain, error messages, dx.sh pattern, and progressive output
+- [Production Readiness Checklist](checklists/production-readiness.md) — 50+ item production readiness checklist covering all CLI quality dimensions: Unix conventions, output modes, error handling, logging, DX, composability, and testing
+- [Platform Guides Index](platforms/README.md) — Index of platform-specific CLI implementation guides and template for adding new platforms
+- [.NET CLI Patterns](platforms/dotnet.md) — .NET 9+ CLI patterns: Spectre.Console.Cli (recommended), System.CommandLine 2.0.3, DI/TypeRegistrar, Serilog, custom exception hierarchy, entry point templates, and testing patterns
+
+## Meta
+
+- [Operations Log](log.md) — Timestamped wiki operations log (ingest, lint, query filings)
+- [Schema](schema.md) — Wiki conventions and page-type definitions

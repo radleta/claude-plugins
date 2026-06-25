@@ -1,3 +1,8 @@
+---
+tags: [csharp-expert/rules]
+summary: "Nullable reference type rules: ? annotations, null checks, null-forgiving operators, NRT migration"
+---
+
 # Null Safety and Nullable Reference Types
 
 Null reference errors are one of the most common runtime failures in C#. Nullable Reference Types (NRT) in C# 8+ provide compile-time null safety, but only when used correctly. Misuse leads to **NullReferenceException at runtime**, **incorrect warnings**, and **false sense of security**.
@@ -367,3 +372,7 @@ Before generating code with nullable reference types:
 ---
 
 **These patterns prevent NullReferenceException, the most common C# runtime error!**
+
+## Related
+
+- [Decision Tree: Null Handling](../decision-trees/null-handling.md) — if-then decision flow for nullable annotations, operators, and throw patterns

@@ -40,7 +40,7 @@ You are a TypeScript Expert with comprehensive knowledge of the TypeScript langu
       </file>
 
       <file name="PRINCIPLES.md" size="610 lines">
-        TypeScript 5.x feature guidance: const type parameters, satisfies operator, decorators, using declarations, NoInfer<T>, inferred type predicates, advanced type system features, compiler optimization strategies
+        TypeScript 5.x feature guidance: const type parameters, satisfies operator, decorators, using declarations, NoInfer&lt;T&gt;, inferred type predicates, advanced type system features, compiler optimization strategies
       </file>
 
       <file name="CHECKLISTS.md" size="310 lines">
@@ -154,13 +154,13 @@ You are a TypeScript Expert with comprehensive knowledge of the TypeScript langu
 
 ## Core Philosophy
 
-**Investigation Before Action**: Use specific tools (Read, Grep, Glob) to understand project setup before generating code. See @INVESTIGATION.md for tool-specific protocols.
+**Investigation Before Action**: Use specific tools (Read, Grep, Glob) to understand project setup before generating code. See [INVESTIGATION.md](INVESTIGATION.md) for tool-specific protocols.
 
 **Principles Over Prescriptions**: Provide outcomes and patterns rather than rigid commands, but make guidance immediately executable with clear tool usage.
 
-**Type Safety as Default**: Always generate strict-mode-compatible types. Make invalid states unrepresentable.
+**Type Safety as Default**: Always generate strict-mode compatible types. Make invalid states unrepresentable.
 
-**Pattern-Based Generation**: Detect context signals and generate appropriate TypeScript patterns from library of 42 templates. See @PATTERNS.md.
+**Pattern-Based Generation**: Detect context signals and generate appropriate TypeScript patterns from library of 42 templates. See [PATTERNS.md](PATTERNS.md).
 
 ## Agent Workflow
 
@@ -168,7 +168,7 @@ When working with TypeScript, follow this **tool-specific** approach:
 
 ### 1. Investigate Project (REQUIRED FIRST STEP)
 
-**Execute investigation protocols from @INVESTIGATION.md**:
+**Execute investigation protocols from [INVESTIGATION.md](INVESTIGATION.md)**:
 
 **Tool: Read** → `tsconfig.json` (or Glob: `**/tsconfig.json`)
 - Extract: `strict`, `target`, `module`, `moduleResolution`
@@ -184,7 +184,7 @@ When working with TypeScript, follow this **tool-specific** approach:
 **Tool: Grep** → Pattern: `\w+Id.*:.*string` (ID types)
 - Decision: Generate branded types?
 
-**See @INVESTIGATION.md for 12 complete investigation protocols**
+**See [INVESTIGATION.md](INVESTIGATION.md) for 12 complete investigation protocols**
 
 ### 2. Detect Pattern Context
 
@@ -197,11 +197,11 @@ Based on user request and investigation, identify pattern:
 - "generic", "reusable" → Generic Function
 - Transform type → Mapped Type / Utility
 
-**See @DETECTION.md for pattern detection rules**
+**See [DETECTION.md](DETECTION.md) for pattern detection rules**
 
 ### 3. Generate Code
 
-Use generation template from @PATTERNS.md:
+Use generation template from [PATTERNS.md](PATTERNS.md):
 
 **Structure**:
 1. Select template based on pattern
@@ -209,17 +209,17 @@ Use generation template from @PATTERNS.md:
 3. Adapt to project conventions (from investigation)
 4. Generate complete, working code
 
-**See @PATTERNS.md for 42 generation templates**
+**See [PATTERNS.md](PATTERNS.md) for 42 generation templates**
 
 ### 4. Verify Generation
 
-**Run verification protocol from @CHECKLISTS.md**:
+**Run verification protocol from [CHECKLISTS.md](CHECKLISTS.md)**:
 - [ ] No `any` types (grep: `:\s*any`)
 - [ ] Strict mode compatible
 - [ ] Follows project patterns
 - [ ] Exhaustive checking (for unions)
 
-**See @CHECKLISTS.md for complete verification**
+**See [CHECKLISTS.md](CHECKLISTS.md) for complete verification**
 
 ## TypeScript 5.x Features (Use These!)
 
@@ -238,7 +238,7 @@ Use generation template from @PATTERNS.md:
 **TS 5.5+**:
 - Inferred type predicates → Generate guards without explicit `value is Type`
 
-**See @PRINCIPLES.md for detailed TS 5.x feature guidance**
+**See [PRINCIPLES.md](PRINCIPLES.md) for detailed TS 5.x feature guidance**
 
 ## Pattern Library Quick Reference
 
@@ -256,18 +256,7 @@ Use generation template from @PATTERNS.md:
 9. **Conditional Types** - Type-level logic
 10. **satisfies** - Type check + inference
 
-**See @PATTERNS.md for all 42 patterns with templates**
-
-## File Organization
-
-**SKILL.md** (this file) - Overview and workflow
-**@INVESTIGATION.md** - Tool-specific investigation protocols
-**@PATTERNS.md** - 42 code generation templates
-**@DETECTION.md** - Pattern detection rules (signals → patterns)
-**@PRINCIPLES.md** - TypeScript 5.x features + best practices
-**@CHECKLISTS.md** - Verification protocols (190+ items)
-**@EXAMPLES.md** - Real-world generation examples
-**@REFERENCE.md** - Performance, troubleshooting, edge cases
+**See [PATTERNS.md](PATTERNS.md) for all 42 patterns with templates**
 
 ## Key Differences from Generic TypeScript Guidance
 
@@ -297,54 +286,6 @@ Use generation template from @PATTERNS.md:
 
 **Note**: Some files contain framework integration checklists for investigational context (detecting what frameworks a project uses), but primary focus is pure TypeScript language features. Framework-specific implementation patterns belong in dedicated framework skills.
 
-**This allows deeper TypeScript language expertise**
-
-## Example: Discriminated Union Generation
-
-**User Request**: "Create state type for data fetching"
-
-**Step 1: Investigate** (Tool: Grep)
-```
-Pattern: "status.*:.*['\"]"
-Found: Project uses status strings
-```
-
-**Step 2: Detect Pattern**
-Signal: State management + status → Discriminated Union
-
-**Step 3: Generate** (Template from @PATTERNS.md)
-```typescript
-type FetchState<T> =
-  | { status: 'idle' }
-  | { status: 'loading' }
-  | { status: 'success'; data: T }
-  | { status: 'error'; error: Error };
-
-function handleFetchState<T>(state: FetchState<T>): Result {
-  switch (state.status) {
-    case 'idle':
-      return handleIdle();
-    case 'loading':
-      return handleLoading();
-    case 'success':
-      return handleSuccess(state.data);
-    case 'error':
-      return handleError(state.error);
-    default:
-      const _exhaustive: never = state;
-      return _exhaustive;
-  }
-}
-```
-
-**Step 4: Verify**
-- [x] All states mutually exclusive
-- [x] Status is literal (not string type)
-- [x] Exhaustive switch with never
-- [x] Data/error available in correct states
-
-**See @EXAMPLES.md for 7 complete examples**
-
 ## Performance Optimization
 
 **Always Apply**:
@@ -353,25 +294,30 @@ function handleFetchState<T>(state: FetchState<T>): Result {
 - Use `import type` for type-only imports
 - Limit recursive type depth (max 5 levels)
 
-**See @REFERENCE.md for complete performance guide**
+**See [REFERENCE.md](REFERENCE.md) for complete performance guide**
 
 ## Getting Started
 
-1. **Investigate** → Run protocols from @INVESTIGATION.md
-2. **Detect** → Identify pattern from @DETECTION.md
-3. **Generate** → Use template from @PATTERNS.md
-4. **Verify** → Check with @CHECKLISTS.md
-
-## Resources
-
-- **@INVESTIGATION.md** - 12 tool-specific investigation protocols
-- **@PATTERNS.md** - 42 code generation templates with detection/adaptation
-- **@DETECTION.md** - Pattern detection rules and decision trees
-- **@PRINCIPLES.md** - TypeScript 5.x features + 12 core principles
-- **@CHECKLISTS.md** - 190+ verification items across 8 categories
-- **@EXAMPLES.md** - 7 real-world generation examples
-- **@REFERENCE.md** - Performance tuning, troubleshooting, edge cases
+1. **Investigate** → Run protocols from [INVESTIGATION.md](INVESTIGATION.md)
+2. **Detect** → Identify pattern from [DETECTION.md](DETECTION.md)
+3. **Generate** → Use template from [PATTERNS.md](PATTERNS.md)
+4. **Verify** → Check with [CHECKLISTS.md](CHECKLISTS.md)
 
 ---
 
 **TypeScript Expert: Investigation-driven, pattern-based, agent-optimized for TypeScript 5.x language mastery!**
+
+## Pages
+
+- [INVESTIGATION.md](INVESTIGATION.md) — 12 tool-specific investigation protocols for TypeScript project analysis (tsconfig, version, patterns, build tools, testing)
+- [PATTERNS.md](PATTERNS.md) — 42 code generation templates covering discriminated unions, branded types, result types, generics, mapped types, and more
+- [DETECTION.md](DETECTION.md) — Signal-to-pattern mapping rules and decision trees for selecting the correct TypeScript pattern
+- [PRINCIPLES.md](PRINCIPLES.md) — TypeScript 5.x feature guidance and 12 core principles for type system mastery and compiler optimization
+- [CHECKLISTS.md](CHECKLISTS.md) — 190+ verification items across 8 categories for comprehensive TypeScript quality assurance
+- [EXAMPLES.md](EXAMPLES.md) — Real-world generation examples and walkthroughs for all 42 patterns with before/after transformations
+- [REFERENCE.md](REFERENCE.md) — Performance optimization, troubleshooting guide, edge cases, and quick CLI commands
+
+## Meta
+
+- [Operations Log](log.md) — Timestamped wiki operations log (ingest, lint, migrate filings)
+- [Schema](schema.md) — Wiki conventions and page-type definitions

@@ -1,3 +1,8 @@
+---
+summary: "CLI app planning protocol: 3-tier testing (unit/integration/e2e), exit codes, piping, output formats, and 8 CLI-specific checklist items. Load when APP_TYPE = cli."
+tags: [plan-expert/protocols]
+---
+
 # CLI App Planning Protocol
 
 When a plan involves a CLI tool (command-line application, terminal utility, or script), apply these additional requirements on top of the standard planning workflow.
@@ -147,3 +152,7 @@ During the investigation phase, add these areas when APP_TYPE = cli:
 - Test fixtures: tests/fixtures/ with sample input files
 - CI: GitHub Actions runs unit + integration tests
 ```
+
+## See Also
+
+- [Web App Planning Protocol](web-app.md) — Sibling protocol for web applications; covers 3-tier testing with chrome-browser, story requirements, visual verification, and 10 web-app-specific checklist items.

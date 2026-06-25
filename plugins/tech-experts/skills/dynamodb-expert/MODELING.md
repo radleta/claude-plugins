@@ -1,3 +1,8 @@
+---
+tags: [dynamodb-expert/modeling]
+summary: Deep-dive data modeling reference — access patterns, composite sort keys, item collections, GSI overloading, TTL strategies, capacity planning, and reserved words.
+---
+
 # DynamoDB Data Modeling — Deep Dive
 
 ## Access Pattern-First Design

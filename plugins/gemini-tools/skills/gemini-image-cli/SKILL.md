@@ -1,6 +1,6 @@
 ---
 name: gemini-image-cli
-description: "Gemini image generation via gemini-image CLI — prompt engineering, reference images, model selection, and API best practices. Use when generating images with Gemini, writing image prompts, editing images with AI, using reference images, or calling the gemini-image script — even for simple single-image generations."
+description: "Gemini image generation via gemini-image CLI — prompt engineering, reference images, model selection, and API best practices. Use when generating images with Gemini, writing image prompts, editing images with AI, using reference images, calling the gemini-image script, or extracting alpha transparency from generated images — even for simple single-image generations."
 ---
 
 <role>
@@ -18,6 +18,7 @@ description: "Gemini image generation via gemini-image CLI — prompt engineerin
     <area>Model selection (Pro vs Flash) and parameter optimization</area>
     <area>gemini-image CLI syntax and workflow</area>
     <area>Text rendering, character consistency, and style control</area>
+    <area>Alpha extraction pipeline (rembg birefnet-general default; SAM2 for composed scenes; magenta flood-fill for fresh pixel art)</area>
   </expertise>
 
   <scope>
@@ -27,11 +28,12 @@ description: "Gemini image generation via gemini-image CLI — prompt engineerin
       <item>Using reference images for editing and style transfer</item>
       <item>Model and parameter selection</item>
       <item>Iterative image refinement workflows</item>
+      <item>Post-processing Gemini images to transparent PNGs (alpha extraction)</item>
     </in-scope>
 
     <out-of-scope>
       <item>Gemini text-only API usage (use gemini-cli skill)</item>
-      <item>Image processing/manipulation outside Gemini</item>
+      <item>General image processing unrelated to Gemini output</item>
       <item>Training or fine-tuning models</item>
     </out-of-scope>
   </scope>
@@ -151,12 +153,21 @@ Verify before running `gemini-image`:
 - [ ] Review text in images for accuracy (if any)
 - [ ] Check faces/hands for artifacts (regenerate if needed)
 
+## Alpha Extraction (Transparent PNGs)
+
+Read [ALPHA-EXTRACTION.md](ALPHA-EXTRACTION.md) for the complete protocol. Three paths, picked by content type.
+
+**Quick summary:**
+- **Logos, portraits, single-subject photos → `rembg -m birefnet-general in.png out.png`** (default; requires `pip install "rembg[cpu,cli]"`)
+- **Composed scenes where you want one object of many → SAM2 point-prompted** via `pip install ultralytics` + Python snippet
+- **Fresh pixel art you control → magenta + flood-fill** (legacy, requires ImageMagick 7+)
+
 ## Limitations and Gotchas
 
 Read [LIMITATIONS.md](LIMITATIONS.md) for the complete limitations reference — covers safety filters, rate limits, known issues, and workarounds.
 
 **Critical to know:**
-- **No transparent backgrounds** — generate on white, remove with external tools
+- **No transparent backgrounds** — use `rembg -m birefnet-general` (default) or the other paths in [ALPHA-EXTRACTION.md](ALPHA-EXTRACTION.md)
 - **Text rendering ~94% accurate** (pro) — always review text in images
 - **Faces degrade after many edits** — restart conversation if faces warp
 - **Hands still error-prone** — improved but not perfect

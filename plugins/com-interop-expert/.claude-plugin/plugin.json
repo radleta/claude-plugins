@@ -1,6 +1,6 @@
 {
   "name": "com-interop-expert",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "COM Interop patterns for C#/.NET including P/Invoke, RCW lifecycle, and STA threading",
   "author": {
     "name": "Richard Adleta",

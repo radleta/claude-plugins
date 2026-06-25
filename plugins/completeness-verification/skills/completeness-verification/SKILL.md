@@ -40,6 +40,16 @@ Run fingerprints 7-10 on all changed files, with or without a plan.
 | 9 | TRUNCATION | No truncation patterns in changed files | `// ...`, `// rest of code`, `/* ... */`, `// implement here`, `// similar to above`, `// continue pattern`, `// add more as needed`, `// same as above`, `// repeat for` found |
 | 10 | STRUCTURAL-SHORTCUT | No placeholder implementations | `throw new Error('Not implemented')`, `throw new Error("Not implemented")`, `NotImplementedException`, `NotImplementedError`, `unimplemented!()`, `todo!()`, `raise NotImplementedError` found |
 
+### Spec Artifact Mode (runs when spec path provided)
+
+Run fingerprints 11-13 when a spec file path is provided alongside the changed files.
+
+| # | Fingerprint | Check | FAIL condition |
+|---|------------|-------|----------------|
+| 11 | STATE-MATRIX-CONFORMANCE | Implementation defines a state type/enum matching the State Matrix's state set; every transition has a handler | Missing state type or unhandled transition → INCOMPLETE |
+| 12 | RESUMABILITY-CONFORMANCE | If spec has a Resumability State Matrix, implementation re-enters from any non-terminal state without data loss | Missing re-entry handling for any resumable state → INCOMPLETE |
+| 13 | DECISION-TABLE-CONFORMANCE | Each Decision Table row has a corresponding branch or case; condition columns map to guard conditions | Missing branch for any defined row → INCOMPLETE |
+
 ## Superseded Steps
 
 Steps with status containing "SUPERSEDED" are skipped entirely — not checked, not reported. Match pattern: `COMPLETED` followed by `SUPERSEDED by` in the step's status field or progress table.

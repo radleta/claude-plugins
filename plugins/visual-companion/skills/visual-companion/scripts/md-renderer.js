@@ -391,8 +391,12 @@
         var line = parseInt(e.target.getAttribute('data-line'), 10);
         var checked = e.target.checked;
 
+        var projectHashMeta = document.querySelector('meta[name="vc-project-hash"]');
+        var projectHash = projectHashMeta ? projectHashMeta.content : '';
+
         var payload = { file: filename, line: line, checked: checked };
         if (currentMtime) payload.mtime = currentMtime;
+        if (projectHash) payload.projectHash = projectHash;
 
         fetch('/toggle', {
           method: 'POST',

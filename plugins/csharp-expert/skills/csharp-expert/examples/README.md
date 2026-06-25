@@ -1,3 +1,8 @@
+---
+tags: [csharp-expert/examples]
+summary: "Index of C# Expert workflow examples demonstrating the investigate→detect→generate→verify process"
+---
+
 # C# Expert Examples
 
 Complete workflow examples demonstrating the 4-step process: Investigate → Detect → Generate → Verify
@@ -64,3 +69,7 @@ Complete workflow examples demonstrating the 4-step process: Investigate → Det
 ---
 
 **Examples complement, don't replace, the core guidance in @rules/, @templates/, and @decision-trees/**
+
+## Pages
+
+- [async-service.md](async-service.md) — Complete async service implementation with cancellation support, DI registration, and ILogger

@@ -1,3 +1,8 @@
+---
+summary: Hard constraints for async test correctness — prevents 67% of flakiness from race conditions, unhandled rejections, fixed sleeps, and improper timeout handling.
+tags: [qa-expert/rules]
+---
+
 # Async Testing Rules
 
 Asynchronous code is one of the most common sources of test failures and flakiness. Research shows that **67% of test flakiness traces to async handling issues** - race conditions, unhandled promise rejections, improper timeouts, and timing assumptions. These problems manifest as intermittent failures, hanging tests, false positives, and mysterious state corruption.

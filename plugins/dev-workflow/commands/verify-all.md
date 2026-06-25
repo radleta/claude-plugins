@@ -65,7 +65,7 @@ Step 1: completeness-verifier agent     (completeness gate — plan-aware, read-
 Step 2: code-verifier agent             (quality focus — naming, style, DRY, codebase-alignment, plan-decision-conformance)
 Step 2: codebase-alignment reviewer     (drift from plan or duplicate patterns — always runs)
 Step 2: requirements-coverage reviewer  (traces code to plan steps — only if plan exists)
-Step 2: domain reviewers                (one per technology with matching expert skill — dynamic)
+Step 2: domain reviewers                (one domain-reviewer agent per affinity group — dynamic)
 Step 2: test-verifier agent             (test quality — if tests exist)
 Step 2: ux-verifier agent               (UX/a11y/responsive — if UI/CLI files changed)
 Step 3: security-verifier agent         (security — FINAL gate, reviews approved code)
@@ -80,7 +80,7 @@ Step 3: security-verifier agent         (security — FINAL gate, reviews approv
     <gate-logic>
       <if>**Verdict:** COMPLETE</if>
       <then>Proceed to step 2</then>
-      <else>Fix incomplete items, re-run completeness-verifier (max 3 cycles)</else>
+      <else>Fix incomplete items, re-run completeness-verifier (max 10 cycles)</else>
     </gate-logic>
     <blocks>2-code-review</blocks>
   </step>
@@ -91,12 +91,31 @@ Step 3: security-verifier agent         (security — FINAL gate, reviews approv
       <action>Launch the **code-verifier** agent via the Agent tool (quality focus: naming, style, DRY, codebase-alignment)</action>
       <action>Launch a **codebase-alignment** reviewer via the Agent tool using the prompt template at `~/.claude/skills/brainstorming/codebase-alignment-reviewer-prompt.md` (artifact_type=diff, depth=REVIEW_DEPTH)</action>
       <action condition="plan exists (REVIEW_DEPTH=light)">Launch a **requirements-coverage** reviewer via the Agent tool — traces code to plan steps using code-verifier with requirements categories only</action>
-      <action condition="technologies in Skill Coverage with matching expert skill">Launch **domain reviewers** — one per matched technology, using the prompt template at `~/.claude/skills/brainstorming/domain-reviewer-prompt-template.md` (artifact_type=diff, depth=REVIEW_DEPTH)</action>
+      <!-- Canonical affinity groups
+           Keep in sync with implement-code.md, brainstorming SKILL.md, and plan-expert SKILL.md affinity maps
+           AFFINITY_GROUPS:
+             frontend:     [react-expert, typescript-expert]
+             backend-net:  [csharp-expert, dynamodb-expert, google-sheets-expert]  # shared .NET/C# integration context
+             infra:        [github-actions-expert, gcp-expert]
+             cli-scripts:  [cli-expert, scripts-expert, powershell-expert]
+           Max 2-3 skills per group. Ungrouped skills → their own solo domain-reviewer dispatch. -->
+      <action condition="technologies in Skill Coverage with matching expert skill">Launch **domain-reviewer** agents — one per affinity group with any detected skills (and one per ungrouped solo skill). Each dispatch is a thin parameter block: `/<skill-1> [/<skill-2> ...]` + Artifact + Depth + Type. The agent invokes the slash-prefixed skills via the Skill tool, reads the artifact, and returns a per-domain report with a `## Aggregate` section. Verdict parsing: extract **Status:** from inside `## Aggregate` (missing = Issues Found fail-safe). Example dispatch: `Agent(subagent_type="domain-reviewer", description="Domain review (frontend)", prompt="/react-expert /typescript-expert\n\nArtifact: <changed files>\nDepth: REVIEW_DEPTH\nType: diff")`.</action>
       <action condition="test files in changes">Launch the **test-verifier** agent via the Agent tool</action>
       <action condition="UI/CLI files in changes">Launch the **ux-verifier** agent via the Agent tool. UI files: .tsx, .jsx, .vue, .svelte, .css, .scss, .html, .astro. CLI files: argument parsers, process.exit, process.stdout, --help literals, commander/yargs/meow imports.</action>
     </actions>
     <note>Launch all applicable agents in parallel (multiple Agent calls in one message).
     Each agent runs in its own isolated context with its methodology skill preloaded.
+
+    **Model selection:** All reviewer agents default to Sonnet (set in their agent
+    definitions). At dispatch time, you may override to `model: opus` for any
+    reviewer when the change involves cross-cutting architectural concerns, complex
+    state management, or subtle correctness reasoning that checklist-driven review
+    would miss. Default to Sonnet — the burden of proof is on escalation.
+
+    **Verdict evaluation:** After reading each reviewer's verdict, check for shallow
+    output (rubber-stamp with no file:line refs, missed known issues, inapplicable
+    flags, vague findings). If a verdict appears shallow, re-dispatch ONLY that
+    reviewer with `model: opus` for higher-fidelity review.
 
     When REVIEW_DEPTH = "light" (plan exists):
     - code-verifier runs with quality focus
@@ -117,7 +136,7 @@ Step 3: security-verifier agent         (security — FINAL gate, reviews approv
     <gate-logic>
       <if>ALL APPROVED (unanimous)</if>
       <then>Proceed to step 3</then>
-      <else>Fix issues, re-run failed agents (max 3 cycles)</else>
+      <else>Fix issues, re-run failed agents (max 10 cycles)</else>
     </gate-logic>
     <blocks>3-security</blocks>
   </step>
@@ -128,7 +147,7 @@ Step 3: security-verifier agent         (security — FINAL gate, reviews approv
     <gate-logic>
       <if>APPROVED</if>
       <then>All gates passed — report results</then>
-      <else>Fix security issues, re-run security-verifier agent (max 3 cycles)</else>
+      <else>Fix security issues, re-run security-verifier agent (max 10 cycles)</else>
     </gate-logic>
   </step>
 

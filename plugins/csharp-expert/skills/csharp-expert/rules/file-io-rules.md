@@ -1,3 +1,8 @@
+---
+tags: [csharp-expert/rules]
+summary: "File I/O constraints: FileSystemWatcher + atomic write incompatibility, async file patterns"
+---
+
 # File I/O Rules & Constraints
 
 ## Rule 1: FileSystemWatcher + Atomic Write Incompatibility (CRITICAL)

@@ -1,3 +1,8 @@
+---
+tags: [react-expert/rules]
+summary: "React performance traps: object/function re-creation in render, missing memo/useMemo/useCallback"
+---
+
 # Performance Traps
 
 React is fast by default, but certain patterns cause unnecessary re-renders that slow down the UI. These aren't bugs - the app still works - but they create janky interactions, slow responses, and poor user experience.
@@ -658,3 +663,7 @@ Avoid performance traps by preventing unnecessary re-renders:
 5. **Avoid inline style objects** - use CSS classes or memoize
 
 But remember: **measure before optimizing**. React is fast by default. Only optimize what's actually slow.
+
+## Related
+
+- [Decision Tree: Performance](../decision-trees/performance.md) — decision tree for diagnosing performance problems and choosing optimizations

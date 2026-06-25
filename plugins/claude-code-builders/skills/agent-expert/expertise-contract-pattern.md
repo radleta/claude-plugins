@@ -1,3 +1,8 @@
+---
+tags: [agent-expert/expertise-contract]
+summary: "Meta-pattern for progressive disclosure architecture with 5 psychological levers, implementation template, and anti-patterns"
+---
+
 # Meta-Pattern: Expertise-Driven File Loading
 
 **Pattern for:** Skills with progressive disclosure (lean SKILL.md + detailed supporting files)
@@ -379,6 +384,8 @@ This pattern:
 
 **Quality:** Senior-level output maintained across all complexity levels
 
+**For cache-aware skill design that complements progressive disclosure:** see [token-turn-optimization.md § Cache-Aware Skill Design](token-turn-optimization.md).
+
 ---
 
 ## Further Reading
@@ -401,3 +408,25 @@ This pattern:
 **Implementation:** Add expertise contract section after "When to Use This Skill"
 
 **Template:** See "Implementation Template" section above for copy-paste ready code.
+
+---
+
+## Using This Meta-Pattern in This Skill
+
+**This skill itself demonstrates the expertise contract pattern.**
+
+This skill uses an **expertise contract** (see "Your Expertise Level as Agent-Expert" section in SKILL.md) that motivates Claude to proactively read supporting files when needed:
+- Identity-driven self-assessment
+- Explicit knowledge gaps (~10% of knowledge base in SKILL.md alone)
+- Accountability framing
+
+**Result:** 73% token savings while maintaining expert-level output (empirically validated).
+
+### When to Apply
+
+Use when building skills with:
+- Progressive disclosure (lean SKILL.md + detailed supporting files)
+- Variable task complexity
+- Expert-level capability claims
+
+**Complete pattern documentation:** See this file for 5 psychological levers, copy-paste implementation template, anti-patterns, and empirical validation results.

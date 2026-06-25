@@ -1,3 +1,8 @@
+---
+tags: [dynamodb-expert/dotnet-sdk]
+summary: Complete .NET SDK patterns — DynamoDBContext config, transactions, pagination, expressions, optimistic locking, testing mocks, TestDynamo in-memory testing, error handling, and 43-item service checklist.
+---
+
 # DynamoDB .NET SDK Patterns — Deep Dive
 
 ## DynamoDBContext Configuration

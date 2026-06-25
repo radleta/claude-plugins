@@ -1,6 +1,6 @@
 {
   "name": "gemini-tools",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Gemini CLI integration for text and image generation",
   "author": {
     "name": "Richard Adleta",

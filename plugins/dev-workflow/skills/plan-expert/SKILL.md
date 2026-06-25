@@ -38,7 +38,7 @@ description: "Research-validated framework for creating implementation plans tha
   </scope>
 </role>
 
-## The 7 Planning Principles
+## The 9 Planning Principles
 
 These principles define what separates effective plans from plans that fail during execution.
 
@@ -67,6 +67,7 @@ Each step must be specific enough that an agent can execute it without human int
 - **Include verification commands** — how to confirm the step succeeded
 - **Specify expected deliverables** — list the count and type of outputs (e.g., "3 components, 1 hook, 1 test file") so the implementer can scope-lock and verify completeness against a concrete target
 - **Reference specific extension points** — each step that modifies existing code must cite the specific file:line to extend, not just "follow existing patterns." This constrains the agent's decision surface and prevents parallel implementations.
+- **Reference reusable sources by path** — when a step applies a pattern, decision, or contract documented elsewhere (wiki page, skill methodology, project doc, code anchor, spec section, HANDOFF entry, external URL), name it via `Apply: Rx` and catalogue Rx in the plan's References table. Never duplicate the source content into the step body. Workstream-specific application (file path, range, behavior) belongs in the step; the canonical source stays where it lives. (see Plan Anatomy: Required Assets table for the References table specification)
 - **Complete all side effects** — reference updates, cross-references, and cleanup happen IN the step that created the change, not deferred to a later "cleanup" step
 
 ```markdown
@@ -148,6 +149,8 @@ Build verification into the plan, not as an afterthought. Each step should state
 3. Manual verification commands (curl endpoint, check database state)
 4. Visual confirmation (screenshot comparison, UI state check)
 
+Every implementation step's Acceptance Criteria must include ≥1 concrete verification command from this hierarchy or the lightweight tier defined in PLAN-QUALITY.md — steps without verification are flagged by Phase 4 validation and cap the plan at Grade C.
+
 ### 7. Separate Planning from Execution
 
 Planning is read-only investigation and document creation. Never implement during planning.
@@ -156,7 +159,19 @@ Planning is read-only investigation and document creation. Never implement durin
 - Planning: write plan documents, decisions, steps
 - Execution: implement code changes (SEPARATE phase, after plan approval)
 
-### 8. Plan Reconciliation Gates
+### 8. Match the Artifact
+
+Structured artifacts beat prose for correctness when correctness is combinatorial. A prose description of a state machine can omit states silently; a State & Transition Matrix with every (state × event) cell filled cannot. A prose API description can omit exception conditions; a Method Contract with `requires`, `ensures`, `throws` fields cannot. Decision Tables expose missing branches that conditional prose conceals.
+
+**Implementer perspective:** A surgical fix to one cell of an existing state machine, decision tree, or method contract needs the structural artifact MORE than the original author did, because the fix must remain consistent with every cell it doesn't touch. The principle therefore applies to fixes and refactors as much as to new construction — gating fires on combinatorial structure in the touched code, not on whether the step is framed as design or fix.
+
+This principle does NOT mean every plan step needs every artifact. It means: when the structural context has a combinatorial shape (states × events, conditions × outcomes, call sites × preconditions), use the matching artifact to surface the bugs prose hides.
+
+**Selection guide and templates:** See `plan-expert/ARTIFACTS.md` for the artifact selection table (indexed by structural pattern type) and copy-pasteable templates for each artifact. See `plan-expert/SIGNALS.md` for the signal list that fires the artifact-required check on plan steps.
+
+**Migration note (deprecated schema):** The previous plan-step schema used `design-step: true|false` YAML frontmatter to gate artifact requirements on author intent. This key is now deprecated. Steps with `design-step:` frontmatter (any value) are rejected by `step-quality-reviewer` with finding `deprecated-frontmatter`. Migration target: replace the frontmatter key with an `## Artifact: <type>` heading (or `## Artifact: none` with substantive rationale). Gating is now content-driven — signals fire on the step text, not on author-set flags.
+
+### 9. Plan Reconciliation Gates
 
 After every design-producing step, a mandatory reconciliation step is auto-inserted. Design-producing steps are those whose deliverables include architectural outputs consumed by later steps.
 
@@ -205,10 +220,22 @@ A complete plan contains these assets:
 | **Investigation findings** | Architecture, patterns, examples discovered | Evidence-based with file:line refs |
 | **Implementation steps** | Ordered sequence of agent-executable actions (8-15 steps typical) | Each has files, criteria, dependencies |
 | **Decision table** | Living record of all decisions with status tracking (Proposed/Accepted/Superseded/Reverted) | Never delete rows; update status as decisions evolve |
+| **References table** | Living catalogue of authoritative sources the plan applies (wiki pages, skills, docs, code anchors, spec sections, HANDOFF entries, external URLs) with workstream-specific application column | All local paths resolve; anchors exist; no source duplication in step bodies; no orphan refs |
 | **Risk assessment** | What could go wrong and mitigations | At least 2 risks per plan |
 | **Verification strategy** | How to confirm the plan succeeded | Tests, checks, or commands |
 
 **File structure principle:** Flat-first. Plan assets live directly in `scratch/[project]/` (no `plan/` subdirectory). Start with single files (research.md, decisions.md, steps/NN-name.md). Only escalate to folders when content volume demands it (e.g., 4+ decisions, 200+ lines of research). Max depth: 2 levels from project root.
+
+## Edit Delegation Protocol
+
+ALL writes to plan files (`README.md`, `research.md`, `decisions.md`, `steps/*.md`) go through a foreground sub-agent. Main session never opens Write/Edit on plan files — even one-line decision-table updates, single criterion additions, or typo fixes during the validation fix loop. The sub-agent reads source artifacts (`spec.md`, `idea.md` if present) directly; main session never pre-summarizes spec content into the dispatch prompt.
+
+**Why:** The artifacts are large by nature — spec alone runs hundreds of lines, plus research, decisions, and N step files drafted in sequence. Main session stays the orchestrator; the actual artifact reading and writing happens in an isolated sub-agent context. Models bias to "I need this in context" — resist.
+
+**Tier:** Sonnet for trivial single-section edits or fix-loop typo applications. Opus when the spec requires translation/decomposition (the initial steps/ generation, README.md authoring, or restructure-class fix-loop applications) — most plan-writing falls here. All dispatches are foreground because the next step (validation, re-review, user approval) depends on the file being on disk.
+
+
+Trust the returned diff. Main session does NOT re-Read plan files after a delegated write unless a specific downstream step needs the contents.
 
 ## Planning Workflow
 
@@ -238,14 +265,6 @@ A complete plan contains these assets:
     Note: Both dimensions can be active simultaneously. A web-app always
     has UI_INVOLVED = true and gets BOTH CDD.md and protocols/web-app.md.
   </gate>
-
-  <phase id="0b-local-memory" name="Register in Local Memory">
-    Push this project to local-memory (CLAUDE.local.md Active Projects) so the plan
-    survives compaction and session boundaries. If another project is already tracked,
-    this new one goes to the TOP — both stay visible. Use /local-memory push or edit
-    CLAUDE.local.md directly. Update local-memory again at plan completion with Status,
-    Direction, Plans paths, and key Decisions.
-  </phase>
 
   <phase id="1-investigate" name="Investigate">
     Explore the codebase to understand current state.
@@ -289,7 +308,6 @@ A complete plan contains these assets:
     Confirm dependencies are explicit and acyclic.
     Ensure verification strategy covers all steps.
     Verify decision table exists with all non-obvious choices recorded and status set.
-    Update local-memory (CLAUDE.local.md) with plan Status, Direction, and key Decisions.
 
     If UI_INVOLVED — verify CDD compliance:
       - Plan follows DATA MODEL → STORIES → BACKEND ordering
@@ -304,15 +322,37 @@ A complete plan contains these assets:
       - Protocol-specific investigation areas were covered
       If checklist score is below threshold, plan is capped at Grade C.
 
+    Load the `verify-fix-loop-expert` skill using the Skill tool before entering the validation loop.
+
+    <!-- Canonical affinity groups
+         Keep in sync with implement-code.md and verify-all.md affinity maps
+         AFFINITY_GROUPS:
+           frontend:     [react-expert, typescript-expert]
+           backend-net:  [csharp-expert, dynamodb-expert, google-sheets-expert]  # shared .NET/C# integration context
+           infra:        [github-actions-expert, gcp-expert]
+           cli-scripts:  [cli-expert, scripts-expert, powershell-expert]
+         Max 2-3 skills per group. Ungrouped skills → their own solo domain-reviewer dispatch. -->
+
     Dispatch parallel review subagents:
     1. **step-quality** reviewer (see step-quality-reviewer-prompt.md in this skill directory)
     2. **investigation-quality** reviewer (see investigation-quality-reviewer-prompt.md in this skill directory)
-    3. **domain reviewers** — for each technology in the project's Skill Coverage section that has
-       a matching expert skill, dispatch one domain reviewer using domain-reviewer-prompt-template.md
-       from the brainstorming/ skill directory (artifact_type=plan, depth=thorough)
+    3. **domain reviewers** — group detected skills by affinity map above. Launch one **domain-reviewer** agent per group with any detected skills (and one per ungrouped solo skill) via the Agent tool. Each dispatch prompt is a thin parameter block:
+       ```
+       /<skill-1> [/<skill-2> ...]
 
-    If any reviewer returns Issues Found: fix issues, re-dispatch ALL reviewers. Max 3 iterations,
-    then escalate to user.
+       Artifact: scratch/{project}/README.md
+       Depth: thorough
+       Type: plan
+       ```
+       The agent handles skill loading and methodology internally. Verdict parsing: extract **Status:** from inside `## Aggregate` (missing = Issues Found fail-safe).
+
+    Verify-fix loop (mandatory):
+    1. IF all reviewers return Approved → exit loop, proceed to plan quality grading.
+    2. IF any reviewer returns Issues Found:
+       a. Fix flagged issues using report findings.
+       b. IMMEDIATELY return to dispatch step — re-dispatch ALL reviewers. Do NOT proceed without re-verification.
+    3. Max 10 iterations. If exceeded, escalate to user.
+    4. NEVER exit this loop without an Approved verdict or explicit user escalation.
 
     If the plan introduces technologies not in the spec's Skill Coverage section,
     run skill coverage detection and gate before dispatching reviewers.
@@ -336,49 +376,33 @@ Not everything needs a plan. Use this decision guide:
 
 ## File Loading Protocol
 
-<loading-decision>
-  <file path="INVESTIGATION.md">
-    <load-when>Starting a plan that requires codebase investigation (most plans)</load-when>
-    <provides>Investigation methodology, areas to explore, findings documentation patterns (~220 lines)</provides>
-  </file>
+Load sibling pages on demand based on task context. See `## Pages` below for the full index with per-file load-when guidance. Quick reference:
 
-  <file path="CDD.md">
-    <load-when>UI_INVOLVED = true (loaded at classification gate BEFORE investigation, not on-demand)</load-when>
-    <provides>Component-driven phasing: stories-first ordering, review gates, mock-data-as-contract pattern, step file conventions for UI plans (~150 lines)</provides>
-  </file>
+- **Always load at classification gate:** CDD.md (UI_INVOLVED = true), protocols/web-app.md (APP_TYPE = web-app), protocols/cli.md (APP_TYPE = cli)
+- **Load during investigation:** INVESTIGATION.md (most plans)
+- **Load at validation:** PLAN-QUALITY.md, step-quality-reviewer-prompt.md, investigation-quality-reviewer-prompt.md
+- **Load on demand:** ANTI-PATTERNS.md (plan review), EXAMPLES.md (need before/after examples)
 
-  <file path="protocols/web-app.md">
-    <load-when>APP_TYPE = web-app (loaded at classification gate BEFORE investigation)</load-when>
-    <provides>Web app testing strategy (unit/integration/e2e with chrome-browser), story requirements, visual verification protocol, web-app-specific checklist (10 items) (~190 lines)</provides>
-  </file>
+**Agent-internal pages — loaded by dispatched reviewers, not by plan authors:**
+- **SIGNALS.md** — Loaded by the step-quality-reviewer dispatch via explicit Read instruction at the top of its task (before any rule application). This is the actual load mechanism — there is no `skills:` field on a general-purpose dispatch. Plan authors do NOT load this page at validation time.
 
-  <file path="protocols/cli.md">
-    <load-when>APP_TYPE = cli (loaded at classification gate BEFORE investigation)</load-when>
-    <provides>CLI testing strategy (unit/integration/e2e), exit codes, piping, output formats, CLI-specific checklist (8 items) (~130 lines)</provides>
-  </file>
+## Pages
 
-  <file path="PLAN-QUALITY.md">
-    <load-when>Evaluating plan quality, grading a plan, or improving a weak plan</load-when>
-    <provides>Quality dimensions, 70-item base checklist (+5 CDD items, +10 web-app items, +8 CLI items), grading rubric A/B/C/D (~330 lines)</provides>
-  </file>
+- [Wiki-Health Baseline Gotcha](wiki-health-baseline-gotcha.md) — wiki-health pre-existing condition check: baseline state must be established before validating plan acceptance criteria
+- [Anti-Patterns](ANTI-PATTERNS.md) — 15+ named anti-patterns organized by category with root causes, failure modes, and fixes
+- [Artifacts](ARTIFACTS.md) — Artifact selection table for State Matrix, Decision Table, Method Contracts, Concrete Examples, Sequence Diagram, and Invariants — when each fires + copy-pasteable templates (Principle 8)
+- [Signals](SIGNALS.md) — Combinatorial signal list organized by artifact type — used by step-quality-reviewer to fire the artifact-required check
+- [CDD](CDD.md) — Component-Driven Development phasing for UI plans: stories-first ordering, review gates, mock-data-as-contract pattern
+- [Examples](EXAMPLES.md) — Annotated before/after examples of steps, decisions, investigations, risk assessments, and complete plans
+- [Investigation](INVESTIGATION.md) — Investigation methodology: discovery areas, depth scaling by risk, anti-patterns, and findings documentation
+- [Plan Quality](PLAN-QUALITY.md) — 5 quality dimensions, 77-item checklist, grading rubric A/B/C/D, and verification cap rules
+- [Step-Quality Reviewer Prompt](step-quality-reviewer-prompt.md) — Dispatch template for step-quality reviewer: granularity, decision-constraining, completeness checklists
+- [Investigation-Quality Reviewer Prompt](investigation-quality-reviewer-prompt.md) — Dispatch template for investigation-quality reviewer: evidence quality and assumption detection checklists
+- [Protocols Index](protocols/README.md) — Index of app-type planning protocols loaded at the classification gate based on APP_TYPE
+- [Web App Protocol](protocols/web-app.md) — Web app planning protocol: 3-tier testing, story requirements, visual verification, 10 checklist items (APP_TYPE = web-app)
+- [CLI Protocol](protocols/cli.md) — CLI app planning protocol: 3-tier testing, exit codes, piping, output formats, 8 checklist items (APP_TYPE = cli)
 
-  <file path="step-quality-reviewer-prompt.md">
-    <load-when>Dispatching plan review subagents in Phase 4</load-when>
-    <provides>Step quality checklist: granularity, decision-constraining, completeness, DRY (~20 items)</provides>
-  </file>
+## Meta
 
-  <file path="investigation-quality-reviewer-prompt.md">
-    <load-when>Dispatching plan review subagents in Phase 4</load-when>
-    <provides>Investigation quality checklist: evidence, discovery, assumption detection (~15 items)</provides>
-  </file>
-
-  <file path="ANTI-PATTERNS.md">
-    <load-when>Reviewing a plan for common failures, or learning what to avoid</load-when>
-    <provides>15+ anti-patterns organized by category with fixes and consequences (~320 lines)</provides>
-  </file>
-
-  <file path="EXAMPLES.md">
-    <load-when>Need concrete before/after examples of good vs bad plan elements</load-when>
-    <provides>Annotated examples of steps, decisions, investigations, structure, CDD phasing, and complete plans (~540 lines)</provides>
-  </file>
-</loading-decision>
+- [Operations Log](log.md) — Timestamped wiki operations log (ingest, lint, query filings)
+- [Schema](schema.md) — Wiki conventions and page-type definitions

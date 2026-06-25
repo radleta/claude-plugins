@@ -1,3 +1,8 @@
+---
+summary: "Investigation methodology for planning: discovery areas (architecture, patterns, constraints, context), depth scaling by risk, anti-patterns, and findings documentation with file:line references."
+tags: [plan-expert/investigation]
+---
+
 # Investigation Methodology
 
 Investigation is the foundation of every good plan. Plans built on assumptions fail during implementation. Plans built on evidence succeed.

@@ -3,6 +3,18 @@
   let ws = null;
   let eventQueue = [];
 
+  function getProjectHash() {
+    const meta = document.querySelector('meta[name="vc-project-hash"]');
+    return meta ? meta.content : '';
+  }
+
+  function sendSubscribe() {
+    const projectHash = getProjectHash();
+    if (projectHash && ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'subscribe', projectHash: projectHash }));
+    }
+  }
+
   function showReloadBanner() {
     if (document.getElementById('vc-reload-banner')) return; // already showing
     const banner = document.createElement('div');
@@ -21,6 +33,7 @@
     ws = new WebSocket(WS_URL);
 
     ws.onopen = () => {
+      sendSubscribe();
       eventQueue.forEach(e => ws.send(JSON.stringify(e)));
       eventQueue = [];
     };

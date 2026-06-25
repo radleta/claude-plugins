@@ -33,14 +33,14 @@
 //   raw-update  — Accept pre-built raw MIME and update a draft (requires draftLabelName, v3.3+)
 //   configure   — Update Script Properties (whitelisted fields only, excludes apiKeys)
 
-var GATEWAY_VERSION = "3.4.0";
+var GATEWAY_VERSION = "3.5.0";
 
 // Fields the 'configure' action is allowed to set.
 // apiKeys, labelName, and draftLabelName are deliberately excluded — manage via Script Properties UI only.
 // apiKeys: controls authentication (adding keys = granting access)
 // labelName: controls read scope (changing label = escalating read permissions)
 // draftLabelName: controls draft management scope
-var CONFIGURE_WHITELIST = ["to", "cc", "defaultSubject", "maxResults"];
+var CONFIGURE_WHITELIST = ["to", "cc", "bcc", "defaultSubject", "maxResults"];
 
 // ============================================
 // Config from Script Properties
@@ -187,6 +187,7 @@ function handleDraft_(config, data) {
 
   var to = data.to || config.to;
   var cc = data.cc || config.cc;
+  var bcc = data.bcc || config.bcc;
   var subject = data.subject || config.defaultSubject;
 
   // Strategy: two paths depending on whether inline images are present.
@@ -224,6 +225,7 @@ function handleDraft_(config, data) {
 
     var options = { htmlBody: safeHtml };
     if (cc) options.cc = cc;
+    if (bcc) options.bcc = bcc;
     options.inlineImages = inlineImagesMap;
 
     // Pass subject directly — GmailApp handles MIME encoding internally.
@@ -237,6 +239,7 @@ function handleDraft_(config, data) {
       from: "",
       to: to,
       cc: cc || "",
+      bcc: bcc || "",
       subject: subject,
       htmlBody: html,
       htmlBodyBase64: "",
@@ -350,6 +353,7 @@ function handleReply_(config, data) {
     from: origTo,
     to: replyTo,
     cc: replyCc,
+    bcc: data.bcc || "",
     subject: subject,
     inReplyTo: origMsgId,
     references: origMsgId,
@@ -728,9 +732,9 @@ function handleEdit_(config, data) {
     return jsonResponse_({ error: "draftId is required" });
   }
 
-  if (!data.subject && !data.to && data.cc === undefined && !data.html) {
+  if (!data.subject && !data.to && data.cc === undefined && data.bcc === undefined && !data.html) {
     return jsonResponse_({
-      error: "at least one field to update is required (subject, to, cc, html)",
+      error: "at least one field to update is required (subject, to, cc, bcc, html)",
     });
   }
 
@@ -765,6 +769,7 @@ function handleEdit_(config, data) {
     from: currentState.from,
     to: data.to || currentState.to,
     cc: data.cc !== undefined ? data.cc : currentState.cc,
+    bcc: data.bcc !== undefined ? data.bcc : (currentState.bcc || ""),
     subject: data.subject || currentState.subject,
     inReplyTo: currentState.inReplyTo,
     references: currentState.references,
@@ -1387,6 +1392,7 @@ function buildMimeMessage_(state) {
   if (state.from) headerLines.push("From: " + sanitizeHeaderValue_(state.from));
   if (state.to) headerLines.push("To: " + sanitizeHeaderValue_(state.to));
   if (state.cc) headerLines.push("Cc: " + sanitizeHeaderValue_(state.cc));
+  if (state.bcc) headerLines.push("Bcc: " + sanitizeHeaderValue_(state.bcc));
   headerLines.push("Subject: " + encodeSubject_(state.subject));
   if (state.inReplyTo)
     headerLines.push("In-Reply-To: " + sanitizeHeaderValue_(state.inReplyTo));

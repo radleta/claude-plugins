@@ -1,3 +1,8 @@
+---
+summary: Hard constraints for writing clear, specific assertions — prevents Assertion Roulette, requires meaningful failure messages, and mandates behavior-not-implementation testing.
+tags: [qa-expert/rules]
+---
+
 # Assertion Rules
 
 Clear, meaningful assertions are the foundation of maintainable test suites. Assertions communicate test intent, provide diagnostic information when failures occur, and serve as living documentation of expected behavior. Poor assertion practices lead to the "Assertion Roulette" anti-pattern, where developers waste hours debugging test failures because they can't tell which assertion failed or why.

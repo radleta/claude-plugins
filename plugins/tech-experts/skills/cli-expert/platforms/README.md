@@ -1,3 +1,8 @@
+---
+tags: [cli-expert/platforms]
+summary: "Index of platform-specific CLI implementation guides and template for adding new platforms"
+---
+
 # Platform-Specific Implementation Guides
 
 The core CLI principles are language-agnostic. This folder contains platform-specific implementation details for each language/framework.

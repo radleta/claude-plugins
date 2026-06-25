@@ -1,3 +1,8 @@
+---
+tags: [cli-expert/platforms]
+summary: ".NET 9+ CLI patterns: Spectre.Console.Cli (recommended), System.CommandLine 2.0.3, DI/TypeRegistrar, Serilog, custom exception hierarchy, entry point templates, and testing patterns"
+---
+
 # .NET CLI Patterns
 
 Implementation patterns for .NET 9+ CLI tools. Covers two frameworks: **Spectre.Console.Cli** (recommended for rich CLIs with DI) and **System.CommandLine** (lighter, for simpler tools).

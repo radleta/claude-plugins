@@ -67,7 +67,7 @@ md-to-pdf --help
 # Expected: usage info and available templates
 
 md-to-pdf --list-templates
-# Expected: list of template names (e.g., akn)
+# Expected: list of template names (e.g., default)
 ```
 
 End-to-end test with a sample file:
@@ -88,4 +88,4 @@ ls -la /tmp/test-md-to-pdf.pdf
 3. Add any assets (logos, fonts) in the same folder
 4. Template is immediately available via `-t <name>`
 
-See `templates/akn/template.tex` as a reference.
+See `templates/default/template.tex` as a reference.

@@ -67,7 +67,7 @@ Always capture BOTH stdout and stderr. Always record the exit code as the last l
 
 ### Web/Browser Protocol
 
-Use the **chrome-devtools MCP tools** directly (loaded via your agent configuration). Follow the chrome-devtools-agent methodology for browser operations.
+Use the **chrome-devtools MCP tools** directly (loaded via your agent configuration). Follow the chrome-devtools-expert methodology for browser operations.
 
 For each web verification step:
 - Take a screenshot and save to your evidence directory

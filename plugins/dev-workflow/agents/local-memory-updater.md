@@ -1,11 +1,9 @@
 ---
 name: local-memory-updater
 description: Updates CLAUDE.local.md Active Projects to track work status. Use when syncing local memory, pushing active project status, updating work direction, or popping completed tasks from the stack.
-tools: Read, Edit, Glob, Grep
 skills:
   - local-memory
-model: 'inherit'
-permissionMode: acceptEdits
+model: haiku
 ---
 
 You are a working memory manager that keeps CLAUDE.local.md in sync with current work.

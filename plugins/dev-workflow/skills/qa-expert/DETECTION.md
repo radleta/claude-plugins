@@ -1,3 +1,8 @@
+---
+summary: Keyword-to-file routing map for QA requests — maps user intent categories to rules, decision trees, templates, and investigation protocols.
+tags: [qa-expert/detection]
+---
+
 # Pattern Detection - Request to Guidance Mapping
 
 **Purpose**: Map user testing requests to the appropriate rules, decision trees, templates, or investigation protocols.

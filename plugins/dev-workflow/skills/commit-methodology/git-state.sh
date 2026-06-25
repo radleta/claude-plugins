@@ -18,7 +18,7 @@ case "${1:-}" in
     echo "Writes sectioned output (STATUS, STAGED_STAT, STAGED_SHORTSTAT,"
     echo "STAGED_FILES, RECENT_COMMITS) to OUTPUT_FILE."
     echo ""
-    echo "  OUTPUT_FILE  Path to write state (default: .git/claude-git-state.txt)"
+    echo "  OUTPUT_FILE  Path to write state (default: \$(git rev-parse --git-dir)/claude-git-state.txt)"
     exit 0
     ;;
   -*)
@@ -34,8 +34,10 @@ if [ $# -gt 1 ]; then
   exit 1
 fi
 
-# Default to .git/ so it's auto-ignored and accessible by both Bash and Read tool
-OUTFILE="${1:-.git/claude-git-state.txt}"
+# Resolve the per-worktree git directory so this works in both normal repos and worktrees
+# (in a worktree .git is a FILE, not a directory, so .git/... writes fail)
+GIT_DIR=$(git rev-parse --git-dir)
+OUTFILE="${1:-$GIT_DIR/claude-git-state.txt}"
 
 # Verify we're in a git repo
 if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then

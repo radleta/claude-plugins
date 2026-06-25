@@ -1,3 +1,8 @@
+---
+tags: [cli-expert/checklists]
+summary: "50+ item production readiness checklist covering all CLI quality dimensions: Unix conventions, output modes, error handling, logging, DX, composability, and testing"
+---
+
 # CLI Production Readiness Checklist
 
 Use this checklist when reviewing a CLI tool for production readiness or when hardening an existing tool.

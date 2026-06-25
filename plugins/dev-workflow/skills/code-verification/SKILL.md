@@ -1,6 +1,6 @@
 ---
 name: code-verification
-description: "Unified code quality and requirements verification with 10 detection categories, traceability matrix, and AI-specific pattern detection. Use when reviewing code changes for quality issues, convention violations, over-engineering, requirements coverage, or plan-decision conformance — even for small diffs."
+description: "Unified code quality and requirements verification with 13 detection categories (10 core + 3 spec-artifact), traceability matrix, and AI-specific pattern detection. Use when reviewing code changes for quality issues, convention violations, over-engineering, requirements coverage, or plan-decision conformance — even for small diffs."
 ---
 
 # Code Verification Methodology
@@ -99,6 +99,24 @@ Checklist:
 - No implementation of a rejected alternative (code implements Option B when decision chose Option A)
 
 **Scope boundary:** Does NOT check structural completeness (completeness-verifier's job). Only checks: given that the code exists, does it match what the decisions said to build?
+
+### Spec Artifact Categories
+
+**contract-conformance** (HIGH): Method implementation violates its spec contract
+- Every method with a `requires` clause has corresponding input validation that rejects violating inputs — not silently proceeds
+- Every `ensures` clause is achievable from every valid input path — trace all paths through the method
+- Thrown exception types match `throws` clauses exactly — no catching a declared exception and re-throwing as generic
+- Anti-pattern: reading the `requires` clause and implementing only the happy path
+
+**invariant-preservation** (HIGH): Spec invariants have no enforcement in code
+- Each spec invariant has at least one enforcement point (runtime assertion, guard clause, or documented structural enforcement)
+- For security-relevant invariants, verify absence-of-violation across all relevant call sites
+- Anti-pattern: invariants that appear in comments but have no executable enforcement
+
+**example-trace** (HIGH): Code produces different output than spec examples state
+- For each `✓` Concrete Example in spec, code produces the stated output for the stated input
+- For each `✗` Concrete Example, code throws the stated exception type (not different exception, not success return)
+- Anti-pattern: code satisfying prose description but producing different value than the example
 
 ## Out of Scope
 

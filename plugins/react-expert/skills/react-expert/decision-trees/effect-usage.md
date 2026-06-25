@@ -1,3 +1,8 @@
+---
+tags: [react-expert/decision-trees]
+summary: "Decision tree for when to use useEffect vs derived state vs event handlers"
+---
+
 # Effect Usage Decision Tree
 
 ## When to Use This Tree

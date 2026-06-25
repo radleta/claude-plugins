@@ -1,3 +1,8 @@
+---
+tags: [csharp-expert/rules]
+summary: "LINQ performance rules: avoid multiple enumeration, materialize with ToList/ToArray, deferred execution awareness"
+---
+
 # LINQ Best Practices
 
 LINQ (Language Integrated Query) uses deferred execution, which is powerful but dangerous when misused. Common mistakes cause **multiple database queries**, **O(n²) performance**, **modified collection exceptions**, and **unexpected behavior**.

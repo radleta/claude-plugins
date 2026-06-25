@@ -459,30 +459,66 @@ function getFolderState(name) {
  */
 async function initializeArchiveBranch(config) {
   const branchExists = gitSilent(['branch', '--list', config.archiveBranch]);
+  if (branchExists.stdout) {
+    return;
+  }
 
-  if (!branchExists.stdout) {
-    writeStatus('Creating archive branch (first-time setup)...', 'Info');
+  // Preflight: without a reachable origin, the orphan path below creates a
+  // phantom init commit locally and then fails on push — leaving a divergent
+  // branch that can't be merged with the real remote if/when it comes back.
+  // Distinguish three states: origin missing, origin unreachable, origin ok.
+  const originUrl = gitSilent(['remote', 'get-url', 'origin']);
+  if (!originUrl.success) {
+    throw new Error(
+      'No git remote named "origin" is configured on the scratch repo. ' +
+      'Add one with: git -C scratch remote add origin <url>',
+    );
+  }
+  const remoteHasArchive = gitSilent([
+    'ls-remote', '--heads', 'origin', config.archiveBranch,
+  ]);
+  if (!remoteHasArchive.success) {
+    throw new Error(
+      `Cannot reach origin (${originUrl.stdout.trim()}): ${remoteHasArchive.stderr.trim() || 'network error'}. ` +
+      'Refusing to create archive branch locally — would diverge from remote.',
+    );
+  }
+  if (remoteHasArchive.stdout) {
+    // Remote already has archive — track it rather than create a divergent orphan.
+    writeStatus('Archive branch exists on remote, creating local tracking branch...', 'Info');
+    git(['fetch', 'origin', config.archiveBranch]);
+    git(['branch', config.archiveBranch, `origin/${config.archiveBranch}`]);
+    writeStatus('Archive branch tracking remote', 'Success');
+    return;
+  }
 
-    try {
-      git(['checkout', '--orphan', config.archiveBranch]);
+  writeStatus('Creating archive branch (first-time setup)...', 'Info');
 
-      // Clear the staging area (orphan branch inherits staged files from previous branch)
-      git(['rm', '-rf', '--cached', '.']);
+  try {
+    git(['checkout', '--orphan', config.archiveBranch]);
 
-      const readmeContent = `# Scratch Archive\n\nArchived projects from ${config.projectName}.\nUse main branch for active projects.`;
-      writeFileSync(join(SCRATCH_DIR, 'README.md'), readmeContent, 'utf-8');
+    // Clear the staging area (orphan branch inherits staged files from previous branch)
+    git(['rm', '-rf', '--cached', '.']);
 
-      git(['add', 'README.md']);
-      git(['commit', '-m', sanitizeCommitMessage('Initialize archive branch')]);
-      git(['checkout', 'main']);
-      git(['push', '-u', 'origin', config.archiveBranch]);
+    const readmeContent = `# Scratch Archive\n\nArchived projects from ${config.projectName}.\nUse main branch for active projects.`;
+    writeFileSync(join(SCRATCH_DIR, 'README.md'), readmeContent, 'utf-8');
 
-      writeStatus('Archive branch created', 'Success');
-    } catch (error) {
-      // Cleanup: try to return to main branch on failure
-      gitSilent(['checkout', 'main']);
-      throw new Error(`Failed to create archive branch: ${error.message}`);
-    }
+    git(['add', 'README.md']);
+    git(['commit', '-m', sanitizeCommitMessage('Initialize archive branch')]);
+    // Force-checkout: `git rm --cached .` unstaged main's files but left them
+    // in the working tree as untracked. A plain `checkout main` refuses to
+    // overwrite untracked files — but these ARE main's files (the orphan
+    // checkout preserved the working tree), so -f is safe and idempotent.
+    git(['checkout', '-f', 'main']);
+    git(['push', '-u', 'origin', config.archiveBranch]);
+
+    writeStatus('Archive branch created', 'Success');
+  } catch (error) {
+    // Cleanup: force return to main. Same reasoning as above — if we got
+    // partway through, we may be stranded on the orphan branch with main's
+    // files as untracked, and a non-force checkout will also fail.
+    gitSilent(['checkout', '-f', 'main']);
+    throw new Error(`Failed to create archive branch: ${error.message}`);
   }
 }
 

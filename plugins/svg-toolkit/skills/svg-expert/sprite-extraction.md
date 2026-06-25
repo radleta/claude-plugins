@@ -1,3 +1,8 @@
+---
+summary: ViewBox-based sprite extraction workflow for isolating individual graphics from composite SVG files without path surgery.
+tags: [svg-expert/sprites]
+---
+
 # Sprite Extraction Workflow
 
 Extract individual graphics from composite SVG using viewBox manipulation.

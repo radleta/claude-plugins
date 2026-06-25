@@ -1,3 +1,8 @@
+---
+tags: [cli-expert/output]
+summary: "Output mode design matrix (normal/quiet/json/verbose), color handling priority chain, TTY detection, and global options architecture for CLI tools"
+---
+
 # Output Modes: --verbose, --quiet, --json, Color, TTY
 
 ## The Four Output Modes

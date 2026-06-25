@@ -2,7 +2,6 @@
 description: Review staged or branch changes for quality, security, and completeness before committing
 argument-hint: [staged | branch] [additional context]
 context: fork
-model: sonnet
 allowed-tools: Read, Glob, Grep, Bash(git *)
 ---
 

@@ -1,3 +1,8 @@
+---
+summary: Overview of all RSpec test templates — BDD-style test patterns for Ruby and Rails covering unit, integration, async, mock, and parametrized scenarios.
+tags: [qa-expert/templates]
+---
+
 # RSpec Test Templates
 
 This directory contains comprehensive RSpec test templates for Ruby and Rails testing. Each template follows BDD (Behavior-Driven Development) best practices and includes common pitfalls that AI agents should avoid.

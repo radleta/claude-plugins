@@ -2,7 +2,6 @@
 description: Summarize current branch changes vs base — the "where was I?" command for returning to work
 argument-hint: [base-branch]
 context: fork
-model: haiku
 allowed-tools: Read, Glob, Grep, Bash(git *)
 ---
 

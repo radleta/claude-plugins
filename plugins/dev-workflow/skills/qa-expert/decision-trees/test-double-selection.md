@@ -1,3 +1,8 @@
+---
+summary: Decision tree for choosing mock vs stub vs spy vs fake vs dummy — prevents over-mocking and ensures correct test double selection for each dependency type.
+tags: [qa-expert/decision-trees]
+---
+
 # Test Double Selection Decision Tree
 
 ## When to Use This Tree

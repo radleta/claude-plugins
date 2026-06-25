@@ -1,3 +1,8 @@
+---
+summary: Complete 4-step workflow example for generating unit tests — investigation, pattern detection, template-based generation, and validation checklist.
+tags: [qa-expert/examples]
+---
+
 # Example: Generating a Unit Test
 
 This example demonstrates the complete 4-step workflow for generating unit tests using test-driven development principles.

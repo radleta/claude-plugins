@@ -1,3 +1,8 @@
+---
+tags: [react-expert/investigation]
+summary: "Protocol for detecting React version, TypeScript config, bundler, and project structure"
+---
+
 # Project Setup Investigation
 
 ## Purpose

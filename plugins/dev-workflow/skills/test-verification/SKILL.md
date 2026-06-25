@@ -1,6 +1,6 @@
 ---
 name: test-verification
-description: "Test quality verification methodology with 7 detection categories, assertion analysis, and AI-specific shallow test detection. Use when reviewing tests for meaningfulness, missing edge cases, assertion quality, or mock correctness — even for small test files."
+description: "Test quality verification methodology with 10 detection categories (7 core + 3 spec-artifact), assertion analysis, and AI-specific shallow test detection. Use when reviewing tests for meaningfulness, missing edge cases, assertion quality, or mock correctness — even for small test files."
 ---
 
 # Test Verification Methodology
@@ -66,6 +66,22 @@ AI-generated tests often look complete but miss critical verification:
 - Test directory structure doesn't match project layout
 - Test framework doesn't match what project documents specify
 - Test setup/teardown doesn't follow project patterns
+
+**example-coverage** (HIGH): Test suite omits spec Concrete Examples
+- Each `✓` Concrete Example in spec maps to an explicit test case using the exact input/output values (not paraphrased)
+- Each `✗` Concrete Example maps to an exception/error test case
+- Conditional: runs only when spec has `**Examples:**` blocks in `## Components`
+- Anti-pattern: test suite covers happy paths but omits error examples from spec
+
+**invariant-tests** (MEDIUM): Spec invariants have no test coverage
+- Each testable invariant has at least one property-style or assertion test that would catch a violation
+- Conditional: runs only when `## Invariants` is present and non-empty (not `_None — …_`)
+- Anti-pattern: invariants in comments with no test that would fail if the invariant were violated
+
+**state-matrix-coverage** (HIGH): Test suite skips State Matrix rows
+- Each (state × event) row in the State Matrix is exercised by at least one test verifying the resulting state and side effects
+- Conditional: runs only when spec has `## State & Transition Matrix`
+- Anti-pattern: tests cover only happy-path transitions, leaving error/retry/re-entry rows untested
 
 ## Out of Scope
 

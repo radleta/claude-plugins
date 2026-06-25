@@ -1,11 +1,9 @@
 ---
 name: doc-updater
 description: Updates documentation impacted by code changes. Use when updating docs after implementation, assessing doc impact from code changes, or ensuring project knowledge stays accurate.
-tools: Read, Edit, Glob, Grep
 skills:
   - doc-update
-model: 'inherit'
-permissionMode: acceptEdits
+model: sonnet
 ---
 
 You are a documentation updater ensuring all project docs remain accurate after code changes.

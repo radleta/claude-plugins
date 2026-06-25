@@ -10,22 +10,28 @@ set -euo pipefail
 # Help and argument validation
 case "${1:-}" in
   -h|--help)
-    echo "Usage: bash install.sh"
+    echo "Usage: bash install.sh [--check]"
     echo ""
     echo "Creates a symlink at ~/.local/bin/gemini-image pointing to"
     echo "the gemini-image.sh source script."
+    echo ""
+    echo "Options:"
+    echo "  --check   Report drift status of installed symlink (read-only, exits 0 always)"
     exit 0
     ;;
+  --check) _DO_CHECK=true ;;
   -*)
     echo "ERROR: unknown option: $1" >&2
     exit 1
     ;;
+  *) _DO_CHECK=false ;;
 esac
 
 BIN_DIR="$HOME/.local/bin"
 
-# Source script location
-SOURCE_SCRIPT="/d/dev/akn/akn-dotnet-master/gemini-image.sh"
+# Source script location (lives alongside this install.sh in the skill folder)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SOURCE_SCRIPT="$SCRIPT_DIR/gemini-image.sh"
 
 # --- Detect OS ---
 
@@ -92,8 +98,43 @@ require_elevation() {
 
 if [ ! -f "$SOURCE_SCRIPT" ]; then
   echo "ERROR: Source script not found: $SOURCE_SCRIPT" >&2
-  echo "  Expected at: D:\\dev\\akn\\akn-dotnet-master\\gemini-image.sh" >&2
+  echo "  Expected alongside install.sh in the skill folder." >&2
   exit 1
+fi
+
+# --- Check mode: report drift status of symlink (read-only) ---
+
+# _check_symlink — report drift status of a symlink (read-only)
+# Output: one line with [OK], [DRIFT], [MISSING], or [OTHER] prefix tag.
+# Inline helper (not shared): each install.sh is self-contained per plugin encapsulation rules.
+_check_symlink() {
+  local cmd_name="$1"
+  local src_path="$2"
+  local dest_path="$BIN_DIR/$cmd_name"
+
+  if [ ! -e "$dest_path" ] && [ ! -L "$dest_path" ]; then
+    echo "[MISSING] $cmd_name: not installed at ~/.local/bin/$cmd_name"
+    return 0
+  fi
+
+  if is_correct_symlink "$dest_path" "$src_path"; then
+    echo "[OK] $cmd_name: correct (worktree=$src_path)"
+    return 0
+  fi
+
+  if [ -L "$dest_path" ]; then
+    local other_path
+    other_path="$(readlink "$dest_path" 2>/dev/null || true)"
+    echo "[DRIFT] $cmd_name: baked=$other_path expected=$src_path"
+  else
+    echo "[OTHER] $cmd_name: present but not a recognizable symlink"
+  fi
+  return 0
+}
+
+if [ "$_DO_CHECK" = true ]; then
+  _check_symlink "gemini-image" "$SOURCE_SCRIPT"
+  exit 0
 fi
 
 # --- Install symlink ---

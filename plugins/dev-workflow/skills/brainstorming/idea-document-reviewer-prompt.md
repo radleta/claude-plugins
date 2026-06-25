@@ -1,60 +1,30 @@
-# Idea Document Reviewer Prompt Template
+# Idea Document Reviewer Dispatch Prompt
 
-Use this template when dispatching an idea document reviewer subagent.
+Dispatched via the `idea-doc-reviewer` agent. Read-only; persists its
+verdict through `mcp__scratch-memory__write_review`.
 
-**Purpose:** Verify the brainstorming idea doc is complete and ready to be translated into a spec.
-
-**Dispatch after:** Brainstorming is complete and idea.md has been updated through all design discussions.
+**Parameters:**
+- `{PROJECT_NAME}` — scratch subdir slug
+- `{ITER}` — 1-based iteration number within the idea review loop
+- `{IDEA_PATH}` — absolute path to `scratch/{project}/idea.md`
 
 ```
-Agent tool:
-  subagent_type: general-purpose
-  description: "Review idea document"
+Agent({
+  subagent_type: "idea-doc-reviewer",
+  description: "Idea doc review iter-{ITER}",
   prompt: |
-    You are a brainstorming idea document reviewer. Verify this idea doc is complete
-    and ready to be translated into a formal spec.
+    Agent's system prompt holds the contract — do not duplicate it here.
 
-    **Step 1:** Use the Read tool to read the idea doc in full:
-    [IDEA_FILE_PATH]
+    ## Inputs
+    - phase: idea
+    - artifact_path: {IDEA_PATH}
+    - project: {PROJECT_NAME}
+    - iteration: {ITER}
 
-    **Step 2:** Check the following:
-
-    | Category | What to Look For |
-    |----------|------------------|
-    | Open Questions | Any unresolved items remaining in the Open Questions section (unchecked checkboxes) |
-    | Scope Boundaries | Both In and Out scope defined — Out scope must list what was explicitly excluded and why |
-    | Decision Consistency | Decisions that contradict each other or contradict stated constraints |
-    | Constraints | At least one constraint or assumption documented |
-    | Success Criteria | Measurable criteria that define "done" — not vague aspirations |
-    | Risks | Known risks or unknowns identified — especially for novel or uncertain technical choices |
-    | Problem Statement | Clear articulation of the pain point or goal, distinct from the solution |
-
-    ## Calibration
-
-    **Only flag issues that would cause the spec to be incomplete or contradictory.**
-    The idea doc is exploratory by nature — it doesn't need perfect prose or exhaustive detail.
-    What matters is: are all decisions made, are open questions resolved, and is there enough
-    information to write a clean spec without guessing?
-
-    Minor gaps in Notes, incomplete Explored Approaches for rejected options, and
-    stylistic issues are NOT blockers. Empty placeholder sections with no real content ARE blockers.
-
-    Approve unless there are gaps that would force the spec author to make unresolved decisions.
-
-    Do NOT check codebase alignment, domain-specific patterns, or technology choices
-    — other reviewers handle those concerns.
-
-    ## Output Format
-
-    ## Idea Review
-
-    **Status:** Approved | Issues Found
-
-    **Issues (if any):**
-    - [Section X]: [specific issue] - [why it blocks spec writing]
-
-    **Recommendations (advisory, do not block approval):**
-    - [suggestions for improvement]
+    ## Your Prior Verdicts (iteration 2+ only — read these first)
+    {one bullet per path in PRIOR_DOC_PATHS, in iteration order}
+    (Omit this block entirely on iter 1 — no prior verdicts exist.)
+})
 ```
 
-**Reviewer returns:** Status, Issues (if any), Recommendations
+**Reviewer returns (to main session):** two lines — `Wrote:` and `Status:`.

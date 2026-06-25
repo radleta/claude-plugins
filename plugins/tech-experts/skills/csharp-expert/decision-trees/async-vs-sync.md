@@ -1,3 +1,8 @@
+---
+tags: [csharp-expert/decision-trees]
+summary: "Decision tree for async vs sync methods: I/O-bound vs CPU-bound, ConfigureAwait usage"
+---
+
 # Decision Tree: Async vs Sync
 
 **Purpose**: Decide when to make a method async vs synchronous.
@@ -108,3 +113,9 @@ public async Task<int> GetCountAsync(List<User> users)
 **Use async for**: I/O operations (database, HTTP, files)
 **Use sync for**: CPU-bound calculations, in-memory operations
 **Avoid**: Fake async (Task.Run wrapping), async-all-the-things
+
+## Related Decision Trees
+
+- [Decision Tree: Null Handling](null-handling.md) — null handling strategy for async return types and nullable parameters
+- [Decision Tree: Collection Types](collection-types.md) — collection type selection including LINQ materialization decisions
+- [Decision Tree: DI Lifetimes](di-lifetimes.md) — DI lifetime selection including async background services

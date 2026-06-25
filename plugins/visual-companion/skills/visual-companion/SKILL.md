@@ -88,14 +88,18 @@ Read the per-file events to see what the user checked/unchecked. These are indep
 ## Starting the Server
 
 ```bash
-visual-companion start <screen_dir>
+visual-companion add <screen_dir>
 ```
 
-`start` is idempotent — call it every time you need the server. If already running, it returns the existing URL. If not running, it starts and returns the new URL. No need to check status first.
+Outputs JSON: `{"url","hash","name","path","shared":true}`
+
+Parse the `url` field — use it for all browser references. Do NOT call `visual-companion url` to get the URL; it is already in the `add` output.
+
+`add` is idempotent — registering the same directory twice returns the same hash and URL with no side effects.
 
 The `screen_dir` is where you write content files. Use a path relative to the current project (e.g., `scratch/my-feature/` or `.brainstorm/`).
 
-After a crash or restart: `visual-companion restart` — reuses the same screen_dir and port.
+**Shared server model:** The server is a machine-wide singleton shared across all sessions and projects. Do NOT call `stop` — stopping would kill the server for everyone. Do NOT call `remove` unless the user explicitly asks to clean up a project registration.
 
 > [!WARNING]
 > Never launch the server script directly (e.g., `node scripts/server.cjs`). The `visual-companion` CLI manages the daemon lifecycle via `just-one` — direct launches create orphan processes that `stop` and `status` cannot track.
@@ -137,11 +141,15 @@ After a crash or restart: `visual-companion restart` — reuses the same screen_
 
 | Route | What it serves |
 |-------|---------------|
-| `/` | Auto-generated index listing all `.md` and `.html` files (newest first, with type badges) |
-| `/{filename}.md` | Markdown rendered client-side via markdown-it + plugins in frame template |
-| `/{filename}.html` | HTML — fragments wrapped in frame template, full documents served raw |
-| `/files/{path}` | Static assets (images, CSS, etc.) |
+| `/` | Dashboard — project cards for all registered directories, sorted by mtime |
+| `GET /_ready` | Health check: `{"ok":true}` |
+| `GET /{hash}/` | Project index — file listing for that project |
+| `GET /{name}/` | Alias — resolves name to hash, shows project index (disambiguation page if name is ambiguous) |
+| `GET /{hash}/{file}` | Serve file from project directory (stable URL — always works) |
+| `GET /{name}/{file}` | Alias — resolves name to hash, serves file (use hash URL for stability) |
 | `POST /toggle` | Checkbox write-back — toggles `- [ ]` / `- [x]` in source `.md` file |
+
+**URL patterns:** Use the `url` from `add`'s JSON output — it contains `/{hash}/` form. The `/{name}/` form is a convenience alias but may break if multiple projects share the same basename (returns disambiguation page instead).
 
 The index page and individual pages auto-reload when files change.
 
@@ -205,11 +213,20 @@ Last click is typically the final selection. If `.events` doesn't exist, use ter
 ## Managing Servers
 
 ```bash
-visual-companion status          # List all running instances
-visual-companion stop            # Stop current project's server
-visual-companion stop <name>     # Stop specific instance
-visual-companion stop --all      # Stop all instances
+visual-companion add <dir>       # Register a directory, start server if needed. Outputs JSON with url/hash/name/path/shared
+visual-companion remove <path|hash>  # Unregister a directory (use path or hash — NOT bare name)
+visual-companion list            # List all registered projects
+visual-companion start           # Start the singleton server (no args — does NOT register a directory)
+visual-companion stop            # Stop the singleton server (shared — avoid unless explicitly asked)
+visual-companion status          # Show server status (PID, port, uptime)
+visual-companion url <dir|hash|name> [file]  # Get URL for a registered project or file
 ```
+
+**Command notes:**
+- `add` is the primary command — registers a directory and ensures the server is running
+- `remove` rejects bare names (e.g., `my-feature`) — pass the full path or hash
+- `stop` kills the server for ALL sessions — do NOT call unless explicitly asked
+- `url` requires a project identifier (hash, path, or name); do NOT use to get the URL after `add` — use the `url` field from the `add` JSON output directly
 
 ## Design Tips
 

@@ -1,3 +1,8 @@
+---
+summary: "Component-Driven Development phasing for UI plans: stories-first ordering, review gates, mock-data-as-contract pattern, and step file conventions. Load when UI_INVOLVED = true."
+tags: [plan-expert/cdd]
+---
+
 # Component-Driven Development Planning
 
 When a feature involves UI, standard planning interleaves UI and backend work per phase. This creates two failure modes that CDD phasing eliminates.

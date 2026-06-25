@@ -1,3 +1,8 @@
+---
+summary: Decision tree for selecting coverage targets and metrics by project type — safety-critical to internal tools, with thresholds and tooling guidance.
+tags: [qa-expert/decision-trees]
+---
+
 # Coverage Strategy Decision Tree
 
 ## When to Use This Tree

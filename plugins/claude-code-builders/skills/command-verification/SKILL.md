@@ -59,11 +59,8 @@ Verify that Claude Code command files (.claude/commands/*.md) meet quality stand
 - Model uses alias if specified (`sonnet`, `opus`, `haiku` — not full model ID)
 - Location appropriate: project-specific in `.claude/commands/`, portable in `~/.claude/commands/`
 
-**For the full decision matrix on tool permissions**, Read:
-- `.claude/skills/claude-command-builder/QUALITY.md`
-
-**For syntax reference**, Read:
-- `.claude/skills/claude-command-builder/SYNTAX.md`
+**For the full decision matrix on tool permissions and syntax reference**, Read:
+- `.claude/skills/claude-code-expert/builders/command-patterns.md` (absorbed from claude-command-builder during Phase 2 consolidation)
 
 ## Workflow
 

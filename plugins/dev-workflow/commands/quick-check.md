@@ -2,7 +2,6 @@
 description: Fast pre-commit sanity check on staged changes — catches secrets, debug artifacts, and TODOs quickly
 argument-hint: [additional context]
 context: fork
-model: haiku
 allowed-tools: Read, Glob, Grep, Bash(git *)
 ---
 

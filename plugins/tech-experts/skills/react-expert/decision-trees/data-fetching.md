@@ -1,3 +1,8 @@
+---
+tags: [react-expert/decision-trees]
+summary: "Decision tree for choosing data fetching strategy: useEffect, SWR, React Query, or server-side"
+---
+
 # Data Fetching Decision Tree
 
 ## When to Use This Tree

@@ -1,3 +1,8 @@
+---
+tags: [csharp-expert/rules]
+summary: "IDisposable patterns: using declarations, dispose order, SafeHandle, finalize/dispose pattern"
+---
+
 # IDisposable Patterns
 
 IDisposable in C# manages unmanaged resources (file handles, database connections, network sockets, memory). Failing to properly dispose resources causes **resource leaks**, **file handle exhaustion**, **memory leaks**, and **"file in use" errors**. These failures accumulate over time and crash applications.

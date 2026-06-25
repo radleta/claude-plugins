@@ -1,3 +1,8 @@
+---
+tags: [react-expert/investigation]
+summary: "Index of investigation protocols: project setup, existing patterns, linting rules, state management detection"
+---
+
 # Investigation Protocols for React Expert
 
 ## Overview
@@ -249,3 +254,10 @@ After reading this overview:
 4. Verify with **linting-rules.md** before finalizing
 
 Each protocol file provides detailed, tool-specific instructions for systematic investigation.
+
+## Pages
+
+- [project-setup.md](project-setup.md) — Protocol for detecting React version, TypeScript config, bundler, and project structure
+- [existing-patterns.md](existing-patterns.md) — Protocol for detecting existing React patterns, hook conventions, and component structures in a codebase
+- [state-management-detection.md](state-management-detection.md) — Protocol for detecting state management library in use: Redux, Zustand, Jotai, Recoil, or Context
+- [linting-rules.md](linting-rules.md) — Protocol for detecting ESLint config, react-hooks plugin, and TypeScript strictness settings

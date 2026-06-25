@@ -1,3 +1,8 @@
+---
+tags: [react-expert/investigation]
+summary: "Protocol for detecting state management library in use: Redux, Zustand, Jotai, Recoil, or Context"
+---
+
 # State Management Detection
 
 ## Purpose
@@ -579,3 +584,7 @@ Generate: New context in contexts/NewFeatureContext.tsx
 - How to handle async operations (thunks, mutations, etc.)
 
 This investigation ensures new state logic integrates seamlessly with existing state management architecture.
+
+## Related
+
+- [Decision Tree: State Management](../decision-trees/state-management.md) — decision tree for choosing state location after library detection is complete

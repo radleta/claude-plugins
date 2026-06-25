@@ -1,3 +1,8 @@
+---
+summary: "15+ named anti-patterns organized by category (investigation failures, step quality, decision failures, structure failures) with root causes, failure modes, and fixes."
+tags: [plan-expert/anti-patterns]
+---
+
 # Planning Anti-Patterns
 
 Common failures that cause plans to fail during implementation. Each anti-pattern includes why it happens, what goes wrong, and how to fix it.
@@ -116,6 +121,28 @@ Common failures that cause plans to fail during implementation. Each anti-patter
 
 ---
 
+### The Commandless Criterion
+
+**Pattern:** Acceptance criteria: "Verify the auth middleware works." / "Confirm functionality." / "Test the feature."
+
+**Why it happens:** Agent knows a step needs verification but uses vague language instead of specifying a concrete runnable command. Feels like it's "covered" but there's nothing to actually run.
+
+**What goes wrong:** Implementing agent has no command to execute. Marks criterion "done" based on subjective assessment. Per-step verification checkpoint in implement-code has nothing to run. Completeness-verifier finds checkboxes marked but no evidence of actual verification.
+
+**Fix:** Replace with a concrete command + expected output. Example:
+- Before: `- [ ] Verify the auth middleware works`
+- After: `- [ ] npm test -- --grep "auth middleware" → 3 tests pass, exit 0`
+
+Non-code steps use lightweight tier commands:
+- File existence: `test -f path/to/file` → exists
+- Config parses: `command --dry-run` → exit 0
+- Scaffolding: `ls -la path/to/dir/` → expected structure
+- Rename/move: `git status` → expected file changes
+
+**Distinction from The Subjective Criterion:** The Subjective Criterion catches *quality language* without objective measurement ("code is clean"). The Commandless Criterion catches *acceptance criteria with no runnable command at all* — structurally unverifiable regardless of language quality. If the criterion uses vague quality words → Subjective. If the criterion has no command to run → Commandless. Both can apply to the same criterion.
+
+---
+
 ## Category 4: Completeness Failures
 
 ### The Happy-Path-Only Plan
@@ -201,6 +228,18 @@ Common failures that cause plans to fail during implementation. Each anti-patter
 **What goes wrong:** Planning phase never ends. 30 steps for a 2-hour feature. Analysis paralysis.
 
 **Fix:** Set a planning budget proportional to implementation scope. Bug fix plan: 30 minutes max. Feature plan: 1-2 hours max. If planning exceeds the budget, the scope needs splitting, not more planning.
+
+---
+
+### The Inline-Edit Plan-Writing Trap
+
+**Pattern:** Main session opens Edit/Write on plan files (`README.md`, `research.md`, `decisions.md`, `steps/*.md`) instead of dispatching a sub-agent. Includes single-row decision-table updates, single-criterion additions, typo fixes during the validation fix loop, and pre-summarizing `spec.md` into a sub-agent dispatch prompt to "save the sub-agent a read."
+
+**Why it happens:** Inline edits feel cheap at the moment of writing. Models also bias to "I need the spec in context to write good steps" — the spec read feels load-bearing for the conversational turn that follows.
+
+**What goes wrong:** Main session pulls the full spec, the post-edit verification Read, and diff context — all accumulating as plan writing progresses through research, decisions, and N step files. The dispatch-prompt-with-pre-summarized-spec variant is worse: main session pays the spec read AND the sub-agent is one translation step removed from the source of truth, so subtle decisions get smoothed over in the summary.
+
+**Fix:** Dispatch a foreground Opus sub-agent that reads `spec.md` (and `idea.md` if present) directly. Pass file paths, not content. See `## Edit Delegation Protocol` in SKILL.md. Red-flag self-rationalizations to ignore: "I need to keep the spec in context," "briefing the sub-agent costs more than doing it," "it's just one step file."
 
 ---
 
@@ -315,6 +354,44 @@ Phase 2: Rename module-c to module-d
 
 ---
 
+## Category 9: References Failures
+
+### Source Duplication
+
+**Pattern:** Step body inlines code, configuration, or prose that has its own authoritative home in a wiki page, doc, or other source.
+
+**Why it happens:** It feels faster to paste the pattern inline than to catalogue it. The step looks self-contained.
+
+**What goes wrong:** The step body diverges silently from the source when the source is updated. Reviewers can't trace which source the step is grounded in. The same pattern pasted across multiple steps must be updated in each when the source changes.
+
+**Fix:** Catalogue the source in the plan's References table, assign it an Rx ID, replace the inlined content in the step body with `Apply: Rx`. The step body describes the workstream-specific application (file path, range, behavior); the canonical source stays where it lives.
+
+---
+
+### Naked Reference
+
+**Pattern:** Step body says "see akn-expert/foo.md" or "follow patterns in X" without an Rx entry in the References table.
+
+**Why it happens:** Author knows the source exists and mentions it informally instead of cataloguing it.
+
+**What goes wrong:** Free-form references are invisible to automated checkers and reviewers. The source path may drift, the anchor may not exist, and there is no resolution check at plan-write time.
+
+**Fix:** Catalogue the source in the References table with its Rx ID and Applies To column. Replace the free-form mention in the step body with `Apply: Rx`.
+
+---
+
+### Orphan Reference
+
+**Pattern:** Rx exists in the References table but no step's `Apply:` field uses it.
+
+**Why it happens:** Source was catalogued during planning but the step(s) that apply it were removed, merged, or never written.
+
+**What goes wrong:** The References table misrepresents which sources the plan actually grounds in. Reviewers waste time verifying a source that no step uses.
+
+**Fix:** Remove the unused Rx from the References table. If the source genuinely applies to a step, add `Apply: Rx` to that step's header.
+
+---
+
 ## Anti-Pattern Quick Reference
 
 | Anti-Pattern | Category | Quick Fix |
@@ -328,6 +405,7 @@ Phase 2: Rename module-c to module-d
 | Vague step | Executability | Specify files, actions, criteria |
 | Assumed context | Executability | List every file explicitly |
 | Subjective criterion | Executability | Use measurable verification |
+| Commandless criterion | Executability | Replace with concrete command + expected output |
 | Happy path only | Completeness | Include error + edge cases |
 | Test last | Completeness | Include tests in each step |
 | Missing implicit reqs | Completeness | Checklist implicit requirements |
@@ -335,6 +413,7 @@ Phase 2: Rename module-c to module-d
 | Context drift | AI-Specific | Re-read objective after each step |
 | Copy-paste architecture | AI-Specific | Follow discovered patterns |
 | Infinite planning | AI-Specific | Set planning time budget |
+| Inline-edit plan-writing | AI-Specific | Dispatch foreground Opus sub-agent that reads spec.md directly |
 | Deferred cleanup | Atomicity | Each phase updates its own references |
 | Non-atomic phase | Atomicity | Phase must leave codebase consistent |
 | Backend-first UI | UI Planning | Build stories first, backend matches mock data shapes |
@@ -343,3 +422,6 @@ Phase 2: Rename module-c to module-d
 | Parallel Implementation | DRY & Reuse | Investigate existing code, reference file:line, justify new files |
 | Assumed Backwards Compatibility | DRY & Reuse | Default extend/adapt, BC requires explicit user approval |
 | Vague Extension Point | DRY & Reuse | Cite specific function/method at file:line |
+| Source Duplication | References | Catalogue source as Rx, replace inline content with Apply: Rx |
+| Naked Reference | References | Catalogue free-form mention in References table, apply by ID |
+| Orphan Reference | References | Remove unused Rx or add Apply: Rx to the step that uses it |

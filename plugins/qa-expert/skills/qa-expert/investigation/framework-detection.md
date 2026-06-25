@@ -1,3 +1,8 @@
+---
+summary: Protocol for detecting which testing framework(s) are in use — identifies Jest, Pytest, JUnit, Mocha, and RSpec from project config files and test file patterns.
+tags: [qa-expert/investigation]
+---
+
 # Framework Detection Protocol
 
 ## Purpose

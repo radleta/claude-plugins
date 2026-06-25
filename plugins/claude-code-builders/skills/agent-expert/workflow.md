@@ -1,3 +1,8 @@
+---
+tags: [agent-expert/workflow]
+summary: "Complete 4-phase transformation process (INVESTIGATE, APPLY, TRANSFORM, VALIDATE) with detailed actions and checklists"
+---
+
 # The 4-Phase Agent-Optimization Workflow
 
 ## Overview
@@ -74,7 +79,11 @@ This file provides the complete, detailed workflow for transforming any human-or
      - Example: "Implement authentication microservice"
      - Apply: All 25 principles comprehensively
 
-3. **List current issues**
+3. **Identify workflow pattern**
+
+   Identify which of the 5 canonical workflow patterns applies (prompt chaining / routing / parallelization / orchestrator-workers / evaluator-optimizer) — see [workflow-following.md](workflow-following.md) for pattern details, required prompt elements, and gotchas per pattern.
+
+4. **List current issues**
 
    Use this checklist to identify problems:
 
@@ -108,7 +117,7 @@ This file provides the complete, detailed workflow for transforming any human-or
    - [ ] Uses passive voice? ("tests should be run" vs "run tests")
    - [ ] Uses questions? ("have you checked?" vs "check")
 
-4. **Determine principle level to apply**
+5. **Determine principle level to apply**
 
    Based on complexity identified in step 2:
 
@@ -598,3 +607,26 @@ Ready for use
 **For validation details:** Use Read tool on validation.md when need complete grading rubric
 **For example transformations:** Use Read tool on examples.md when need 7 complete examples across complexity levels
 **For principle details:** See SKILL.md - All content inline in "Core 4 Principles" and "Additional Principles" sections
+**For runtime reliability and drift countermeasures:** Use Read tool on workflow-following.md when designing multi-step or looping workflows
+
+---
+
+## Core Workflow Summary
+
+```
+1. INVESTIGATE
+   ↓
+   Determine complexity (Simple/Multi-Step/Complex/Mission-Critical)
+   ↓
+2. APPLY PRINCIPLES
+   ↓
+   Select principles based on complexity
+   ↓
+3. TRANSFORM
+   ↓
+   Convert human → agent format using patterns
+   ↓
+4. VALIDATE
+   ↓
+   Check quality (Grade A/B/C/D), iterate if needed
+```

@@ -1,3 +1,8 @@
+---
+summary: Complete 4-step workflow example for generating integration tests with database and HTTP interactions — investigation, mocking strategy, and validation.
+tags: [qa-expert/examples]
+---
+
 # Example: Generating an Integration Test
 
 This example demonstrates the complete 4-step workflow for generating an integration test with database interactions and HTTP testing.

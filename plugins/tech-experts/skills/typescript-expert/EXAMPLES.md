@@ -1,3 +1,8 @@
+---
+summary: Real-world generation examples and walkthroughs for all 42 TypeScript patterns — before/after transformations, complete implementations, and anti-patterns to avoid.
+tags: [typescript-expert/examples]
+---
+
 # TypeScript Examples & Walkthroughs
 
 Real-world examples demonstrating TypeScript patterns, principles, and best practices.
@@ -807,3 +812,49 @@ These examples demonstrate:
 - Advanced types enable better APIs
 
 These patterns adapt to your specific project needs while maintaining type safety and maintainability.
+
+---
+
+## Quick-Start: Discriminated Union Generation
+
+**User Request**: "Create state type for data fetching"
+
+**Step 1: Investigate** (Tool: Grep)
+```
+Pattern: "status.*:.*['\"]"
+Found: Project uses status strings
+```
+
+**Step 2: Detect Pattern**
+Signal: State management + status → Discriminated Union
+
+**Step 3: Generate** (Template from PATTERNS.md)
+```typescript
+type FetchState<T> =
+  | { status: 'idle' }
+  | { status: 'loading' }
+  | { status: 'success'; data: T }
+  | { status: 'error'; error: Error };
+
+function handleFetchState<T>(state: FetchState<T>): Result {
+  switch (state.status) {
+    case 'idle':
+      return handleIdle();
+    case 'loading':
+      return handleLoading();
+    case 'success':
+      return handleSuccess(state.data);
+    case 'error':
+      return handleError(state.error);
+    default:
+      const _exhaustive: never = state;
+      return _exhaustive;
+  }
+}
+```
+
+**Step 4: Verify**
+- [x] All states mutually exclusive
+- [x] Status is literal (not string type)
+- [x] Exhaustive switch with never
+- [x] Data/error available in correct states

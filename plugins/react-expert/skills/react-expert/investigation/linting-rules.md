@@ -1,3 +1,8 @@
+---
+tags: [react-expert/investigation]
+summary: "Protocol for detecting ESLint config, react-hooks plugin, and TypeScript strictness settings"
+---
+
 # Linting Rules Investigation
 
 ## Purpose

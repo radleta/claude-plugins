@@ -4,9 +4,9 @@
 # Usage: git-status-all
 # Requires: .subrepos file in cwd (one directory per line, # comments allowed)
 #
-# Output:
-#   .git/commit-all-summary.txt          — per-repo status overview
-#   .git/commit-all-diffs/{name}.diff    — full diff per dirty repo (sectioned format)
+# Output (paths under $(git rev-parse --git-dir)/):
+#   commit-all-summary.txt          — per-repo status overview
+#   commit-all-diffs/{name}.diff    — full diff per dirty repo (sectioned format)
 #   stdout: inline summary for quick triage
 
 set -euo pipefail
@@ -19,9 +19,9 @@ case "${1:-}" in
     echo "Gather git state across all repos defined in .subrepos."
     echo "Requires a .subrepos file in the current directory."
     echo ""
-    echo "Output:"
-    echo "  .git/commit-all-summary.txt        — per-repo status overview"
-    echo "  .git/commit-all-diffs/{name}.diff   — full diff per dirty repo"
+    echo "Output (written under \$(git rev-parse --git-dir)/):"
+    echo "  commit-all-summary.txt        — per-repo status overview"
+    echo "  commit-all-diffs/{name}.diff  — full diff per dirty repo"
     exit 0
     ;;
   -*)
@@ -37,8 +37,6 @@ if [ $# -gt 0 ]; then
   exit 1
 fi
 
-SUMMARY_FILE=".git/commit-all-summary.txt"
-DIFF_DIR=".git/commit-all-diffs"
 SUBREPOS_FILE=".subrepos"
 
 # --- Validate ---
@@ -52,6 +50,12 @@ if [ ! -f "$SUBREPOS_FILE" ]; then
   echo "ERROR: No .subrepos file found. Create one with sub-repo directories, one per line." >&2
   exit 1
 fi
+
+# Resolve the per-worktree git directory so this works in both normal repos and worktrees
+# (in a worktree .git is a FILE, not a directory, so .git/... writes fail)
+GIT_DIR=$(git rev-parse --git-dir)
+SUMMARY_FILE="$GIT_DIR/commit-all-summary.txt"
+DIFF_DIR="$GIT_DIR/commit-all-diffs"
 
 # --- Parse .subrepos ---
 

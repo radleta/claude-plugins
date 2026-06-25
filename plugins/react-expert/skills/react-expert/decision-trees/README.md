@@ -1,3 +1,8 @@
+---
+tags: [react-expert/decision-trees]
+summary: "Index of decision trees for common React choices: data fetching, effects, performance, state management"
+---
+
 # Decision Trees for React Development
 
 ## Overview
@@ -235,3 +240,10 @@ To add a new decision tree:
 - `@investigation/` - When to investigate vs decide
 - `@validation/` - Quality checklists
 - `@templates/` - Code templates for implementations
+
+## Pages
+
+- [state-management.md](state-management.md) — Decision tree for choosing state location: local state, context, useReducer, or external store
+- [effect-usage.md](effect-usage.md) — Decision tree for when to use useEffect vs derived state vs event handlers
+- [performance.md](performance.md) — Decision tree for React performance: when to use memo, useMemo, useCallback, or virtualization
+- [data-fetching.md](data-fetching.md) — Decision tree for choosing data fetching strategy: useEffect, SWR, React Query, or server-side

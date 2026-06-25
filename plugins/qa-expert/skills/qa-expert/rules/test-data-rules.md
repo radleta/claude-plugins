@@ -1,3 +1,8 @@
+---
+summary: Hard constraints for test data quality — prevents magic numbers, General Fixture anti-pattern, and requires intention-revealing data with factories and builders.
+tags: [qa-expert/rules]
+---
+
 # Test Data Management Rules
 
 Test data quality directly impacts test maintainability, readability, and reliability. Poor test data practices lead to two critical anti-patterns: **Hard-Coded Test Data** (magic numbers and strings that obscure test intent) and **General Fixture** (shared setup containing data not needed by all tests). Well-managed test data makes tests self-documenting, isolated, and resilient to change.

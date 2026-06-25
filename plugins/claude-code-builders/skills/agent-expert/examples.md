@@ -1,3 +1,8 @@
+---
+tags: [agent-expert/examples]
+summary: "8 complete before/after transformations across all complexity levels (simple, multi-step, complex, mission-critical)"
+---
+
 # Agent-Optimization Examples: Before & After Transformations
 
 ## Overview
@@ -658,3 +663,26 @@ After implementing, have an agent review the code and check security.
 - Dependencies stated (step 5 depends on step 4 passing)
 
 **Grade:** A (Executable, unambiguous, role-defined, context-crafted, model-selected)
+
+---
+
+## Quick Start Example (from SKILL.md)
+
+**Before (Human):**
+```markdown
+Make sure the code is good quality before committing.
+```
+
+**After (Agent-Optimized):**
+```markdown
+Verify code quality before committing:
+- [ ] Linter passes (run: npm run lint, expect 0 warnings)
+- [ ] TypeScript compiles (run: tsc --noEmit, must succeed)
+- [ ] All tests pass (run: npm test)
+- [ ] Coverage ≥80% (run: npm test -- --coverage)
+- [ ] All public functions have JSDoc comments
+```
+
+**Principles Applied:** #7 (Executable), #9 (No Ambiguity), #13 (Imperative), #10 (Acceptance Criteria)
+
+**Grade:** A (Excellent)

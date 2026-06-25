@@ -1,6 +1,6 @@
 {
   "name": "scripts-expert",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Portable shell and Node.js script patterns with install.sh and Windows/MSYS compatibility",
   "author": {
     "name": "Richard Adleta",

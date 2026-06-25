@@ -1,3 +1,8 @@
+---
+tags: [csharp-expert/rules]
+summary: "DI lifetime rules: no Singleton capturing Scoped, captive dependency prevention, service scope validation"
+---
+
 # Dependency Injection Rules
 
 Dependency Injection (DI) in .NET has strict rules about service lifetimes (Transient, Scoped, Singleton). Violating lifetime rules causes **memory leaks**, **captive dependencies**, **stale data**, **ObjectDisposedException**, and **race conditions**.

@@ -1,3 +1,8 @@
+---
+tags: [csharp-expert/templates]
+summary: "Index of working C# code templates: async methods, DI registration, LINQ queries, IDisposable"
+---
+
 # C# Expert Templates
 
 Working C# code templates for common patterns. Each template demonstrates correct usage of C# conventions, async patterns, dependency injection, and resource management.
@@ -122,3 +127,14 @@ Templates are loaded on-demand based on detected pattern:
 ---
 
 **Templates provide working code patterns that prevent the Top 10 C# agent mistakes!**
+
+## Related
+
+- [Example: Async Service](../examples/async-service.md) — complete async service workflow demonstrating how templates are applied end-to-end
+
+## Pages
+
+- [async-method-with-cancellation.cs](async-method-with-cancellation.cs) — Async method with full cancellation support, exception handling, and logging
+- [constructor-injection.cs](constructor-injection.cs) — Service with constructor injection and proper DI lifetimes
+- [idisposable-implementation.cs](idisposable-implementation.cs) — Full IDisposable pattern with proper disposal and using declarations
+- [linq-query-patterns.cs](linq-query-patterns.cs) — Correct LINQ usage: materialization, projection, and avoiding multiple enumeration

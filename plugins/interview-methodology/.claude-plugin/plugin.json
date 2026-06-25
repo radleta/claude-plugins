@@ -1,0 +1,17 @@
+{
+  "name": "interview-methodology",
+  "version": "1.0.1",
+  "description": "Structured option-batch protocol for eliciting user decisions with recommendations",
+  "author": {
+    "name": "Richard Adleta",
+    "email": "radleta@gmail.com",
+    "url": "https://github.com/radleta"
+  },
+  "repository": "https://github.com/radleta/claude-plugins",
+  "license": "MIT",
+  "keywords": [
+    "interview",
+    "decisions",
+    "elicitation"
+  ]
+}

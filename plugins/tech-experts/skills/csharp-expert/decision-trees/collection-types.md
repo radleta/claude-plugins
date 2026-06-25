@@ -1,3 +1,8 @@
+---
+tags: [csharp-expert/decision-trees]
+summary: "Decision tree for collection type selection: List vs HashSet vs Dictionary vs Array vs IEnumerable"
+---
+
 # Decision Tree: Collection Type Selection
 
 **Purpose**: Choose the correct collection type (List, HashSet, Dictionary, Array) for the use case.
@@ -176,3 +181,9 @@ var activeUserIds = _context.Users
 **Unique values**: Use HashSet
 **Key-value mapping**: Use Dictionary
 **Default choice**: List<T> (most common, flexible)
+
+## Related Decision Trees
+
+- [Decision Tree: Async vs Sync](async-vs-sync.md) — async vs sync decisions including async LINQ materialization patterns
+- [Decision Tree: DI Lifetimes](di-lifetimes.md) — DI lifetime selection including IDisposable collection considerations
+- [Decision Tree: Null Handling](null-handling.md) — null handling including nullable collection elements

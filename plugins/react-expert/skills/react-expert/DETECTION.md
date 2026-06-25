@@ -1,3 +1,8 @@
+---
+tags: [react-expert/detection]
+summary: "Keyword-to-file mapping for routing React requests to appropriate rules, decision trees, and templates"
+---
+
 # Pattern Detection - Request to Guidance Mapping
 
 **Purpose**: Map user requests to the appropriate rules, decision trees, or templates.

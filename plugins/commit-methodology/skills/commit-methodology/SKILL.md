@@ -27,7 +27,7 @@ Arguments may include a session context summary describing what was done and why
 git-state
 ```
 
-This writes sectioned output to `.git/claude-git-state.txt` with headers: `STATUS`, `STAGED_STAT`, `STAGED_SHORTSTAT`, `STAGED_FILES`, `RECENT_COMMITS`. Use Read or Grep on that file — do not re-run git commands individually.
+This writes sectioned output to `$(git rev-parse --git-dir)/claude-git-state.txt` (path printed on stdout) with headers: `STATUS`, `STAGED_STAT`, `STAGED_SHORTSTAT`, `STAGED_FILES`, `RECENT_COMMITS`. Use Read or Grep on that file — do not re-run git commands individually.
 
 Then assess the staging area from the `STATUS` section. Follow the first matching case:
 
@@ -215,9 +215,9 @@ Run the multi-repo status script:
 git-status-all
 ```
 
-This reads `.subrepos`, surveys all repos + main, and writes:
-- `.git/commit-all-summary.txt` — per-repo status overview
-- `.git/commit-all-diffs/{name}.diff` — full diff per dirty repo (sectioned format)
+This reads `.subrepos`, surveys all repos + main, and writes (paths printed on stdout, under `$(git rev-parse --git-dir)/`):
+- `commit-all-summary.txt` — per-repo status overview
+- `commit-all-diffs/{name}.diff` — full diff per dirty repo (sectioned format)
 
 Read the summary file to identify which repos have changes.
 
@@ -225,13 +225,13 @@ If all repos are clean: report "All repos clean, nothing to commit." and **STOP*
 
 ### Step M1: Plan Accuracy Check
 
-1. Read `CLAUDE.local.md` for active projects (look for `<local-memory>` tags)
-2. For each active project with plan files in scratch/:
+1. Discover active plans from the scratch/ diff: scan the scratch diff file (path printed by `git-status-all` as `commit-all-diffs/scratch.diff` under `$(git rev-parse --git-dir)/`) for changed files matching `scratch/*/README.md` or `scratch/*/steps/*` — each unique `scratch/{project}/` prefix is an active plan touched by this commit
+2. For each active plan discovered:
    - Read the plan's README.md progress table
-   - Read the matching diff file (`.git/commit-all-diffs/scratch.diff` and `.git/commit-all-diffs/main.diff`)
+   - Read the matching diff content (already available in the `commit-all-diffs/scratch.diff` and `commit-all-diffs/main.diff` files under `$(git rev-parse --git-dir)/`)
    - Identify steps that appear completed based on diff content
    - If completed steps are not checked in the plan: dispatch **plan-updater** agent with the plan path and a summary of completed work
-3. If a dirty repo has no matching active project AND no `$ARGUMENTS` context was provided: warn the user and ask whether to proceed
+3. If no plan was touched AND no `$ARGUMENTS` context was provided: proceed without plan accuracy check (the commit is unrelated to plan progress)
 4. If `$ARGUMENTS` were provided: proceed (user context implies acknowledgment)
 
 ### Step M2: Per-Repo Commit
@@ -245,7 +245,7 @@ For each dirty repo:
 1. Auto-stage all changes: `git -C {repo_path} add -A`
 2. Dispatch **commit-worker** agent with prompt:
    - Working directory: `{repo_path}`
-   - Pre-gathered state: `.git/commit-all-diffs/{name}.diff`
+   - Pre-gathered state: `$(git rev-parse --git-dir)/commit-all-diffs/{name}.diff`
    - Session context: `$ARGUMENTS` (if provided)
 3. If commit fails (security block, pre-commit hook, etc.): log the error and **continue** to next repo. Do not halt.
 

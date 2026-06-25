@@ -1,3 +1,8 @@
+---
+tags: [agent-expert/validation]
+summary: "10-item quality checklist, A/B/C/D grading system, failure modes and fixes for agent-optimized instructions"
+---
+
 # Agent-Optimization Validation & Quality Assessment
 
 ## Overview

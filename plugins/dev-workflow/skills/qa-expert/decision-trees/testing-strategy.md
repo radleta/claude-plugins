@@ -1,3 +1,8 @@
+---
+summary: Decision tree for unit vs integration vs E2E test distribution — test pyramid and trophy guidance by project type and risk profile.
+tags: [qa-expert/decision-trees]
+---
+
 # Testing Strategy Decision Tree
 
 ## When to Use This Tree

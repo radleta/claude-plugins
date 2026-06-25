@@ -6,15 +6,27 @@
 
 Gemini cannot generate PNGs with alpha channel transparency.
 
-**Workaround:** Generate on a solid white (or green) background, then remove the background with external tools (ImageMagick, rembg, Photoshop).
+**Workaround:** Use the validated magenta background + flood-fill + edge erode pipeline. See [ALPHA-EXTRACTION.md](ALPHA-EXTRACTION.md) for the complete protocol.
 
 ```bash
-# Generate with explicit white background
-gemini-image "a red cardinal bird on a pure white background, studio lighting" -o cardinal.png
+# Generate with magenta background (classic transparency color)
+gemini-image "a red cardinal bird on a solid magenta (#FF00FF) background, bold dark outlines" -o cardinal.png
 
-# Remove background with rembg (pip install rembg)
-rembg i cardinal.png cardinal-transparent.png
+# Remove magenta via flood-fill from corners + erode fringe
+w=$(magick identify -format '%w' cardinal.png)
+h=$(magick identify -format '%h' cardinal.png)
+magick cardinal.png \
+  -fuzz 20% -fill none \
+  -draw "color 0,0 floodfill" \
+  -draw "color $((w-1)),0 floodfill" \
+  -draw "color 0,$((h-1)) floodfill" \
+  -draw "color $((w-1)),$((h-1)) floodfill" \
+  \( +clone -alpha extract -morphology erode disk:1 \) \
+  -compose CopyOpacity -composite \
+  -trim +repage cardinal-transparent.png
 ```
+
+**Why magenta over white/green:** Gemini produces shade variation in backgrounds (not pure #FF00FF). Magenta is unlikely to appear in actual artwork, so flood-fill removal is cleaner. White backgrounds bleed into light-colored subjects. Green backgrounds conflict with nature subjects.
 
 ### Text Rendering
 

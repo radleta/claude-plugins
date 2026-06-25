@@ -1,3 +1,8 @@
+---
+tags: [react-expert/rules]
+summary: "Key prop requirements: unique stable keys for lists, never use index as key for reorderable lists"
+---
+
 # Key Prop Requirements
 
 The `key` prop is a special React attribute used when rendering lists. It helps React identify which items have changed, been added, or removed. Choosing the wrong key causes state corruption, performance issues, and mysterious bugs.

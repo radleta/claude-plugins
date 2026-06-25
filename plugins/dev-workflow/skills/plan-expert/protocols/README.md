@@ -1,3 +1,8 @@
+---
+summary: "Index of app-type planning protocols — each protocol adds testing, verification, and checklist requirements at the classification gate based on APP_TYPE."
+tags: [plan-expert/protocols]
+---
+
 # App-Type Planning Protocols
 
 Protocol files that add app-type-specific testing, verification, and checklist requirements to plans. Each protocol is loaded at the classification gate based on APP_TYPE.

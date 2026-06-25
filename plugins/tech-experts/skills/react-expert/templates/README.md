@@ -1,3 +1,8 @@
+---
+tags: [react-expert/templates]
+summary: "Index of production-ready React + TypeScript templates for common patterns agents frequently generate incorrectly"
+---
+
 # React + TypeScript Templates
 
 This folder contains **working code templates** for common React + TypeScript patterns that agents frequently generate incorrectly. Each template is production-ready code with placeholder variables for adaptation.
@@ -219,3 +224,27 @@ When updating templates:
 - Update related rule/decision links
 - Maintain working code status
 - Update this README index if adding/removing templates
+
+## Related
+
+- [Rules: TypeScript Essentials](../rules/typescript-essentials.md) — TypeScript type rules for React that these templates implement and enforce
+
+## Pages
+
+- [function-component.tsx](function-component.tsx) — Basic functional component with typed props (no state)
+- [component-with-state.tsx](component-with-state.tsx) — Component with local state using useState and immutable updates
+- [component-with-effect.tsx](component-with-effect.tsx) — Component with side effects: data fetching, subscriptions, cleanup
+- [component-with-reducer.tsx](component-with-reducer.tsx) — Complex state logic with useReducer and discriminated union actions
+- [custom-hook.tsx](custom-hook.tsx) — Extracting reusable stateful logic into a typed custom hook
+- [context-provider.tsx](context-provider.tsx) — Sharing state across component tree with typed context and provider pattern
+- [form-controlled.tsx](form-controlled.tsx) — Controlled form inputs with typed event handlers, validation, submission
+- [event-handlers.tsx](event-handlers.tsx) — All common event types: onClick, onChange, onSubmit, onKeyDown
+- [list-rendering.tsx](list-rendering.tsx) — Rendering arrays with stable unique key props (not index)
+- [conditional-effects.tsx](conditional-effects.tsx) — Effects with conditional logic inside, not conditional effect calls
+- [derived-state.tsx](derived-state.tsx) — Computing values from state during render or with useMemo
+- [memo-component.tsx](memo-component.tsx) — Preventing unnecessary re-renders with React.memo and custom comparison
+- [data-fetching-effect.tsx](data-fetching-effect.tsx) — Fetching data in useEffect with AbortController and loading/error states
+- [error-boundary.tsx](error-boundary.tsx) — Class component catching React errors with fallback UI
+- [suspense-lazy.tsx](suspense-lazy.tsx) — Code splitting with React.lazy and Suspense boundary
+- [generic-component.tsx](generic-component.tsx) — Components with type parameters, constraints, and proper inference
+- [forward-ref.tsx](forward-ref.tsx) — Exposing ref to parent components with forwardRef and useImperativeHandle

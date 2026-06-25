@@ -1,3 +1,8 @@
+---
+tags: [github-actions-expert/patterns]
+summary: "Extended workflow patterns: shell portability, GITHUB_OUTPUT syntax, advanced matrix, multi-job pipelines, OIDC auth, checksum generation"
+---
+
 # Extended GitHub Actions Patterns
 
 ## Shell Portability
