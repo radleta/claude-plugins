@@ -1,0 +1,62 @@
+name: Cowork Zip Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - cowork-skills.json
+      - "plugins/**"
+      - .github/workflows/cowork-zip-release.yml
+  workflow_dispatch:
+
+concurrency:
+  group: "${{ github.workflow }}-${{ github.ref }}"
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Ensure cowork-latest release exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release view cowork-latest >/dev/null 2>&1 \
+            || gh release create cowork-latest \
+                 --title "Cowork Skills — Latest" \
+                 --notes "" \
+                 --prerelease
+
+      - name: Zip and upload skill archives
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          jq -r '.skills[] | select(.source_dir != null and .asset != null) | [.source_dir, .asset] | @tsv' \
+            cowork-skills.json \
+          | while IFS=$'\t' read -r source_dir asset; do
+              asset_path="$RUNNER_TEMP/$asset"
+              ( cd "${GITHUB_WORKSPACE}/$(dirname "$source_dir")" && zip -r "$asset_path" "$(basename "$source_dir")" )
+              gh release upload cowork-latest "$asset_path" --clobber
+            done
+
+      - name: Remove orphaned release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          while IFS= read -r orphan; do
+            gh release delete-asset cowork-latest "$orphan" --yes
+          done < <(comm -23 \
+            <(gh release view cowork-latest --json assets -q '.assets[].name' | sort) \
+            <(jq -r '.skills[] | select(.asset != null) | .asset' cowork-skills.json | sort))
