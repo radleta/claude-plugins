@@ -42,6 +42,8 @@ email-draft reply --profile support --id <messageId> --reply-sender-only reply.m
 
 Creates a threaded draft reply. Uses reply-all by default; `--reply-sender-only` replies to sender only.
 
+The draft body includes the quoted original (v3.6.0+): the new reply text appears first, followed by a Gmail-style attribution line (`On <date>, <sender> wrote:`) and a `<blockquote class="gmail_quote">` wrapping the original message body — matching the appearance of a native Gmail reply.
+
 ## Download Attachments
 
 ```bash

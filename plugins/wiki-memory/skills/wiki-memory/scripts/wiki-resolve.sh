@@ -69,7 +69,7 @@ checked_paths=()
 _resolve_skill_as_wiki() {
   local domain="$1"
   local dir="${PWD%/}"
-  while [ "$dir" != "/" ]; do
+  while [ -n "$dir" ]; do
     local skill_dir="$dir/.claude/skills/$domain"
     local skill_md="$skill_dir/SKILL.md"
     local mditerc="$skill_dir/.mditerc"
@@ -82,7 +82,9 @@ _resolve_skill_as_wiki() {
         fi
       fi
     fi
-    dir="$(dirname "$dir")"
+    local parent="$(dirname "$dir")"
+    [ "$parent" = "$dir" ] && break
+    dir="$parent"
   done
   return 1
 }
@@ -100,7 +102,7 @@ fi
 # $PWD is pinned to the session's project directory by CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR.
 # Walk up looking for .wiki-memory/<domain>/, stopping at first .git/ so we don't cross repo boundaries.
 walk_dir="${PWD%/}"
-while [[ -n "$walk_dir" && "$walk_dir" != "/" ]]; do
+while [[ -n "$walk_dir" ]]; do
   candidate="$walk_dir/.wiki-memory/$domain"
   if [[ -d "$candidate" && -f "$candidate/index.md" ]]; then
     printf "WARN: wiki '%s' resolved via legacy %s/%s/ — migrate to skill-as-wiki layout under .claude/skills/%s/ (see /wiki-memory migrate)\n" \
@@ -111,7 +113,9 @@ while [[ -n "$walk_dir" && "$walk_dir" != "/" ]]; do
   fi
   checked_paths+=("project-walk($candidate)")
   [[ -d "$walk_dir/.git" ]] && break
-  walk_dir="$(dirname "$walk_dir")"
+  walk_parent="$(dirname "$walk_dir")"
+  [[ "$walk_parent" == "$walk_dir" ]] && break
+  walk_dir="$walk_parent"
 done
 
 # --- Resolution 2: Walk-up from script's real location ---

@@ -53,11 +53,13 @@ _install_wrapper() {
 # Pattern reference: .claude/skills/wiki-memory/scripts/install.sh _install_wrapper()
 TARGET_REL_PATH="${target_rel_path}"
 dir=\$(pwd)
-while [ "\$dir" != "/" ]; do
+while [ -n "\$dir" ]; do
   if [ -f "\$dir/\$TARGET_REL_PATH" ]; then
     exec ${runner} "\$dir/\$TARGET_REL_PATH" "\$@"
   fi
-  dir=\$(dirname "\$dir")
+  parent=\$(dirname "\$dir")
+  [ "\$parent" = "\$dir" ] && break
+  dir=\$parent
 done
 exec ${runner} "${baked_abs_path}" "\$@"
 WALKER
@@ -99,11 +101,13 @@ _check_wrapper() {
 # Pattern reference: .claude/skills/wiki-memory/scripts/install.sh _install_wrapper()
 TARGET_REL_PATH="${target_rel_path}"
 dir=\$(pwd)
-while [ "\$dir" != "/" ]; do
+while [ -n "\$dir" ]; do
   if [ -f "\$dir/\$TARGET_REL_PATH" ]; then
     exec ${runner} "\$dir/\$TARGET_REL_PATH" "\$@"
   fi
-  dir=\$(dirname "\$dir")
+  parent=\$(dirname "\$dir")
+  [ "\$parent" = "\$dir" ] && break
+  dir=\$parent
 done
 exec ${runner} "${baked_abs_path}" "\$@"
 WALKER

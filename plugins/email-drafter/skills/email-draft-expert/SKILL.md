@@ -17,7 +17,7 @@ description: "Manages Gmail drafts and reads label-gated emails via Apps Script 
 - [Code Updates](code-updates.md) — Checking if the Apps Script gateway needs updating and deploying the latest code (v2.1).
 - [Caching](caching.md) — Transparent cache layout and invalidation rules for thread, download, and draft-raw operations.
 - [Security Model](security-model.md) — Security boundaries: draft-only writes, label-gated reads, API key management, and kill switch.
-- [Backward Compatibility](backward-compatibility.md) — Version compatibility matrix for v1 through v3.3 gateway deployments and feature gating.
+- [Backward Compatibility](backward-compatibility.md) — Version compatibility matrix for v1 through v3.6.0 gateway deployments and feature gating.
 
 ## Developer Reference
 

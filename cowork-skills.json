@@ -1,0 +1,12 @@
+{
+  "release_tag": "cowork-latest",
+  "skills": [
+    {
+      "skill": "human-voice",
+      "source_dir": "plugins/human-voice/skills/human-voice",
+      "asset": "human-voice.zip",
+      "url": "https://github.com/radleta/claude-plugins/releases/download/cowork-latest/human-voice.zip",
+      "displayName": "Human Voice"
+    }
+  ]
+}

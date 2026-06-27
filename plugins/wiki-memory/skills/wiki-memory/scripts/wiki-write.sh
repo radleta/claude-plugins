@@ -38,8 +38,9 @@ Write a wiki page to a wiki-backed skill domain.
 Arguments:
   <domain>    Wiki domain name (e.g. claude-code-ref-expert). Must not contain
               '/', '\', '..', or spaces.
-  <slug>      Page filename without the .md extension (e.g. my-page). Must not
-              contain '/', '\', '..', or spaces.
+  <slug>      Page filename without the .md extension (e.g. my-page). May contain
+              at most one '/' subdir separator (e.g. backend/my-page). Must not
+              contain '..', leading/trailing '/', or shell metacharacters.
 
 Required flags:
   --from <path>     Path to a readable payload markdown file. The file must
@@ -108,6 +109,39 @@ _validate_name() {
   if [[ "$value" == *$'\n'* ]]; then
     _err "invalid chars in ${label}: ${value}"
     exit 2
+  fi
+}
+
+# --- Slug-specific validation: allows exactly one '/' subdir separator ---
+# Each segment on either side of the '/' must pass _validate_name.
+# Rejects: '..', leading/trailing '/', more than one '/'.
+# Flat slugs (no '/') go through _validate_name directly — same behaviour as before.
+_validate_slug() {
+  local value="$1"
+  # Reject '..' anywhere (belt-and-suspenders; _validate_name also catches this per-segment)
+  if [[ "$value" == *..* ]]; then
+    _err "invalid slug: '..' not allowed: ${value}"
+    exit 2
+  fi
+  # Reject leading or trailing '/'
+  if [[ "$value" == /* || "$value" == */ ]]; then
+    _err "invalid slug: leading or trailing '/' not allowed: ${value}"
+    exit 2
+  fi
+  # Count '/' — at most one subdir separator
+  local _slashes="${value//[^\/]/}"
+  if [[ ${#_slashes} -gt 1 ]]; then
+    _err "invalid slug: at most one '/' subdir separator allowed: ${value}"
+    exit 2
+  fi
+  # Validate each segment via _validate_name (handles all metacharacter checks)
+  if [[ "$value" == */* ]]; then
+    local _seg1="${value%%/*}"
+    local _seg2="${value##*/}"
+    _validate_name "slug segment" "$_seg1"
+    _validate_name "slug segment" "$_seg2"
+  else
+    _validate_name "slug" "$value"
   fi
 }
 
@@ -275,7 +309,7 @@ fi
 
 # === Blocklist validation for domain and slug ===
 _validate_name "domain" "$DOMAIN"
-_validate_name "slug"   "$SLUG"
+_validate_slug "$SLUG"
 
 # === Payload file path safety check (defensive hardening) ===
 # Reject paths that contain '..' traversal segments after normalization, or that
@@ -335,7 +369,7 @@ done
 _probe_skill_as_wiki() {
   local domain="$1"
   local dir="${PWD%/}"
-  while [ "$dir" != "/" ]; do
+  while [ -n "$dir" ]; do
     local skill_dir="$dir/.claude/skills/$domain"
     local skill_md="$skill_dir/SKILL.md"
     local mditerc="$skill_dir/.mditerc"
@@ -347,7 +381,9 @@ _probe_skill_as_wiki() {
         fi
       fi
     fi
-    dir="$(dirname "$dir")"
+    local parent="$(dirname "$dir")"
+    [ "$parent" = "$dir" ] && break
+    dir="$parent"
   done
   return 1
 }
@@ -373,12 +409,14 @@ else
     # Locate the project root (first ancestor containing .claude/).
     _project_root=""
     _walk="$PWD"
-    while [[ "$_walk" != "/" ]]; do
+    while [[ -n "$_walk" ]]; do
       if [[ -d "$_walk/.claude/skills" ]]; then
         _project_root="$_walk"
         break
       fi
-      _walk="$(dirname "$_walk")"
+      _walk_parent="$(dirname "$_walk")"
+      [[ "$_walk_parent" == "$_walk" ]] && break
+      _walk="$_walk_parent"
     done
     if [[ -z "$_project_root" ]]; then
       _err "cannot locate project .claude/skills/ directory from $PWD"
@@ -476,6 +514,10 @@ fi
 # --- Atomic write ---
 # tmpfile must be in the SAME directory as the target so that mv is an intra-fs rename.
 _target_dir="$(dirname "$TARGET_PAGE")"
+# Create subdir if needed (supports <subdir>/<slug> patterns; no-op for flat slugs)
+if [[ ! -d "$_target_dir" ]]; then
+  mkdir -p "$_target_dir" || { _err "cannot create target directory: ${_target_dir}"; exit 3; }
+fi
 if [[ ! -w "$_target_dir" ]]; then
   _err "target directory is not writable: ${_target_dir}"
   exit 3

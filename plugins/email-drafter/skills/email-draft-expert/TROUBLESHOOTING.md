@@ -49,6 +49,7 @@ If missing, re-create the shim (see SETUP.md Step 2).
 | `unknown action: list-drafts` | Apps Script is pre-v3.0 — update Code.gs with new `apps-script.js` and redeploy |
 | `File too large` | Attachments are limited to 15MB per file |
 | Attachment upload is slow | Files >10MB trigger a warning. Consider compressing or splitting |
+| `read-draft --id r-…` returns "draft not found" | Reply draft IDs start with `r` (e.g. `r8545654272423649717`) — pass the ID exactly as printed by `reply`. Do NOT insert a hyphen; `r-…` is invalid and the Gmail API rejects it |
 
 ## Configure action (v2.1)
 
@@ -112,6 +113,8 @@ curl -sL "$EMAIL_DRAFTER_PROFILE_personal_URL"
 - v3.0 (with labels): `{"status":"ok","version":"3.0","label":"leah-read","draftLabel":"ai-drafts"}`
 - v3.3.0: `{"status":"ok","version":"3.3.0"}`
 - v3.3.0 (with labels): `{"status":"ok","version":"3.3.0","label":"leah-read","draftLabel":"ai-drafts"}`
+- v3.6.0: `{"status":"ok","version":"3.6.0"}`
+- v3.6.0 (with labels): `{"status":"ok","version":"3.6.0","label":"leah-read","draftLabel":"ai-drafts"}`
 
 ## Script Properties reference
 

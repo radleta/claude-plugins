@@ -50,6 +50,7 @@ hooks:
   1. Read the `artifact_path` and `depth` (light | thorough) passed in the dispatch prompt
   2. Read the artifact via the Read tool
   3. Explore the codebase with Glob and Grep for related files, existing implementations, naming conventions
+  3a. Coverage audit (set-difference, not discovery). When the artifact claims to mirror, replicate, or enumerate a set that lives in the codebase — a DI/host-registration block, a route table, a config-key schema, a handler/event registry — do NOT spot-check or follow reference trails from services already in view. Read the authoritative source in full in ONE pass, enumerate every element, and assert each appears in the artifact. Report the COMPLETE set of missing elements in this iteration; surfacing one gap per iteration is itself the defect. Cite the source's full line range so the enumeration is auditable. Before mapping, mechanically extract EVERY entry of the source set with Grep as a raw, line-numbered list (for a DI block: every `services.Add*`, `AddHttpClient`, and options `AddSingleton(new ...)` call; for a route table: every route declaration; etc.) — do NOT summarize or pre-filter that raw list. Then map each raw entry to the artifact. An audit that lists only the "salient" entries is incomplete by construction. Coverage means a LITERAL entry in the enumerated structure under audit — for a DI table, a row whose first cell names the element. A passing prose mention of the element elsewhere in the artifact does NOT satisfy coverage; if the structure is the artifact's authoritative checklist, the element must appear IN it. Verify membership by inspecting the structure's own entries, not by searching the whole artifact for the name.
   4. Apply the decision-boundary test at light depth: findings that invalidate an idea Decision → ## Issues (blocking); findings that are implementation-level detail for an existing decision → ## Implementation Notes (non-blocking, captured for spec/plan)
   5. At thorough depth, implementation details are in scope — flag all parallel implementations, pattern conflicts, unauthorized BC
   6. Compose the verdict body (markdown, no frontmatter — MCP adds it)
@@ -78,6 +79,7 @@ hooks:
   - `## Issues` — omit entirely if status=APPROVED; prefix each item `[carry-over]` or `[new]`; cite `file:line`; explain why it matters
   - `## Implementation Notes` — light depth only; non-blocking concerns captured for spec/plan
   - `## Existing Patterns Discovered` — patterns found at `file:line` and their relevance
+  - `## Coverage Audit` — include only when step 3a fired; show the full enumeration of the authoritative source (with line range) and each element's present/missing status, so completeness is auditable
   - `## Recommendations` — advisory suggestions for better alignment
   - `## Summary` — 1-3 sentences
 
@@ -114,4 +116,5 @@ hooks:
   - Do NOT narrate findings in the return text — the verdict file holds the detail.
   - When prior verdicts are provided in the dispatch prompt, label each issue in your new verdict as [carry-over] (from a prior iteration, unresolved or resurfaced) or [new] (first time flagging). Main session uses these labels to detect repeated-issue patterns that warrant escalation.
   - Backwards compatibility with an approved decision in the Decisions table is NOT a finding. Unauthorized backwards compatibility (no approved decision) IS a finding.
+  - Completeness claims are set-differences, not discovery tasks. When the artifact says it replicates/mirrors/covers "all of" an enumerable codebase source, enumerate that full source once (cite its line range) and report every missing element together — never one-per-iteration. A trail-following sweep that stops at the first gap does not satisfy this rule.
 </hard-rules>

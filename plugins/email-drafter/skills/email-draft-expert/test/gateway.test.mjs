@@ -66,6 +66,8 @@ function createGatewayContext() {
   let mockHeaders = {};
   let mockMessageTo = 'recipient@example.com';
   let mockMessageFrom = 'sender@example.com';
+  let mockBody = '';
+  let mockDate = new Date('2024-01-15T10:30:00Z');
 
   const context = {
     // GmailApp mock
@@ -87,6 +89,8 @@ function createGatewayContext() {
           return '';
         },
         getPlainBody: () => 'test body',
+        getBody: () => mockBody,
+        getDate: () => mockDate,
         getAttachments: () => [],
       }),
       getUserLabelByName: (name) => ({
@@ -182,6 +186,12 @@ function createGatewayContext() {
       },
       Charset: { UTF_8: 'UTF_8' },
       getUuid: () => 'test-uuid-' + Math.random().toString(36).slice(2, 8),
+      formatDate: (date, tz, fmt) => 'Mon, Jan 15, 2024 at 10:30 AM',
+    },
+
+    // Session mock
+    Session: {
+      getScriptTimeZone: () => 'America/New_York',
     },
 
     // Logger mock
@@ -204,6 +214,8 @@ function createGatewayContext() {
     setMockHeaders: (headers) => { mockHeaders = headers; },
     setMockMessageTo: (to) => { mockMessageTo = to; },
     setMockMessageFrom: (from) => { mockMessageFrom = from; },
+    setMockBody: (body) => { mockBody = body; },
+    setMockDate: (date) => { mockDate = date; },
   };
 }
 
@@ -661,5 +673,60 @@ describe('gateway: handleReply_ From and Reply-To handling', () => {
     const rawMime = Buffer.from(createCall.resource.message.raw, 'base64').toString('utf8');
     assert.match(rawMime, /To: direct-sender@example\.com/,
       'To should fall back to From when no Reply-To');
+  });
+
+  it('includes gmail_quote block when original message has a body', () => {
+    gw.setMockMessageFrom('original-sender@example.com');
+    gw.setMockMessageTo('me@example.com');
+    gw.setMockBody('<p>Original message body</p>');
+    gw.setMockDate(new Date('2024-01-15T10:30:00Z'));
+
+    const result = callInContext(gw.context, 'handleReply_',
+      { labelName: 'AI-Drafts', draftLabelName: 'AI-Drafts' },
+      { messageId: 'msg-123', html: '<p>My reply</p>', replyAll: false },
+    );
+    const resp = JSON.parse(result.getContent());
+    assert.ok(resp.ok, 'reply should succeed');
+
+    const raw = gw.calls.draftsCreate[0].resource.message.raw;
+    const normalized = raw.replace(/-/g, '+').replace(/_/g, '/');
+    const rawMime = Buffer.from(normalized, 'base64').toString('utf8');
+
+    // The MIME body part is itself base64-encoded (Content-Transfer-Encoding: base64).
+    // Extract the base64 body payload and decode it to inspect the HTML content.
+    const bodyMatch = rawMime.match(/\r\n\r\n([\s\S]+)$/);
+    const htmlBody = bodyMatch
+      ? Buffer.from(bodyMatch[1].replace(/\r\n/g, ''), 'base64').toString('utf8')
+      : rawMime;
+
+    assert.match(htmlBody, /My reply/, 'body should contain the new reply text');
+    assert.match(htmlBody, /gmail_quote/, 'body should contain gmail_quote blockquote');
+    assert.match(htmlBody, /original-sender@example\.com wrote:/, 'body should contain attribution line');
+    assert.match(htmlBody, /Original message body/, 'body should contain the quoted original body');
+  });
+
+  it('omits quote block when original message has no body', () => {
+    gw.setMockMessageFrom('original-sender@example.com');
+    gw.setMockMessageTo('me@example.com');
+    gw.setMockBody(''); // empty body → no quote block
+
+    const result = callInContext(gw.context, 'handleReply_',
+      { labelName: 'AI-Drafts', draftLabelName: 'AI-Drafts' },
+      { messageId: 'msg-123', html: '<p>My reply</p>', replyAll: false },
+    );
+    const resp = JSON.parse(result.getContent());
+    assert.ok(resp.ok, 'reply should succeed');
+
+    const raw = gw.calls.draftsCreate[0].resource.message.raw;
+    const normalized = raw.replace(/-/g, '+').replace(/_/g, '/');
+    const rawMime = Buffer.from(normalized, 'base64').toString('utf8');
+
+    const bodyMatch = rawMime.match(/\r\n\r\n([\s\S]+)$/);
+    const htmlBody = bodyMatch
+      ? Buffer.from(bodyMatch[1].replace(/\r\n/g, ''), 'base64').toString('utf8')
+      : rawMime;
+
+    assert.match(htmlBody, /My reply/, 'body should contain the new reply text');
+    assert.doesNotMatch(htmlBody, /gmail_quote/, 'body should NOT contain gmail_quote when body is empty');
   });
 });

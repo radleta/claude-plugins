@@ -58,6 +58,8 @@ node --test test/cli.test.mjs        # CLI integration only
 
 **MIME header injection prevention** — Both server-side (`sanitizeHeaderValue_()` in GAS) and client-side (`sanitizeHeader()` in `lib/mime.mjs`) strip `\r\n` (prevents header injection) and replace `"` with `'` (prevents quote escaping in filenames/Content-IDs). Applied to all user-controlled values embedded in MIME headers: To, Cc, From, Subject, filenames, and Content-IDs.
 
+**Reply quote HTML escaping (v3.6.0)** — `escapeHtml_()` in GAS encodes the five XML/HTML metacharacters (`&`, `<`, `>`, `"`) in the sender's `From:` address before embedding it in the reply attribution line. This prevents a maliciously crafted From header from injecting HTML into the quoted-original block. `&` is encoded first to avoid double-encoding.
+
 **Batch attach (v3.3)** — Multiple files can be attached in a single `attach` call (`email-draft attach --id <draftId> file1.pdf file2.pdf`). Client-side MIME rebuild parses once, adds all attachments, rebuilds once, and updates once. `--content-id <cid>` applies to the next positional file only, then resets — allowing interspersed inline images (`--content-id logo logo.png report.pdf`). Gateway < 3.3 falls back to sequential server-side `attach` calls. Inline images in markdown are auto-detected and attached with `cid:` references after the draft is created.
 
 ## Gotchas

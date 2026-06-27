@@ -1,6 +1,6 @@
 {
   "name": "email-drafter",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Gmail draft management and label-gated email composition",
   "author": {
     "name": "Richard Adleta",

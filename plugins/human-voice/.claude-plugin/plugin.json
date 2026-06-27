@@ -1,7 +1,7 @@
 {
-  "name": "wiki-memory",
-  "version": "1.0.2",
-  "description": "Wiki-backed persistent memory for Claude Code projects",
+  "name": "human-voice",
+  "version": "1.0.1",
+  "description": "Strips AI tells from text so emails, posts, and copy read as genuinely human-authored",
   "author": {
     "name": "Richard Adleta",
     "email": "radleta@gmail.com",
@@ -10,9 +10,10 @@
   "repository": "https://github.com/radleta/claude-plugins",
   "license": "MIT",
   "keywords": [
-    "wiki",
-    "memory",
-    "knowledge",
-    "documentation"
+    "writing",
+    "humanize",
+    "voice",
+    "editing",
+    "email"
   ]
 }

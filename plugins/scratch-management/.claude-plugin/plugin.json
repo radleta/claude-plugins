@@ -1,6 +1,6 @@
 {
   "name": "scratch-management",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Scratch folder lifecycle management for plans and temp files",
   "author": {
     "name": "Richard Adleta",

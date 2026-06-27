@@ -1,6 +1,6 @@
 ---
 tags: [email-draft-expert/backward-compatibility]
-summary: "Version compatibility matrix for v1 through v3.3 gateway deployments and feature gating."
+summary: "Version compatibility matrix for v1 through v3.6.0 gateway deployments and feature gating."
 ---
 
 # Backward Compatibility
@@ -15,3 +15,4 @@ summary: "Version compatibility matrix for v1 through v3.3 gateway deployments a
 | v3.0 | `draft` and `reply` now return `draftId` in response and label drafts with `draftLabelName` (if configured) |
 | v3.3 | `edit`, `attach`, `detach` use client-side MIME rebuild (postal-mime + mimetext) with version-gated fallback to server-side for gateway < 3.3 |
 | v3.3 | New gateway actions `draft-raw`, `draft-meta`, `raw-update` for lightweight MIME fetch/update |
+| v3.6.0 | `reply` action now appends a Gmail-style quoted original (attribution line + `<blockquote class="gmail_quote">`) to reply drafts; sender address is HTML-escaped via `escapeHtml_()` |

@@ -14,6 +14,7 @@ summary: "Security boundaries: draft-only writes, label-gated reads, API key man
 | Auth | API key per machine, stored in Script Properties, revocable individually |
 | Tokens | None stored locally — Apps Script runs server-side |
 | Kill switch | Disable the Apps Script deployment (instant) |
+| HTML injection | `escapeHtml_()` encodes sender `From:` address before embedding in reply quote block (v3.6.0+) |
 
 ## Apps Script Gateway Pattern
 

@@ -33,7 +33,7 @@
 //   raw-update  — Accept pre-built raw MIME and update a draft (requires draftLabelName, v3.3+)
 //   configure   — Update Script Properties (whitelisted fields only, excludes apiKeys)
 
-var GATEWAY_VERSION = "3.5.0";
+var GATEWAY_VERSION = "3.6.0";
 
 // Fields the 'configure' action is allowed to set.
 // apiKeys, labelName, and draftLabelName are deliberately excluded — manage via Script Properties UI only.
@@ -291,6 +291,45 @@ function htmlEncodeSupplementary_(str) {
 }
 
 /**
+ * HTML-escape the five XML/HTML metacharacters in a plain-text string.
+ * Encodes & first to avoid double-encoding (e.g. "&amp;" → "&amp;amp;").
+ * Used to safely embed user-controlled strings like From: addresses in HTML.
+ */
+function escapeHtml_(str) {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+/**
+ * Build a Gmail-style quoted-original block for reply drafts.
+ * Returns "" when msg.getBody() is empty/falsy so callers can concatenate safely.
+ * Otherwise returns an attribution line followed by a <blockquote class="gmail_quote">
+ * wrapping the original body HTML — mirroring native Gmail web reply markup.
+ */
+function buildQuoteBlock_(msg) {
+  var body = msg.getBody();
+  if (!body) return "";
+  var date = Utilities.formatDate(
+    msg.getDate(),
+    Session.getScriptTimeZone(),
+    "EEE, MMM d, yyyy 'at' h:mm a",
+  );
+  return (
+    "On " +
+    date +
+    ", " +
+    escapeHtml_(msg.getFrom()) +
+    " wrote:<br>" +
+    '<blockquote class="gmail_quote">' +
+    body +
+    "</blockquote>"
+  );
+}
+
+/**
  * Create a draft reply to a specific message.
  * The message's thread must have the access label (if labelName set) or be unrestricted.
  */
@@ -357,7 +396,7 @@ function handleReply_(config, data) {
     subject: subject,
     inReplyTo: origMsgId,
     references: origMsgId,
-    htmlBody: html,
+    htmlBody: html + buildQuoteBlock_(msg),
     htmlBodyBase64: "",
     attachments: [],
   };
@@ -732,9 +771,16 @@ function handleEdit_(config, data) {
     return jsonResponse_({ error: "draftId is required" });
   }
 
-  if (!data.subject && !data.to && data.cc === undefined && data.bcc === undefined && !data.html) {
+  if (
+    !data.subject &&
+    !data.to &&
+    data.cc === undefined &&
+    data.bcc === undefined &&
+    !data.html
+  ) {
     return jsonResponse_({
-      error: "at least one field to update is required (subject, to, cc, bcc, html)",
+      error:
+        "at least one field to update is required (subject, to, cc, bcc, html)",
     });
   }
 
@@ -769,7 +815,7 @@ function handleEdit_(config, data) {
     from: currentState.from,
     to: data.to || currentState.to,
     cc: data.cc !== undefined ? data.cc : currentState.cc,
-    bcc: data.bcc !== undefined ? data.bcc : (currentState.bcc || ""),
+    bcc: data.bcc !== undefined ? data.bcc : currentState.bcc || "",
     subject: data.subject || currentState.subject,
     inReplyTo: currentState.inReplyTo,
     references: currentState.references,
