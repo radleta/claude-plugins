@@ -16,41 +16,15 @@ import {
   writeFileSync,
   appendFileSync,
   existsSync,
-  openSync,
-  writeSync,
-  fsyncSync,
-  closeSync,
-  unlinkSync,
-  renameSync,
-  readdirSync,
 } from 'node:fs';
 import { resolve, join, sep } from 'node:path';
 import { createInterface } from 'node:readline';
 import process from 'node:process';
 import { execFileSync } from 'node:child_process';
-import { createHash, randomBytes } from 'node:crypto';
-import { rewritePointer } from './rewrite-pointer.mjs';
-import {
-  TASK_STATUS,
-  MAX_BLOCKED_ON_LEN,
-  ISSUE_ROLES,
-  SPIKE_TYPES,
-  ISSUE_SLUG_PATTERN,
-} from './tasks.mjs';
+import { createHash } from 'node:crypto';
 
 // --- Module-top constants (no PROJECT_ROOT dependency) ---
 const ISSUES_SUBDIR = 'issues';
-
-// JSON-Schema pattern for a comma-separated slug list (`epic`, `blocked_by`):
-// the slug_override pattern, comma-joined. It requires at least one element,
-// so the "zero blockers" case is expressed by OMITTING the parameter rather
-// than passing an empty string -- consistent with every other optional
-// parameter here, all of which are emitted only when supplied. The schema is
-// what conveys the format to the calling model, so it carries the pattern
-// rather than leaving it to the description prose. Per-element validation
-// server-side uses ISSUE_SLUG_PATTERN from tasks.mjs, so the two cannot
-// disagree about the charset.
-const SLUG_LIST_PATTERN = '^[a-z0-9]([a-z0-9-]*[a-z0-9])?(,[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$';
 const PLACEHOLDER = '_Not captured._';
 const MAX_BODY_BYTES = 1_048_576; // 1 MB defensive cap for write_session body
 
@@ -227,10 +201,6 @@ const REVIEW_ROLES = [
   'creative',
   'decision-traceability',
   'combinatorial-completeness',
-  'craft',
-  'step-quality',
-  'investigation-quality',
-  'spec-traceability',
 ];
 
 const STATUS_BY_REVIEW_ROLE = {
@@ -240,19 +210,15 @@ const STATUS_BY_REVIEW_ROLE = {
   'decision-traceability': ['APPROVED', 'ISSUES_FOUND'],
   'combinatorial-completeness': ['APPROVED', 'ISSUES_FOUND'],
   'creative': ['SUGGESTIONS', 'NO_SUGGESTIONS'],
-  'craft': ['APPROVED', 'ISSUES_FOUND'],
-  'step-quality': ['APPROVED', 'ISSUES_FOUND'],
-  'investigation-quality': ['APPROVED', 'ISSUES_FOUND'],
-  'spec-traceability': ['APPROVED', 'ISSUES_FOUND'],
 };
 
-const REVIEW_PHASES = ['idea', 'spec', 'draft', 'plan'];
+const REVIEW_PHASES = ['idea', 'spec'];
 
 const TOOLS = [
   {
     name: 'write_report',
     description:
-      'Append-only write of a structured sub-agent report to scratch/{project}/steps/step-{NN}/{role}-iter{N}-{ts}.md. Used by verifier sub-agents in the /implement-code end-of-build wave and the standalone /verify-* commands to record output without passing content through the main session. Server adds YAML frontmatter (including a queryable "status" field) and timestamp; refuses to overwrite existing files.',
+      'Append-only write of a structured sub-agent report to scratch/{project}/steps/step-{NN}/{role}-iter{N}-{ts}.md. Used by coder and verifier sub-agents in /implement-code workflows to record output without passing content through the main session. Server adds YAML frontmatter (including a queryable "status" field) and timestamp; refuses to overwrite existing files.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -300,7 +266,7 @@ const TOOLS = [
   {
     name: 'write_review',
     description:
-      'Append-only write of a structured reviewer verdict to scratch/{project}/reviews/{phase}/{role}-iter{N}-{ts}.md. Used by /brainstorming reviewer sub-agents (idea review pass), the blog-writer draft/craft review loop, and plan-phase reviewers to persist verdicts without passing content through the main session. Server adds YAML frontmatter (including a queryable "status" field) and timestamp; refuses to overwrite existing files. Separate tool from write_report because brainstorming has different roles (document-quality, codebase-alignment, domain, creative, decision-traceability) and statuses (APPROVED | ISSUES_FOUND | SUGGESTIONS | NO_SUGGESTIONS) than the step-based /implement-code workflow. When used alongside a domain reviewer, include the ordered expert-skill list in the `skills` parameter so the verdict filename is disambiguated (e.g. `domain-frontend-iter1-<ts>.md`). The server cross-validates status against the body: APPROVED with a non-empty blocking findings section (or, for role=domain, an Aggregate that does not say Approved) is rejected, as is ISSUES_FOUND with no findings section — align the body and status before calling.',
+      'Append-only write of a structured reviewer verdict to scratch/{project}/reviews/{phase}/{role}-iter{N}-{ts}.md. Used by /brainstorming reviewer sub-agents (idea and spec review loops) to persist verdicts without passing content through the main session. Server adds YAML frontmatter (including a queryable "status" field) and timestamp; refuses to overwrite existing files. Separate tool from write_report because brainstorming has different roles (document-quality, codebase-alignment, domain, creative, decision-traceability) and statuses (APPROVED | ISSUES_FOUND | SUGGESTIONS | NO_SUGGESTIONS) than the step-based /implement-code workflow. When used alongside a domain reviewer, include the ordered expert-skill list in the `skills` parameter so the verdict filename is disambiguated (e.g. `domain-frontend-iter1-<ts>.md`).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -311,9 +277,9 @@ const TOOLS = [
         },
         phase: {
           type: 'string',
-          enum: ['idea', 'spec', 'draft', 'plan'],
+          enum: ['idea', 'spec'],
           description:
-            'Review phase: "idea" for idea.md review loop, "spec" for spec.md review loop, "draft" for the blog-writer craft-review loop on a prose draft, "plan" for a plan-validation review.',
+            'Review phase: "idea" for idea.md review loop, "spec" for spec.md review loop.',
         },
         iter: {
           type: 'integer',
@@ -329,13 +295,9 @@ const TOOLS = [
             'creative',
             'decision-traceability',
             'combinatorial-completeness',
-            'craft',
-            'step-quality',
-            'investigation-quality',
-            'spec-traceability',
           ],
           description:
-            'Reviewer role producing this verdict. document-quality (idea-doc or spec-doc completeness); codebase-alignment (conflicts/duplicates); domain (expert-skill-specific review); creative (alternative approaches, advisory); decision-traceability (idea→spec coverage, spec-only); combinatorial-completeness (combinatorial state coverage and reachable-state closure checks); craft (writing-expert craft review of a prose draft, used with phase=draft); step-quality (plan-step granularity and decision-constraining review, used with phase=plan); investigation-quality (research evidence and citation-reality review, used with phase=plan); spec-traceability (spec→plan coverage and orphan-step review, used with phase=plan).',
+            'Reviewer role producing this verdict. document-quality (idea-doc or spec-doc completeness); codebase-alignment (conflicts/duplicates); domain (expert-skill-specific review); creative (alternative approaches, advisory); decision-traceability (idea→spec coverage, spec-only); combinatorial-completeness (combinatorial state coverage and reachable-state closure checks).',
         },
         status: {
           type: 'string',
@@ -407,30 +369,6 @@ const TOOLS = [
           type: 'string',
           description: 'Additional freeform notes.',
         },
-        role: {
-          type: 'string',
-          enum: ISSUE_ROLES,
-          description:
-            'Optional discovery-stage role. "epic" = a bounded destination whose body carries Destination/Decisions/Not Yet Specified/Out of Scope; "spike" = a decision ticket belonging to one or more epics. Omit for an ordinary capture. A spike must also supply epic.',
-        },
-        epic: {
-          type: 'string',
-          pattern: SLUG_LIST_PATTERN,
-          description:
-            'Optional. Slug(s) of the epic(s) this capture belongs to, comma-separated with no spaces (e.g. "auth-rework" or "auth-rework,billing-cleanup"). Required when role is "spike".',
-        },
-        spike_type: {
-          type: 'string',
-          enum: SPIKE_TYPES,
-          description:
-            'Optional. How this spike resolves: "interview" via discuss-methodology, "research" via the researcher agent, "task" as-is, "prototype" by producing an artifact its Resolution names. Requires role: "spike".',
-        },
-        blocked_by: {
-          type: 'string',
-          pattern: SLUG_LIST_PATTERN,
-          description:
-            'Optional. Slug(s) of the spikes that must resolve before this one, comma-separated with no spaces. Omit entirely when nothing blocks it — there is no empty-string form. Requires role: "spike".',
-        },
       },
       required: ['kind', 'title'],
     },
@@ -450,12 +388,12 @@ const TOOLS = [
           type: 'string',
           minLength: 1,
           description:
-            'Caller-chosen unique identifier for the workstream. Not normalized or\n' +
-            'validated as a UUID, but must match the charset ^[A-Za-z0-9._-]+$ — only\n' +
-            'letters, digits, dots, underscores, or hyphens (e.g. "handoff-sid-fix").\n' +
-            'Path separators, \'..\', a leading \'.\', newlines, null bytes, and shell\n' +
-            'metacharacters are all rejected by this charset gate. Determines the\n' +
-            'workstream folder name as \'S-{session_id}\' directly.',
+            'Caller-chosen unique identifier for the workstream. Any non-empty string —\n' +
+            'UUID or meaningful slug (e.g. "handoff-sid-fix"). Opaque to the server: not\n' +
+            'parsed, not normalized, not validated as UUID. Must not contain path\n' +
+            'separators (\'/\' or \'\\\\\'), \'..\', a leading \'.\', newline characters, or null\n' +
+            'bytes (\\0). Determines the workstream folder name as \'S-{session_id}\'\n' +
+            'directly.',
         },
         body: {
           type: 'string',
@@ -471,62 +409,6 @@ const TOOLS = [
         },
       },
       required: ['session_id', 'body'],
-      additionalProperties: false,
-    },
-  },
-  {
-    name: 'write_task',
-    description:
-      'Append-only write of a new workstream task to scratch/S-{session_id}/tasks/{id}-{slug}.md. ' +
-      'Server mints the id (t-XXXXXX), stamps created and updated, creates tasks/ idempotently, and ' +
-      'refuses to overwrite an existing task. Mutations after creation (status changes, blocked_on ' +
-      'updates, etc.) are hand Edits to the file directly — there is no update_task tool; that is ' +
-      'deliberately deferred. Returns {path, id, title, status} — all server-derived. Caller class: ' +
-      'main-session-invoked, ad hoc — the main session calls this directly when a work item surfaces ' +
-      'in conversation. It is not gated behind a command, it is not for sub-agents, and neither ' +
-      '/handoff nor /pickup ever creates tasks.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        session_id: {
-          type: 'string',
-          pattern: '^[A-Za-z0-9._-]+$',
-          description:
-            'Workstream identifier (the task file is written under scratch/S-{session_id}/tasks/). ' +
-            'Only letters, digits, dots, underscores, or hyphens.',
-        },
-        title: {
-          type: 'string',
-          minLength: 1,
-          maxLength: 80,
-          description: 'Short human-readable title for the task (1–80 characters).',
-        },
-        body: {
-          type: 'string',
-          maxLength: MAX_BODY_BYTES,
-          description:
-            'Optional freeform markdown body for the task. Must not exceed 1 MB ' +
-            '(1,048,576 bytes; the MAX_BODY_BYTES constant on the server) of UTF-8 bytes. ' +
-            'Larger bodies fail with JSON-RPC -32602 BODY_TOO_LARGE.',
-        },
-        status: {
-          type: 'string',
-          enum: TASK_STATUS,
-          default: 'open',
-          description:
-            "Task status: one of open, blocked, done, dropped, promoted. Defaults to 'open' when omitted.",
-        },
-        blocked_on: {
-          type: 'string',
-          minLength: 1,
-          maxLength: MAX_BLOCKED_ON_LEN,
-          description:
-            'Free text describing what this task is blocked on (1–120 characters). Rendered inline ' +
-            'in a one-line task row (e.g. "(blocked on: <blocked_on>, updated 3d ago)"), so the ' +
-            'length is bounded to keep that row one line.',
-        },
-      },
-      required: ['session_id', 'title'],
       additionalProperties: false,
     },
   },
@@ -553,28 +435,28 @@ function tsCompactDashed(date) {
 
 function writeReport({ project, step, iter, role, status, body }) {
   if (typeof project !== 'string' || !/^[a-zA-Z0-9._-]+$/.test(project)) {
-    throw new ProtocolError(-32602, 'PROJECT_INVALID',
-      `PROJECT_INVALID: Invalid project name: ${JSON.stringify(project)} (must match [a-zA-Z0-9._-]+)`);
+    throw new Error(
+      `Invalid project name: ${JSON.stringify(project)} (must match [a-zA-Z0-9._-]+)`
+    );
   }
   if (!Number.isInteger(step) || step < 0) {
-    throw new ProtocolError(-32602, 'STEP_INVALID',
-      `STEP_INVALID: Invalid step: ${step} (must be integer >= 0)`);
+    throw new Error(`Invalid step: ${step} (must be integer >= 0)`);
   }
   if (!Number.isInteger(iter) || iter < 1) {
-    throw new ProtocolError(-32602, 'ITER_INVALID',
-      `ITER_INVALID: Invalid iter: ${iter} (must be integer >= 1)`);
+    throw new Error(`Invalid iter: ${iter} (must be integer >= 1)`);
   }
   const validRoles = Object.keys(STATUS_BY_ROLE);
   if (!validRoles.includes(role)) {
-    throw new ProtocolError(-32602, 'ROLE_INVALID', `ROLE_INVALID: Invalid role: ${role}`);
+    throw new Error(`Invalid role: ${role}`);
   }
   const allowedStatuses = STATUS_BY_ROLE[role];
   if (!allowedStatuses.includes(status)) {
-    throw new ProtocolError(-32602, 'STATUS_INVALID',
-      `STATUS_INVALID: Invalid status for role=${role}: ${JSON.stringify(status)} (allowed: ${allowedStatuses.join(' | ')})`);
+    throw new Error(
+      `Invalid status for role=${role}: ${JSON.stringify(status)} (allowed: ${allowedStatuses.join(' | ')})`
+    );
   }
   if (typeof body !== 'string') {
-    throw new ProtocolError(-32602, 'BODY_INVALID', 'BODY_INVALID: body must be a string');
+    throw new Error('body must be a string');
   }
 
   const now = new Date();
@@ -587,15 +469,10 @@ function writeReport({ project, step, iter, role, status, body }) {
   // Hard boundary — refuse paths outside scratch root
   const scratchPrefix = SCRATCH_ROOT + sep;
   if (!filePath.startsWith(scratchPrefix)) {
-    throw new ProtocolError(-32000, 'FS_FAILURE',
-      `FS_FAILURE: Refused: path escapes scratch root: ${filePath}`);
+    throw new Error(`Refused: path escapes scratch root: ${filePath}`);
   }
 
-  try {
-    mkdirSync(stepDir, { recursive: true });
-  } catch (err) {
-    throw new ProtocolError(-32000, 'FS_FAILURE', 'FS_FAILURE: ' + err.message);
-  }
+  mkdirSync(stepDir, { recursive: true });
 
   const frontmatter =
     [
@@ -611,14 +488,10 @@ function writeReport({ project, step, iter, role, status, body }) {
     ].join('\n');
 
   // Append-only: 'wx' fails if file exists. Collision = caller bug.
-  try {
-    writeFileSync(filePath, frontmatter + body, {
-      flag: 'wx',
-      encoding: 'utf-8',
-    });
-  } catch (err) {
-    throw new ProtocolError(-32000, 'FS_FAILURE', 'FS_FAILURE: ' + err.message);
-  }
+  writeFileSync(filePath, frontmatter + body, {
+    flag: 'wx',
+    encoding: 'utf-8',
+  });
 
   appendFileSync(
     AUDIT_PATH,
@@ -638,112 +511,46 @@ function writeReport({ project, step, iter, role, status, body }) {
   return filePath;
 }
 
-// Status/body cross-validation for write_review: a reviewer that claims
-// APPROVED while its body carries findings (or vice versa) is rejected at the
-// write boundary, so main-session routing can trust the status field.
-function reviewSectionHasContent(body, heading) {
-  const lines = body.split('\n');
-  for (let i = 0; i < lines.length; i++) {
-    if (lines[i].trim() === heading) {
-      for (let j = i + 1; j < lines.length; j++) {
-        const t = lines[j].trim();
-        if (t.startsWith('## ')) break;
-        if (t !== '') return true;
-      }
-    }
-  }
-  return false;
-}
-
-const REVIEW_BLOCKING_SECTIONS = Object.freeze([
-  '## Issues',
-  '## Traceability Gaps',
-  '## Orphaned Spec Decisions',
-  '## Skill Coverage Delta',
-  '## Scope / Constraint / Success Criteria Delta',
-  '## Failure Modes Delta',
-  '## Deferred Notes Delta',
-]);
-
-function validateReviewStatusBodyConsistency(role, status, body) {
-  if (role === 'creative') return; // advisory statuses; no blocking sections
-  if (role === 'domain') {
-    // Domain verdicts signal via the mandatory ## Aggregate section.
-    let aggStatus = null;
-    const aggIdx = body.search(/^##\s+Aggregate\b.*$/m);
-    if (aggIdx !== -1) {
-      const rest = body.slice(aggIdx);
-      const nextH2 = rest.slice(2).search(/^##\s/m);
-      const section = nextH2 === -1 ? rest : rest.slice(0, nextH2 + 2);
-      const m = section.match(/\*\*Status:\*\*\s*(Approved|Issues Found)/i);
-      if (m) aggStatus = m[1].toLowerCase();
-    }
-    if (status === 'APPROVED' && aggStatus !== 'approved') {
-      throw new ProtocolError(-32602, 'STATUS_BODY_MISMATCH',
-        'STATUS_BODY_MISMATCH: Status/body mismatch: status=APPROVED requires a `## Aggregate` section with `**Status:** Approved` (a missing or malformed Aggregate must be written as ISSUES_FOUND per the fail-safe).');
-    }
-    if (status === 'ISSUES_FOUND' && aggStatus === 'approved') {
-      throw new ProtocolError(-32602, 'STATUS_BODY_MISMATCH',
-        'STATUS_BODY_MISMATCH: Status/body mismatch: status=ISSUES_FOUND but `## Aggregate` says `**Status:** Approved`. Align the Aggregate section and the status parameter.');
-    }
-    return;
-  }
-  const nonEmpty = REVIEW_BLOCKING_SECTIONS.filter((h) =>
-    reviewSectionHasContent(body, h)
-  );
-  if (status === 'APPROVED' && nonEmpty.length > 0) {
-    throw new ProtocolError(-32602, 'STATUS_BODY_MISMATCH',
-      `STATUS_BODY_MISMATCH: Status/body mismatch: status=APPROVED but body contains non-empty blocking section(s): ${nonEmpty.join(', ')}. Remove the findings or set status=ISSUES_FOUND.`);
-  }
-  if (status === 'ISSUES_FOUND' && nonEmpty.length === 0) {
-    throw new ProtocolError(-32602, 'STATUS_BODY_MISMATCH',
-      `STATUS_BODY_MISMATCH: Status/body mismatch: status=ISSUES_FOUND but body contains no non-empty blocking section (expected at least one of: ${REVIEW_BLOCKING_SECTIONS.join(', ')}).`);
-  }
-}
-
 function writeReview({ project, phase, iter, role, status, skills, body }) {
   if (typeof project !== 'string' || !/^[a-zA-Z0-9._-]+$/.test(project)) {
-    throw new ProtocolError(-32602, 'PROJECT_INVALID',
-      `PROJECT_INVALID: Invalid project name: ${JSON.stringify(project)} (must match [a-zA-Z0-9._-]+)`);
+    throw new Error(
+      `Invalid project name: ${JSON.stringify(project)} (must match [a-zA-Z0-9._-]+)`
+    );
   }
   if (!REVIEW_PHASES.includes(phase)) {
-    throw new ProtocolError(-32602, 'PHASE_INVALID',
-      `PHASE_INVALID: Invalid phase: ${JSON.stringify(phase)} (allowed: ${REVIEW_PHASES.join(' | ')})`);
+    throw new Error(
+      `Invalid phase: ${JSON.stringify(phase)} (allowed: ${REVIEW_PHASES.join(' | ')})`
+    );
   }
   if (!Number.isInteger(iter) || iter < 1) {
-    throw new ProtocolError(-32602, 'ITER_INVALID',
-      `ITER_INVALID: Invalid iter: ${iter} (must be integer >= 1)`);
+    throw new Error(`Invalid iter: ${iter} (must be integer >= 1)`);
   }
   if (!REVIEW_ROLES.includes(role)) {
-    throw new ProtocolError(-32602, 'ROLE_INVALID',
-      `ROLE_INVALID: Invalid review role: ${role} (allowed: ${REVIEW_ROLES.join(' | ')})`);
+    throw new Error(
+      `Invalid review role: ${role} (allowed: ${REVIEW_ROLES.join(' | ')})`
+    );
   }
   const allowedStatuses = STATUS_BY_REVIEW_ROLE[role];
-  if (!allowedStatuses) {
-    throw new ProtocolError(-32602, 'ROLE_INVALID',
-      `ROLE_INVALID: Unknown review role has no STATUS_BY_REVIEW_ROLE entry: ${role}`);
-  }
   if (!allowedStatuses.includes(status)) {
-    throw new ProtocolError(-32602, 'STATUS_INVALID',
-      `STATUS_INVALID: Invalid status for role=${role}: ${JSON.stringify(status)} (allowed: ${allowedStatuses.join(' | ')})`);
+    throw new Error(
+      `Invalid status for role=${role}: ${JSON.stringify(status)} (allowed: ${allowedStatuses.join(' | ')})`
+    );
   }
   if (skills !== undefined) {
     if (!Array.isArray(skills)) {
-      throw new ProtocolError(-32602, 'SKILLS_INVALID',
-        'SKILLS_INVALID: skills must be an array of strings');
+      throw new Error('skills must be an array of strings');
     }
     for (const s of skills) {
       if (typeof s !== 'string' || !/^[a-zA-Z0-9._-]+$/.test(s)) {
-        throw new ProtocolError(-32602, 'SKILLS_INVALID',
-          `SKILLS_INVALID: Invalid skill name: ${JSON.stringify(s)} (must match [a-zA-Z0-9._-]+)`);
+        throw new Error(
+          `Invalid skill name: ${JSON.stringify(s)} (must match [a-zA-Z0-9._-]+)`
+        );
       }
     }
   }
   if (typeof body !== 'string') {
-    throw new ProtocolError(-32602, 'BODY_INVALID', 'BODY_INVALID: body must be a string');
+    throw new Error('body must be a string');
   }
-
-  validateReviewStatusBodyConsistency(role, status, body);
 
   const now = new Date();
   const ts = tsCompact(now);
@@ -755,15 +562,10 @@ function writeReview({ project, phase, iter, role, status, skills, body }) {
 
   const scratchPrefix = SCRATCH_ROOT + sep;
   if (!filePath.startsWith(scratchPrefix)) {
-    throw new ProtocolError(-32000, 'FS_FAILURE',
-      `FS_FAILURE: Refused: path escapes scratch root: ${filePath}`);
+    throw new Error(`Refused: path escapes scratch root: ${filePath}`);
   }
 
-  try {
-    mkdirSync(phaseDir, { recursive: true });
-  } catch (err) {
-    throw new ProtocolError(-32000, 'FS_FAILURE', 'FS_FAILURE: ' + err.message);
-  }
+  mkdirSync(phaseDir, { recursive: true });
 
   const frontmatterLines = [
     '---',
@@ -780,14 +582,10 @@ function writeReview({ project, phase, iter, role, status, skills, body }) {
   frontmatterLines.push('---', '');
   const frontmatter = frontmatterLines.join('\n');
 
-  try {
-    writeFileSync(filePath, frontmatter + body, {
-      flag: 'wx',
-      encoding: 'utf-8',
-    });
-  } catch (err) {
-    throw new ProtocolError(-32000, 'FS_FAILURE', 'FS_FAILURE: ' + err.message);
-  }
+  writeFileSync(filePath, frontmatter + body, {
+    flag: 'wx',
+    encoding: 'utf-8',
+  });
 
   appendFileSync(
     AUDIT_PATH,
@@ -821,81 +619,27 @@ function deriveSlug(title) {
   return s;
 }
 
-// Validate one comma-separated slug list (`epic`, `blocked_by`). Every
-// element is checked against ISSUE_SLUG_PATTERN — imported from tasks.mjs, so
-// the writer and the corpus lint cannot disagree about the charset. An empty
-// string yields one empty element and is rejected: omitting the parameter is
-// how "none" is expressed.
-function validateSlugList(name, value) {
-  if (typeof value !== 'string') {
-    throw new ProtocolError(-32602, `${name.toUpperCase()}_INVALID`,
-      `${name.toUpperCase()}_INVALID: Invalid ${name}: must be a string`);
-  }
-  const elements = value.split(',');
-  if (!elements.every((element) => ISSUE_SLUG_PATTERN.test(element))) {
-    throw new ProtocolError(-32602, `${name.toUpperCase()}_INVALID`,
-      `${name.toUpperCase()}_INVALID: Invalid ${name}: ${JSON.stringify(value)} (must be one or more slugs matching ${ISSUE_SLUG_PATTERN.source}, comma-separated with no spaces)`);
-  }
-}
-
-function writeIssue({ kind, title, slug_override, summary, intent, impact, prior_thinking, related, notes,
-  role, epic, spike_type, blocked_by }) {
+function writeIssue({ kind, title, slug_override, summary, intent, impact, prior_thinking, related, notes }) {
   // Validators (fail loudly — MCP returns error to caller):
   if (!['issue', 'idea', 'mixed'].includes(kind)) {
-    throw new ProtocolError(-32602, 'KIND_INVALID',
-      `KIND_INVALID: Invalid kind: ${JSON.stringify(kind)} (must be one of: issue, idea, mixed)`);
+    throw new Error(`Invalid kind: ${JSON.stringify(kind)} (must be one of: issue, idea, mixed)`);
   }
   if (typeof title !== 'string' || title.length < 1 || title.length > 80) {
-    throw new ProtocolError(-32602, 'TITLE_INVALID',
-      'TITLE_INVALID: Invalid title: must be a non-empty string of length 1..80');
+    throw new Error(`Invalid title: must be a non-empty string of length 1..80`);
   }
   const safeTitle = title.replace(/[\r\n]+/g, ' ').trim();
   if (safeTitle.length === 0) {
-    throw new ProtocolError(-32602, 'TITLE_INVALID',
-      'TITLE_INVALID: Invalid title: became empty after whitespace normalization');
+    throw new Error(`Invalid title: became empty after whitespace normalization`);
   }
   if (slug_override !== undefined) {
     if (typeof slug_override !== 'string' || !/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(slug_override)) {
-      throw new ProtocolError(-32602, 'SLUG_OVERRIDE_INVALID',
-        `SLUG_OVERRIDE_INVALID: Invalid slug_override: ${JSON.stringify(slug_override)} (must match ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$)`);
+      throw new Error(`Invalid slug_override: ${JSON.stringify(slug_override)} (must match ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$)`);
     }
   }
   for (const [name, val] of [['summary', summary], ['intent', intent], ['impact', impact], ['prior_thinking', prior_thinking], ['related', related], ['notes', notes]]) {
     if (val !== undefined && typeof val !== 'string') {
-      throw new ProtocolError(-32602, 'FIELD_INVALID',
-        `FIELD_INVALID: Invalid ${name}: must be a string`);
+      throw new Error(`Invalid ${name}: must be a string`);
     }
-  }
-
-  // Epic/spike keys (D14). Shape first, then exactly two cross-field rules.
-  // The server enforces only what is checkable WITHIN one call: anything
-  // needing a sibling file (the graph rules E1, E2, E3 and the decision-record
-  // rule E5) stays lint-only, because the server cannot see the corpus.
-  if (role !== undefined && !ISSUE_ROLES.includes(role)) {
-    throw new ProtocolError(-32602, 'ROLE_INVALID',
-      `ROLE_INVALID: Invalid role: ${JSON.stringify(role)} (must be one of: ${ISSUE_ROLES.join(', ')})`);
-  }
-  if (spike_type !== undefined && !SPIKE_TYPES.includes(spike_type)) {
-    throw new ProtocolError(-32602, 'SPIKE_TYPE_INVALID',
-      `SPIKE_TYPE_INVALID: Invalid spike_type: ${JSON.stringify(spike_type)} (must be one of: ${SPIKE_TYPES.join(', ')})`);
-  }
-  if (epic !== undefined) validateSlugList('epic', epic);
-  if (blocked_by !== undefined) validateSlugList('blocked_by', blocked_by);
-
-  // Mirrors lint rule E7: a spike names the epic it belongs to.
-  if (role === 'spike' && epic === undefined) {
-    throw new ProtocolError(-32602, 'EPIC_REQUIRED',
-      'EPIC_REQUIRED: role "spike" requires epic: the slug(s) of the epic(s) this spike belongs to');
-  }
-  // Mirrors lint rule E10, which covers spike_type and blocked_by but
-  // deliberately NOT epic -- an ordinary capture may carry epic alone, since
-  // whether a capture can be promoted into a spike in place is an open
-  // question the design declines to foreclose. Requiring spike_type here as
-  // well (lint rule E8) was considered and rejected as over-strict for a
-  // two-rule mirror; E8 catches a spike missing it on the first edit.
-  if ((spike_type !== undefined || blocked_by !== undefined) && role !== 'spike') {
-    throw new ProtocolError(-32602, 'ROLE_SPIKE_REQUIRED',
-      'ROLE_SPIKE_REQUIRED: spike_type and blocked_by require role: "spike"');
   }
 
   const branch = gitCall(['rev-parse', '--abbrev-ref', 'HEAD'], 'unknown', 'git_branch');
@@ -941,19 +685,14 @@ function writeIssue({ kind, title, slug_override, summary, intent, impact, prior
   // Sandbox check on finalPath BEFORE any filesystem mutation.
   const scratchPrefix = SCRATCH_ROOT + sep;
   if (!finalPath.startsWith(scratchPrefix)) {
-    throw new ProtocolError(-32000, 'FS_FAILURE',
-      `FS_FAILURE: Refused: path escapes scratch root: ${finalPath}`);
+    throw new Error(`Refused: path escapes scratch root: ${finalPath}`);
   }
 
-  try {
-    mkdirSync(issuesDir, { recursive: true });
-  } catch (err) {
-    throw new ProtocolError(-32000, 'FS_FAILURE', 'FS_FAILURE: ' + err.message);
-  }
+  mkdirSync(issuesDir, { recursive: true });
 
   const now = new Date();
   const escapedTitle = safeTitle.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-  const frontmatterLines = [
+  const frontmatter = [
     '---',
     'tool: write_issue',
     `kind: ${kind}`,
@@ -965,20 +704,9 @@ function writeIssue({ kind, title, slug_override, summary, intent, impact, prior
     `branch: ${branch}`,
     `commit: ${commit}`,
     `working_tree: ${working_tree}`,
-  ];
-  // The four optional epic/spike keys (D14), emitted only when supplied and
-  // appended AFTER the ten required keys -- write_task's precedent, and what
-  // keeps every existing corpus file and the lint's key-order assumption
-  // untouched. Values are unquoted comma-separated scalars, never YAML lists:
-  // the frontmatter parser splits each line at the first colon and stores the
-  // raw string, so a flow sequence would round-trip as the literal "[a, b]".
-  // A slug contains no colon, so no quoting is needed.
-  if (role !== undefined) frontmatterLines.push(`role: ${role}`);
-  if (epic !== undefined) frontmatterLines.push(`epic: ${epic}`);
-  if (spike_type !== undefined) frontmatterLines.push(`spike_type: ${spike_type}`);
-  if (blocked_by !== undefined) frontmatterLines.push(`blocked_by: ${blocked_by}`);
-  frontmatterLines.push('---', '');
-  const frontmatter = frontmatterLines.join('\n');
+    '---',
+    '',
+  ].join('\n');
 
   const headingPrefix = kind === 'issue' ? 'Issue' : kind === 'idea' ? 'Idea' : 'Feature';
   const bodyLines = [
@@ -1021,11 +749,7 @@ function writeIssue({ kind, title, slug_override, summary, intent, impact, prior
   );
   const body = bodyLines.join('\n');
 
-  try {
-    writeFileSync(finalPath, frontmatter + body, { flag: 'wx', encoding: 'utf-8' });
-  } catch (err) {
-    throw new ProtocolError(-32000, 'FS_FAILURE', 'FS_FAILURE: ' + err.message);
-  }
+  writeFileSync(finalPath, frontmatter + body, { flag: 'wx', encoding: 'utf-8' });
 
   // Audit append — project is the LITERAL string "issues" (not caller-supplied; intentional deviation from write_report/write_review pattern per spec.md:85).
   appendFileSync(
@@ -1046,256 +770,6 @@ function writeIssue({ kind, title, slug_override, summary, intent, impact, prior
   return { path: finalPath, kind, title: safeTitle, collision_note };
 }
 
-// writeTask({ session_id, title, body?, status?, blocked_on? }) -> { path, id, title, status }
-//
-// The plan's only writer for scratch/S-{session_id}/tasks/ (D4). Mirrors
-// write_issue's conventions selectively: reuses deriveSlug()/MAX_BODY_BYTES/
-// the malformed-XML guard (in the dispatch branch)/the sandbox-prefix check/
-// the literal-project audit line, but skips git-state gathering entirely
-// (the task schema has no repo/branch/commit/working_tree fields), handles
-// id collision by re-minting rather than by a numeric filename suffix (a
-// suffix would break the id-matches-filename-prefix lint rule, T8), and
-// publishes via tmp+rename rather than a direct wx write, because the
-// readers of tasks/ (tasks list/lint, --with-tasks, the PostToolUse hook)
-// are separate OS processes that can be reading while a write is in flight.
-function writeTask({ session_id, title, body, status, blocked_on }) {
-  // All validation throws before any filesystem mutation. Order: session_id
-  // -> title -> body -> status -> blocked_on -> filesystem (Step 03b pins
-  // this order for the two-invalid-fields case).
-  if (typeof session_id !== 'string' || session_id.trim() === '') {
-    throw new ProtocolError(-32602, 'SESSION_ID_REQUIRED',
-      'SESSION_ID_REQUIRED: session_id is required and must be a non-empty string');
-  }
-  if (/[/\\]|\.\.|(^\.)|\0|\r|\n/.test(session_id)) {
-    throw new ProtocolError(-32602, 'SESSION_ID_INVALID',
-      'SESSION_ID_INVALID: session_id contains invalid characters (path separators, .., leading dot, newlines, or null bytes)');
-  }
-  // Positive charset gate mirrors writeSession's (server.mjs's own
-  // SESSION_ID_INVALID gate above it) -- proves the server self-safe
-  // regardless of caller, since session_id flows into path construction below.
-  if (!/^[A-Za-z0-9._-]+$/.test(session_id)) {
-    throw new ProtocolError(-32602, 'SESSION_ID_INVALID',
-      'SESSION_ID_INVALID: session_id must contain only letters, digits, dots, underscores, or hyphens');
-  }
-  const workstreamFolder = join(SCRATCH_ROOT, 'S-' + session_id);
-  const resolvedWorkstream = resolve(workstreamFolder);
-  const resolvedScratch = resolve(SCRATCH_ROOT);
-  if (!resolvedWorkstream.startsWith(resolvedScratch + sep)) {
-    throw new ProtocolError(-32602, 'SESSION_ID_INVALID',
-      'SESSION_ID_INVALID: session_id would resolve outside scratch root');
-  }
-
-  if (typeof title !== 'string') {
-    throw new ProtocolError(-32602, 'TITLE_REQUIRED',
-      'TITLE_REQUIRED: title is required and must be a string');
-  }
-  if (title.length < 1 || title.length > 80) {
-    throw new ProtocolError(-32602, 'TITLE_INVALID',
-      'TITLE_INVALID: title must be a string of length 1..80');
-  }
-  const safeTitle = title.replace(/[\r\n]+/g, ' ').trim();
-  if (safeTitle.length === 0) {
-    throw new ProtocolError(-32602, 'TITLE_INVALID',
-      'TITLE_INVALID: title became empty after whitespace normalization');
-  }
-
-  if (body !== undefined) {
-    if (typeof body !== 'string') {
-      throw new ProtocolError(-32602, 'BODY_INVALID', 'BODY_INVALID: body must be a string');
-    }
-    if (Buffer.byteLength(body, 'utf8') > MAX_BODY_BYTES) {
-      throw new ProtocolError(-32602, 'BODY_TOO_LARGE',
-        'BODY_TOO_LARGE: body exceeds ' + MAX_BODY_BYTES + ' bytes');
-    }
-  }
-
-  let resolvedStatus = 'open';
-  if (status !== undefined) {
-    if (typeof status !== 'string' || !TASK_STATUS.includes(status)) {
-      throw new ProtocolError(-32602, 'STATUS_INVALID',
-        `STATUS_INVALID: status must be one of: ${TASK_STATUS.join(', ')}`);
-    }
-    resolvedStatus = status;
-  }
-
-  // Validated AFTER CR/LF normalization, not before: a value only over-length
-  // because of embedded newlines should pass, since the newlines never
-  // survive into the rendered one-line brief row either way.
-  let safeBlockedOn;
-  if (blocked_on !== undefined) {
-    if (typeof blocked_on !== 'string') {
-      throw new ProtocolError(-32602, 'BLOCKED_ON_INVALID', 'BLOCKED_ON_INVALID: blocked_on must be a string');
-    }
-    safeBlockedOn = blocked_on.replace(/[\r\n]+/g, ' ').trim();
-    if (safeBlockedOn.length < 1 || safeBlockedOn.length > MAX_BLOCKED_ON_LEN) {
-      throw new ProtocolError(-32602, 'BLOCKED_ON_INVALID',
-        `BLOCKED_ON_INVALID: blocked_on must be 1..${MAX_BLOCKED_ON_LEN} characters after whitespace normalization`);
-    }
-  }
-
-  // --- Filesystem ---
-  const tasksDir = join(workstreamFolder, 'tasks');
-  const slug = deriveSlug(safeTitle);
-
-  // Sandbox check on tasksDir BEFORE any filesystem mutation -- mkdirSync
-  // below is this function's first mutation, so this mirrors writeIssue's
-  // finalPath-then-mkdirSync ordering (:836-842). workstreamFolder was
-  // already proven inside SCRATCH_ROOT above (the session_id resolve
-  // check), so this is a second, defense-in-depth confirmation rather than
-  // the only line of defense.
-  const scratchPrefix = SCRATCH_ROOT + sep;
-  if (!resolve(tasksDir).startsWith(scratchPrefix)) {
-    throw new ProtocolError(-32000, 'FS_FAILURE',
-      `Refused: path escapes scratch root: ${tasksDir}`);
-  }
-
-  // Collision is checked against existing ids, not existing filenames: two
-  // tasks with different titles produce different filenames even when their
-  // ids collide, so an existsSync(finalPath) test alone would miss it and
-  // emit a file that violates the T8 lint rule the moment a second file
-  // claims the same prefix. Tolerates a not-yet-created tasks/ directory
-  // (ENOENT) as an empty listing -- it is valid to create a task for a
-  // workstream that has no sessions/ (or tasks/) yet.
-  let existingIds;
-  try {
-    existingIds = new Set(
-      readdirSync(tasksDir)
-        .filter((name) => name.startsWith('t-') && name.endsWith('.md'))
-        .map((name) => name.slice(0, 8))
-    );
-  } catch (err) {
-    if (err.code === 'ENOENT') {
-      existingIds = new Set();
-    } else {
-      throw new ProtocolError(-32000, 'FS_FAILURE', 'FS_FAILURE: ' + err.message);
-    }
-  }
-
-  mkdirSync(tasksDir, { recursive: true });
-
-  const now = new Date();
-  const nowIso = now.toISOString();
-  const escapedTitle = safeTitle.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-  const escapedBlockedOn = safeBlockedOn !== undefined
-    ? safeBlockedOn.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
-    : undefined;
-
-  // Mint + publish loop, one 100-attempt bound covering both cases: a
-  // directory-scan collision (checked against existingIds above) and the
-  // belt-and-braces existsSync recheck immediately before the rename below.
-  // renameSync overwrites its destination silently, so the never-clobber
-  // guarantee an old wx-on-final write would have given has to come from the
-  // id re-mint check plus this recheck instead. Atomic *visibility* (a
-  // concurrent reader sees either no file or the complete file, never a
-  // partial write) was chosen over wx-on-final *exclusivity* because the
-  // concurrency that actually exists here is many readers (tasks list/lint,
-  // --with-tasks, the PostToolUse hook) and exactly one writer -- this
-  // process handles JSON-RPC frames sequentially, so a collision surviving
-  // both checks is unreachable in practice; the bound exists so a bug here
-  // can never hang the server.
-  let id, finalPath;
-  let attempts = 0;
-  while (true) {
-    attempts++;
-    if (attempts > 100) {
-      throw new ProtocolError(-32000, 'FS_FAILURE',
-        'FS_FAILURE: could not mint a unique task id after 100 attempts');
-    }
-
-    const candidateId = 't-' + randomBytes(3).toString('hex');
-    if (existingIds.has(candidateId)) continue;
-
-    const candidateFinalPath = resolve(join(tasksDir, `${candidateId}-${slug}.md`));
-    // Sandbox-prefix check on the fully-constructed candidate path, before
-    // this candidate's tmp-file write below. tasksDir itself was already
-    // sandbox-checked above (before mkdirSync, this function's first
-    // mutation) -- this is defense-in-depth confirming the minted id and
-    // derived slug (which deriveSlug guarantees is free of '/', '\', '..')
-    // didn't somehow escape it too.
-    if (!candidateFinalPath.startsWith(scratchPrefix)) {
-      throw new ProtocolError(-32000, 'FS_FAILURE',
-        `Refused: path escapes scratch root: ${candidateFinalPath}`);
-    }
-
-    // Frontmatter: exactly the task schema keys, in order -- id, title,
-    // status, created, updated, and blocked_on only when provided. No
-    // tool: key (the task schema has none) and no promoted_to: key (set by
-    // hand at promotion time, D5, never by the writer).
-    const frontmatterLines = [
-      '---',
-      `id: ${candidateId}`,
-      `title: "${escapedTitle}"`,
-      `status: ${resolvedStatus}`,
-      `created: ${nowIso}`,
-      `updated: ${nowIso}`,
-    ];
-    if (escapedBlockedOn !== undefined) {
-      frontmatterLines.push(`blocked_on: "${escapedBlockedOn}"`);
-    }
-    frontmatterLines.push('---', '');
-    // Frontmatter only when body is omitted -- no placeholder sections; the
-    // task body is freeform per spec, unlike write_issue's fixed skeleton.
-    // frontmatterLines.join('\n') already ends in a single '\n' (its last
-    // element is ''), so the frontmatter-only case is correct as-is. When
-    // body IS supplied, normalize its trailing newlines to exactly one --
-    // otherwise a caller-supplied body with no trailing '\n' (the common
-    // case) would leave the file with none at all, violating the "ending in
-    // a single trailing newline" contract this step's Actions list states.
-    const content = frontmatterLines.join('\n') + (body ? body.replace(/\n*$/, '\n') : '');
-
-    // Publish via tmp + rename, same directory (renameSync is only atomic
-    // within one filesystem). The tmp name is dot-prefixed AND does not
-    // start with 't-', so it fails every reader's `t-*.md` filter twice
-    // over -- structurally invisible to scanners by construction, not
-    // merely absent by timing (test-tasks.mjs's scanner-filter coverage is
-    // the assertion that keeps this true).
-    const candidateTmpPath = join(tasksDir, `.${candidateId}-${slug}.md.tmp`);
-    try {
-      writeFileSync(candidateTmpPath, content, { flag: 'wx', encoding: 'utf-8' });
-    } catch (err) {
-      throw new ProtocolError(-32000, 'FS_FAILURE', 'FS_FAILURE: ' + err.message);
-    }
-
-    if (existsSync(candidateFinalPath)) {
-      try { unlinkSync(candidateTmpPath); } catch {}
-      existingIds.add(candidateId);
-      continue;
-    }
-
-    try {
-      renameSync(candidateTmpPath, candidateFinalPath);
-    } catch (err) {
-      try { unlinkSync(candidateTmpPath); } catch {}
-      throw new ProtocolError(-32000, 'FS_FAILURE', 'FS_FAILURE: ' + err.message);
-    }
-
-    id = candidateId;
-    finalPath = candidateFinalPath;
-    break;
-  }
-
-  // Audit append AFTER the rename succeeds, so an audited task is always a
-  // published task. project is the LITERAL string "tasks" -- never
-  // caller-supplied -- matching write_issue's documented deviation at :846
-  // (no fsync here either; the audit log is advisory, not authoritative).
-  appendFileSync(
-    AUDIT_PATH,
-    JSON.stringify({
-      ts: now.toISOString(),
-      tool: 'write_task',
-      status: 'created',
-      project: 'tasks',
-      session_id,
-      id,
-      title: safeTitle,
-      path: finalPath,
-    }) + '\n',
-    'utf-8'
-  );
-
-  return { path: finalPath, id, title: safeTitle, status: resolvedStatus };
-}
-
 function writeSession({ session_id, body }) {
   // Validation throws — all four must occur before any filesystem mutation.
   if (typeof session_id !== 'string' || session_id.trim() === '') {
@@ -1305,14 +779,6 @@ function writeSession({ session_id, body }) {
   if (/[/\\]|\.\.|(^\.)|\0|\r|\n/.test(session_id)) {
     throw new ProtocolError(-32602, 'SESSION_ID_INVALID',
       'SESSION_ID_INVALID: session_id contains invalid characters (path separators, .., leading dot, newlines, or null bytes)');
-  }
-  // Positive charset gate: makes the server self-safe regardless of caller. session_id
-  // flows verbatim into pointer.recovery's shell-command string on pointer-write failure
-  // (see below) — restricting to [A-Za-z0-9._-] proves that string injection-free without
-  // relying on any caller-side gate (e.g. the /handoff command's own charset check).
-  if (!/^[A-Za-z0-9._-]+$/.test(session_id)) {
-    throw new ProtocolError(-32602, 'SESSION_ID_INVALID',
-      'SESSION_ID_INVALID: session_id must contain only letters, digits, dots, underscores, or hyphens');
   }
   // Additional sandbox-escape check: verify S-{session_id} path stays within SCRATCH_ROOT
   const candidatePath = join(SCRATCH_ROOT, 'S-' + session_id);
@@ -1358,7 +824,7 @@ function writeSession({ session_id, body }) {
   const resolvedRoot = resolve(SCRATCH_ROOT);
   const resolved = resolve(destPath);
   if (!resolved.startsWith(resolvedRoot + sep)) {
-    throw new ProtocolError(-32000, 'FS_FAILURE', 'FS_FAILURE: path escapes scratch root: ' + destPath);
+    throw new Error('FS_FAILURE: path escapes scratch root: ' + destPath);
   }
 
   // Ensure sessions/ directory exists (idempotent — covers all four Workstream Collision Policy rows).
@@ -1368,49 +834,29 @@ function writeSession({ session_id, body }) {
   let counter = 1;
   destPath = join(sessionsDir, `${ts}-${hex}.md`);
   while (counter <= 100) {
-    // openSync with 'wx' — OUTSIDE the write try/finally so EEXIST can retry the suffix loop.
-    // D22: ZERO body-content validation. write_session never inspects body shape.
-    // Validation is the caller's job; the per-session log is the immutable source of truth
-    // and HANDOFF.md is a derived cache regenerated by rewrite-pointer.
-    // History: write_handoff (commit d25a085 → ad18ada, 2026-04-22→25) failed because
-    // strict schema validation forced 2-10k token retries near context limit. Do NOT
-    // reintroduce content checks here. Body integrity flows through agent's Opus
-    // classification + bounded retry (D14, D25).
-    // D006: keep flag:'wx'; no tmp+rename — preserves exclusive-create / collision-safe guarantee.
-    let fd;
     try {
-      fd = openSync(destPath, 'wx');
+      // D22: ZERO body-content validation. write_session never inspects body shape.
+      // Validation is the AGENT's job (synthesizability classification, see handoff-manager).
+      // History: write_handoff (commit d25a085 → ad18ada, 2026-04-22→25) failed because
+      // strict schema validation forced 2-10k token retries near context limit. Do NOT
+      // reintroduce content checks here. Body integrity flows through agent's Opus
+      // classification + bounded retry (D14, D25).
+      writeFileSync(destPath, injectedBody, { flag: 'wx', encoding: 'utf8' });
+      break;
     } catch (e) {
       if (e.code === 'EEXIST') {
         counter += 1;
         destPath = join(sessionsDir, `${ts}-${hex}-${counter}.md`);
         continue;
       }
-      throw new ProtocolError(-32000, 'FS_FAILURE', 'FS_FAILURE: ' + e.message);
+      throw new Error('FS_FAILURE: ' + e.message);
     }
-    // fd held — write, fsync for durability, then always close in finally.
-    // On write/sync failure: unlink the partial file to prevent a stale wx path from
-    // blocking future retries, then re-throw as FS_FAILURE (spec line 155).
-    try {
-      writeSync(fd, injectedBody, null, 'utf8');
-      fsyncSync(fd);
-    } catch (writeErr) {
-      try { unlinkSync(destPath); } catch (unlinkErr) {
-        process.stderr.write(`write_session: unlink after write failure: ${unlinkErr.message}\n`);
-      }
-      throw new ProtocolError(-32000, 'FS_FAILURE', 'FS_FAILURE: ' + writeErr.message);
-    } finally {
-      closeSync(fd);
-    }
-    break;
   }
   if (counter > 100) {
-    throw new ProtocolError(-32000, 'FS_FAILURE', 'FS_FAILURE: collision suffix exceeded 100 iterations');
+    throw new Error('FS_FAILURE: collision suffix exceeded 100 iterations');
   }
 
   // Audit log entry.
-  // No fsync here — the crash window between the durable session file and the audit entry
-  // is intentional per D006: the audit log is advisory, not authoritative.
   appendFileSync(
     AUDIT_PATH,
     JSON.stringify({
@@ -1423,23 +869,7 @@ function writeSession({ session_id, body }) {
     'utf-8'
   );
 
-  // Regenerate the derived HANDOFF.md pointer mechanically so callers can never
-  // drop it. Non-fatal: the session file is the source of truth; a pointer
-  // failure is surfaced in the return for recovery but does not fail the write.
-  let pointer;
-  try {
-    const { targetPath } = rewritePointer(workstream_folder);
-    pointer = { written: true, path: targetPath };
-  } catch (err) {
-    process.stderr.write(`write_session: pointer regeneration failed (non-fatal): ${err.message}\n`);
-    pointer = {
-      written: false,
-      error: err.message,
-      recovery: `scratch-memory rewrite-pointer 'scratch/S-${session_id}/'`,
-    };
-  }
-
-  return { path: destPath, session_id, started, ended, pointer };
+  return { path: destPath, session_id, started, ended };
 }
 
 // --- Dispatch ---
@@ -1460,8 +890,7 @@ function handleCall(name, args) {
   if (name === 'write_issue') {
     validateNoMalformedToolCallXml(
       args,
-      ['summary', 'intent', 'impact', 'prior_thinking', 'related', 'notes',
-        'role', 'epic', 'spike_type', 'blocked_by'],
+      ['summary', 'intent', 'impact', 'prior_thinking', 'related', 'notes'],
       'write_issue',
     );
     const result = writeIssue(args || {});
@@ -1482,11 +911,6 @@ function handleCall(name, args) {
     return {
       content: [{ type: 'text', text: JSON.stringify(result) }],
     };
-  }
-  if (name === 'write_task') {
-    validateNoMalformedToolCallXml(args, ['title', 'body', 'blocked_on'], 'write_task');
-    const result = writeTask(args || {});
-    return { content: [{ type: 'text', text: JSON.stringify(result) }] };
   }
   throw new Error(`Tool not found: ${name}`);
 }

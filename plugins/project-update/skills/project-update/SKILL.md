@@ -33,7 +33,7 @@ allowed-tools: ["Read", "Glob", "Grep", "Bash", "Write", "Edit", "Agent"]
 
 Find the project context doc in this order:
 1. **Repo root**: `PROJECT_UPDATE.md` (check if it's a pointer — if it says "moved to", follow the path)
-2. **Sub-repo docs**: a project-specific docs sub-repo's `PROJECT_UPDATE.md` (e.g. `docs/PROJECT_UPDATE.md` — the sub-repo name varies per project; check `.subrepos` for candidates)
+2. **Sub-repo docs**: `akn-docs/PROJECT_UPDATE.md` or similar docs sub-repo
 3. **Argument override**: user passes path as second arg after cadence
 4. **CLAUDE.md reference**: look for a `project-update` or `PROJECT_UPDATE.md` reference
 
@@ -59,9 +59,6 @@ The context doc (`PROJECT_UPDATE.md`) defines everything project-specific:
 | monthly | Calendar month of anchor | path/to/updates/monthly/ | YYYY-MM-DD.md |
 
 ## Email Distribution
-**Optional — skip if the `email-draft` CLI (or your project's equivalent) isn't installed.** This
-section only applies if you want a Gmail draft generated automatically; omit it entirely to
-just write the update file.
 - **Profile**: `work` (sender@example.com)
 - **To**: recipient@example.com
 - **CC**: cc-recipient@example.com
@@ -107,8 +104,6 @@ Forward-looking priorities and upcoming milestones (not immediate tasks — thos
 - Priority 2
 
 ## Roadmap Image
-**Optional — skip if the `gemini-image` CLI (or your project's equivalent image-gen tool) isn't
-installed.** Omit this section entirely to generate updates without a roadmap image.
 - **Template**: path/to/roadmap-template.png (reference image for Gemini)
 - **Logo**: path/to/logo.png (brand anchor for Gemini)
 - **Style**: description of the visual style (e.g., chalk art chalkboard)
@@ -237,9 +232,9 @@ These are **different sections** serving different purposes:
       <action>Append to "Progress Log" — add dated entries for milestone-relevant changes this period (what advanced, what was decided, what's blocked)</action>
       <action>Update the "What's Next" section in PROJECT_UPDATE.md — remove completed items visible in git history, keep items still upcoming, suggest new items based on active branches</action>
       <action>**USER REVIEW GATE 1**: Present draft update to user for review — percentages, summaries, highlights, what's next. Incorporate feedback before proceeding.</action>
-      <action>If Roadmap Image config exists AND the required image-gen CLI (e.g. `gemini-image`) is installed, generate updated image. If a companion doc (e.g., ROADMAP-IMAGE.md) is referenced, follow its recipe for tool, prompt template, and reference images. Skip this action entirely (optional) if either the config section or the CLI is absent.</action>
+      <action>If Roadmap Image config exists, generate updated image. If a companion doc (e.g., ROADMAP-IMAGE.md) is referenced, follow its recipe for tool, prompt template, and reference images.</action>
       <action>**USER REVIEW GATE 2**: Show generated image to user. Iterate until approved.</action>
-      <action>If Email Distribution config exists in the context doc AND the `email-draft` CLI (or your project's equivalent) is installed, add frontmatter (to, cc, subject) to the update file and offer to create a Gmail draft via email-draft CLI. Run from the output directory so inline images resolve correctly. Skip this action entirely (optional) if either the config section or the CLI is absent.</action>
+      <action>If Email Distribution config exists in the context doc, add frontmatter (to, cc, subject) to the update file and offer to create a Gmail draft via email-draft CLI. Run from the output directory so inline images resolve correctly.</action>
       <action>Report the output file path to the user</action>
     </actions>
   </step>

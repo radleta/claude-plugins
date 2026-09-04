@@ -1,0 +1,17 @@
+{
+  "name": "web-scraper",
+  "version": "1.0.1",
+  "description": "Systematic web scraping methodology with escalating strategies",
+  "author": {
+    "name": "Richard Adleta",
+    "email": "radleta@gmail.com",
+    "url": "https://github.com/radleta"
+  },
+  "repository": "https://github.com/radleta/claude-plugins",
+  "license": "MIT",
+  "keywords": [
+    "scraping",
+    "web",
+    "automation"
+  ]
+}

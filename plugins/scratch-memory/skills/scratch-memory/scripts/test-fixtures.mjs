@@ -4,7 +4,6 @@
 //
 // Provides:
 //   createFixture()                              → { projectRoot, sessionsDir, cleanup() }
-//   createAnchorFixture()                        → { projectRoot, scratchDir, cleanup() }
 //   writePidFile(sessionsDir, opts)              → void
 //   parseFrontmatter(content)                    → { fields, sessionChain, bodyText }
 //   validBody(overrides?)                        → string
@@ -32,33 +31,6 @@ export function createFixture() {
     cleanup() {
       try { rmSync(projectRoot, { recursive: true, force: true }); } catch {}
       try { rmSync(sessionsDir, { recursive: true, force: true }); } catch {}
-    },
-  };
-}
-
-/**
- * Create a lightweight `.git`-anchor fixture: mkdtemp, an empty `.git` FILE
- * marker (no `git init`, no subprocess), and an empty `scratch/` directory.
- *
- * Choice criterion vs. createFixture(): use createAnchorFixture() when the
- * code under test only needs project-root resolution to succeed —
- * resolveProjectRoot() (handoff.mjs:45-65) only `statSync`s for a `.git`
- * file-or-directory, it never reads git state. Use createFixture() when the
- * code under test needs real git state (a real repo, a commit, `git`
- * subprocess calls to succeed).
- *
- * @returns {{ projectRoot: string, scratchDir: string, cleanup(): void }}
- */
-export function createAnchorFixture() {
-  const projectRoot = mkdtempSync(join(tmpdir(), 'smcp-anchor-'));
-  writeFileSync(join(projectRoot, '.git'), '', 'utf-8');
-  const scratchDir = join(projectRoot, 'scratch');
-  mkdirSync(scratchDir, { recursive: true });
-  return {
-    projectRoot,
-    scratchDir,
-    cleanup() {
-      try { rmSync(projectRoot, { recursive: true, force: true }); } catch {}
     },
   };
 }
@@ -126,7 +98,7 @@ export function validBody(overrides) {
   const done = o.done ?? '- Did initial setup';
   const decisions = o.decisions ?? '- Use Node stdlib';
   const avoid = o.avoid ?? '- Do not edit manually';
-  const artifacts = o.artifacts ?? '- scratch/my-feature/README.md';
+  const artifacts = o.artifacts ?? '- scratch/handoff-methodology/README.md';
   return [
     '## Goal',
     'Ship handoff skill.',

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # consolidate-smoke-test.sh — Smoke-test runner for /wiki-memory consolidate
 #
-# Stages the synthetic fixtures from fixtures/consolidate-smoke-test/
+# Stages the synthetic fixtures from scratch/wiki-fleet-conversion/smoke-test/
 # into a temporary directory, exercises the pure-mechanical sub-steps of the
 # consolidate protocol (fixture structure validation), and reports per-criterion
 # PASS/FAIL results.
@@ -28,7 +28,7 @@ Usage: consolidate-smoke-test.sh [--help]
 Smoke-test runner for the /wiki-memory consolidate operation.
 
 Stages synthetic skill fixtures from:
-  fixtures/consolidate-smoke-test/
+  scratch/wiki-fleet-conversion/smoke-test/
 
 into a mktemp -d temporary directory, then validates the six structural
 acceptance criteria for the consolidate operation against the staged fixtures.
@@ -65,7 +65,7 @@ fi
 
 # ----- Locate fixtures root -----------------------------------------------
 # Walk upward from this script's location to find the repo root, then resolve
-# the fixtures/consolidate-smoke-test/ path relative to this script's own directory.
+# the scratch/wiki-fleet-conversion/smoke-test/ path.
 _resolve_script_dir() {
   local src="${BASH_SOURCE[0]}"
   while [[ -L "$src" ]]; do
@@ -78,11 +78,13 @@ _resolve_script_dir() {
 }
 SCRIPT_DIR="$(_resolve_script_dir)"
 
-FIXTURES_ROOT="$SCRIPT_DIR/fixtures/consolidate-smoke-test"
+# scripts/ -> wiki-memory/ -> skills/ -> .claude/ -> repo root
+REPO_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
+FIXTURES_ROOT="$REPO_ROOT/scratch/wiki-fleet-conversion/smoke-test"
 
 if [ ! -d "$FIXTURES_ROOT" ]; then
   echo "ERROR: fixtures root not found: $FIXTURES_ROOT" >&2
-  echo "  Expected the fixtures tree next to this script: scripts/fixtures/consolidate-smoke-test/" >&2
+  echo "  Run this script from a clone of claude-code-ref-gray with the scratch subrepo present." >&2
   exit 1
 fi
 

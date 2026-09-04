@@ -18,7 +18,6 @@ import {
   statSync,
 } from 'node:fs';
 import { resolve, join, sep, dirname, basename } from 'node:path';
-import { pathToFileURL } from 'node:url';
 
 import {
   parseFrontmatter,
@@ -32,12 +31,9 @@ import {
   parseRelatedProjectsFromFm,
   atomicWriteSync,
   detectShape,
-} from './handoff.mjs';
-import {
   HANDOFF_TEMPLATE_V2,
   EXPECTED_SECTIONS_V1,
-} from './handoff-legacy.mjs';
-import { rewritePointer } from './rewrite-pointer.mjs';
+} from './handoff.mjs';
 
 // ---------------------------------------------------------------------------
 // Help text
@@ -74,16 +70,14 @@ Error strings (on stderr, exit 1):
 // Helpers
 // ---------------------------------------------------------------------------
 
-// Parse a "## Skills — {label}" section from the HANDOFF.md body.
-// Strips inline rationale by splitting on ' — ' (space + U+2014 + space), ASCII '--', or '–'.
+// Parse the ## Skills — Mandatory section from the HANDOFF.md body.
+// Strips inline rationale by splitting on ' — ' (space + U+2014 + space), symmetric with parseAvailable.
 // Returns string[] of skill names (empty array if section absent or empty).
-// Shared by parseMandatory/parseAvailable (DRY-1) — the two only differ by heading label.
-function parseSkillsSection(body, label) {
+export function parseMandatory(body) {
   const sections = body.split(/^(?=## )/m);
-  const headingRe = new RegExp(`^## skills (?:—|--|–) ${label}$`, 'i');
   for (const sec of sections) {
     const firstLine = sec.split('\n')[0];
-    if (!headingRe.test(firstLine.trim())) continue;
+    if (!/^## skills (?:—|--|–) mandatory$/i.test(firstLine.trim())) continue;
     const lines = sec.split('\n').slice(1);
     const skills = [];
     for (const line of lines) {
@@ -100,14 +94,28 @@ function parseSkillsSection(body, label) {
   return [];
 }
 
-// Parse the ## Skills — Mandatory section from the HANDOFF.md body.
-export function parseMandatory(body) {
-  return parseSkillsSection(body, 'mandatory');
-}
-
 // Parse the ## Skills — Available section from the HANDOFF.md body.
+// Strips inline rationale by splitting on the EXACT string ' — ' (space + U+2014 + space).
+// Returns string[] of skill names (empty array if section absent or empty).
 export function parseAvailable(body) {
-  return parseSkillsSection(body, 'available');
+  const sections = body.split(/^(?=## )/m);
+  for (const sec of sections) {
+    const firstLine = sec.split('\n')[0];
+    if (!/^## skills (?:—|--|–) available$/i.test(firstLine.trim())) continue;
+    const lines = sec.split('\n').slice(1);
+    const skills = [];
+    for (const line of lines) {
+      if (/^## /.test(line)) break;
+      const match = line.match(/^ {0,2}(?:- |\* )(.+)$/);
+      if (!match) continue;
+      const item = match[1].trim();
+      const sepMatch = item.match(/ (?:—|--|–) /);
+      const name = sepMatch ? item.slice(0, sepMatch.index).trim() : item;
+      if (name) skills.push(name);
+    }
+    return skills;
+  }
+  return [];
 }
 
 // ---------------------------------------------------------------------------
@@ -146,13 +154,10 @@ async function cmdPickup(fromArg, opts) {
     process.exit(1);
   }
 
-  // Use resolveSessionArg to resolve UUID / exact slug to a { sessionId, folderPath }.
+  // Use resolveSessionArg to resolve UUID / slug / prefix to a { sessionId, folderPath }.
   // resolveSessionArg validates fromArg internally (CWE-22 path-traversal guard) and calls
-  // process.exit(1) on invalid arg or no-match. exact:true disables the prefix-glob
-  // fallback — pickup is mutating, so a retired id must error rather than silently
-  // resolving to whatever folder happens to prefix-match it (e.g. after a rename
-  // to S-<id>-2 leaves the retired <id> as a live prefix of the renamed folder).
-  const { sessionId: from_session_id } = resolveSessionArg(fromArg, projectRoot, { fieldName: 'from_session_id', exact: true });
+  // process.exit(1) on invalid arg, no-match, or ambiguous prefix.
+  const { sessionId: from_session_id } = resolveSessionArg(fromArg, projectRoot, { fieldName: 'from_session_id' });
 
   // 3. Compose target folder — use to_session_id directly (D-SPEC-7: CLI always requires flag)
   const targetSlug = to_session_id;
@@ -213,7 +218,7 @@ async function cmdPickup(fromArg, opts) {
   let shape = detectShape(fromFile, sessionsPath);
   let migrated_from_legacy = false;
 
-  // Refine 'inconsistent' shape by examining body content:
+  // Refine 'inconsistent' by body content (mirrors resolveEffectiveSchema from handoff.mjs):
   // sessions/ exists but no ## Sessions heading → check if V1 sections present.
   // This handles test fixtures and mid-migration folders that have V1 body in a V2-init folder.
   if (shape === 'inconsistent') {
@@ -286,9 +291,7 @@ async function cmdPickup(fromArg, opts) {
       process.exit(1);
     }
     // Inject `_legacy: true` into frontmatter before closing `---`
-    const injectedContent = legacyContent
-      .replace(/\n---\n/, '\n_legacy: true\n---\n')
-      .replace(/^## Open questions\s*$/m, '## Open questions raised');
+    const injectedContent = legacyContent.replace(/\n---\n/, '\n_legacy: true\n---\n');
     writeFileSync(tmpLegacyPath, injectedContent, 'utf-8');
     renameSync(tmpLegacyPath, legacyFilePath);
 
@@ -347,13 +350,6 @@ async function cmdPickup(fromArg, opts) {
     }
   }
 
-  // FIX 1: capture whether the source was a v3 pointer, captured once right after shape
-  // detection/refinement above. shape is never reassigned to 'v3-pointer' by the 'inconsistent'
-  // refinement or the legacy-migration block, so this flag stays accurate through collision
-  // handling and the success paths below — used to best-effort regenerate a proper v3 pointer
-  // at the target after a successful pickup (see step 13).
-  const sourceWasV3Pointer = shape === 'v3-pointer';
-
   // 6. Collision check — target folder exists. Three resolutions:
   //    a. Idempotent re-pickup: target already ours (session_id match + from in chain)
   //    b. Same-path takeover: source and target slugs collide (fromFolder === toFolder)
@@ -390,25 +386,6 @@ async function cmdPickup(fromArg, opts) {
     } else {
       // Idempotent pickup: target already belongs to us — clean up stale source and return.
       // fromFolder !== toFolder is guaranteed here: isSamePathTakeover handles the equal case above.
-      // F3 guard: the collision check above only inspects the TARGET's session_chain — it never
-      // verifies whether fromFolder itself now holds real, independent session data (a reused slug
-      // could have a populated sessions/ log by the time this runs). Refuse to delete when so.
-      const fromSessionsPath = join(fromFolder, 'sessions');
-      let fromHasRealSessions = false;
-      if (existsSync(fromSessionsPath)) {
-        try {
-          fromHasRealSessions = readdirSync(fromSessionsPath).some(f => f.endsWith('.md'));
-        } catch {
-          // unreadable sessions/ dir — treat as empty (matches pre-guard delete behavior)
-        }
-      }
-      if (fromHasRealSessions) {
-        process.stderr.write(
-          `ERROR: PICKUP_IDEMPOTENT_SOURCE_NOT_EMPTY: source folder ${fromFolder} holds real session data; ` +
-          `refusing to delete — resolve the slug conflict manually.\n`
-        );
-        process.exit(1);
-      }
       rmSync(fromFolder, { recursive: true, force: true });
       const targetContent2 = readFileSync(toFile, 'utf-8');
       const fm2 = parseFrontmatter(targetContent2);
@@ -481,7 +458,8 @@ async function cmdPickup(fromArg, opts) {
   // consecutive `/pickup wiki-investigator`) while preserving meaningful
   // alternating lineage (A→B→A→B remains 4 distinct entries).
   // NOTE: global dedup (any-position .includes()) is WRONG here because A→B→A
-  // is a valid sequence.
+  // is a valid sequence — handoff.mjs uses global dedup only because it always
+  // appends its own session_id, which legitimately cannot recur.
   const last = priorChain.length - 1;
   const session_chain = (last >= 0 && priorChain[last] === from_session_id)
     ? [...priorChain]
@@ -489,7 +467,7 @@ async function cmdPickup(fromArg, opts) {
 
   // 11. Extract body: content after the closing '---' of the frontmatter block
   const fmEndIdx = priorContent.indexOf('\n---\n');
-  const body = fmEndIdx !== -1 ? priorContent.slice(fmEndIdx + 5) : priorContent;
+  const body = fmEndIdx !== -1 ? priorContent.slice(fmEndIdx + 5) : '';
 
   // 12. Compose new frontmatter with updated session_id and session_chain; preserve all other fields
   const safeGoal = goal_fm.replace(/[\r\n]/g, ' ');
@@ -522,15 +500,7 @@ async function cmdPickup(fromArg, opts) {
   // Write updated file back to fromFile BEFORE rename so rename failure leaves a valid file.
   // Use writeFileSync directly (not atomicWriteSync) — atomic rename is the next step;
   // writing to a tmp sibling and then renaming again would interfere with the folder rename.
-  //
-  // Skipped for a same-path v3 takeover: there is no rename to guard, and the V2-shaped
-  // frontmatter written here (session_chain/related_projects/goal) is not part of a v3
-  // pointer at all — rewritePointer() below rebuilds from sessions/ and discards every
-  // byte of it. Writing it would only corrupt a valid pointer for the width of two
-  // statements, and leave it corrupt if the process died between them.
-  if (!(sourceWasV3Pointer && fromFolder === toFolder)) {
-    writeFileSync(fromFile, newFrontmatter + '\n---\n' + body, { flag: 'w', encoding: 'utf-8' });
-  }
+  writeFileSync(fromFile, newFrontmatter + '\n---\n' + body, { flag: 'w', encoding: 'utf-8' });
 
   // 13. Rename folder — directory rename is atomic on same filesystem.
   //     Skip when fromFolder === toFolder (same-path takeover case).
@@ -539,38 +509,8 @@ async function cmdPickup(fromArg, opts) {
       renameSync(fromFolder, toFolder);
     }
   } catch (err) {
-    // F2: the frontmatter write above already mutated fromFile to claim session_id: to_session_id.
-    // If the rename then fails (TOCTOU on toFolder, OS error), best-effort restore fromFile to its
-    // pre-pickup content so the folder isn't left in a semantically inconsistent state (frontmatter
-    // claiming ownership by to_session_id while the folder is still physically S-{from_session_id}).
-    try {
-      writeFileSync(fromFile, priorContent, { flag: 'w', encoding: 'utf-8' });
-    } catch {
-      // best-effort — restore failure does not mask the original rename error
-    }
     process.stderr.write(`ERROR: PICKUP_RENAME_FAILED: ${err.message}\n`);
     process.exit(2);
-  }
-
-  // FIX 1 (BUG): the write/rename block above (steps 7-13) unconditionally overwrites the
-  // target's HANDOFF.md with a V2-shaped ownership-claiming frontmatter block — correct for
-  // legacy/V2 sources, but destructive for a v3 source (it corrupts the v3 pointer's
-  // last_pointer_rewrite/session_count fields and 5-section body). When the source was a v3
-  // pointer, regenerate a proper v3 pointer at the target now that the rename has completed
-  // (this also covers the same-path takeover flow — the try/catch above always runs; rename
-  // itself is simply skipped for same-path via the inner `fromFolder !== toFolder` guard).
-  // Best-effort: on failure, leave the V2-shaped pointer in place — rewrite-pointer remains
-  // the manual recovery path. Never throws, never changes the exit code or --json stdout
-  // contract; a failure is logged to stderr (see catch below) so it isn't silent.
-  if (sourceWasV3Pointer) {
-    try {
-      rewritePointer(toFolder);
-    } catch (err) {
-      // best-effort — non-fatal; surfaced on stderr (channel-separated from --json stdout)
-      // so a silently-corrupted V2-shaped pointer doesn't go unnoticed. Mirrors write_session's
-      // pointer-regeneration-failure logging in server.mjs.
-      process.stderr.write(`pickup: pointer regeneration failed (non-fatal): ${err.message}\n`);
-    }
   }
 
   // The file is now at toFolder/HANDOFF.md
@@ -688,18 +628,3 @@ export async function dispatch(argv) {
 }
 
 export default dispatch;
-
-// ---------------------------------------------------------------------------
-// Entry-point guard — forward to dispatch() on direct invocation (`node
-// pickup.mjs ...`), not just when imported by scratch-memory.mjs or the
-// pickup-with-pid.mjs test helper (whose process.argv override never matches
-// this module's own import.meta.url, so the guard correctly stays inert
-// there). Without this, direct invocation silently exits 0 with no output
-// (issue: verb-modules-silent-noop-direct-invocation).
-// ---------------------------------------------------------------------------
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  dispatch(process.argv.slice(2)).catch(err => {
-    process.stderr.write(`${err.stack ?? err.message}\n`);
-    process.exit(2);
-  });
-}

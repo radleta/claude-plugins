@@ -10,9 +10,6 @@
 // rhythm, rule-of-three abuse) are left to the human-voice SKILL.md workflow;
 // a clean lint report does NOT mean the text reads as human.
 
-import { realpathSync } from "node:fs";
-import { pathToFileURL } from "node:url";
-
 // ─── Detection tables ────────────────────────────────────────────────────────
 // Each table entry carries a short `fix` hint so the report is actionable.
 // Severity tiers: "high" = strong tell on its own; "med" = tell in clusters;
@@ -108,10 +105,8 @@ export const PHRASE_TELLS = [
   { phrase: "in today's fast-paced", fix: "cut the throat-clearing" },
   { phrase: "in today's digital age", fix: "cut the throat-clearing" },
   { phrase: "at the end of the day", fix: "cut the filler" },
-  { phrase: "navigating the complexities", fix: "say 'handling' / 'working through'" },
-  { phrase: "navigating the challenges", fix: "say 'handling' / 'working through'" },
-  { phrase: "navigate the complexities", fix: "say 'handle' / 'work through'" },
-  { phrase: "navigate the challenges", fix: "say 'handle' / 'work through'" },
+  { phrase: "navigating the", fix: "say 'handling' / 'working through'" },
+  { phrase: "navigate the", fix: "say 'handle' / 'work through'" },
   { phrase: "the ever-evolving", fix: "cut the cliche" },
   { phrase: "ever-changing", fix: "cut the cliche" },
   { phrase: "more than just", fix: "say what it is, directly" },
@@ -119,13 +114,7 @@ export const PHRASE_TELLS = [
   { phrase: "let's explore", fix: "just start" },
   { phrase: "in conclusion", fix: "cut it; the ending is obvious" },
   { phrase: "deeply rooted", fix: "say where it comes from" },
-  { phrase: "commitment to excellence", fix: "show the action, not the label" },
-  { phrase: "commitment to quality", fix: "show the action, not the label" },
-  { phrase: "commitment to innovation", fix: "show the action, not the label" },
-  { phrase: "commitment to sustainability", fix: "show the action, not the label" },
-  { phrase: "commitment to delivering", fix: "show the action, not the label" },
-  { phrase: "here's a", severity: "low", fix: "framing preamble — cut in attributed text; fine in casual notes" },
-  { phrase: "let me know if you have", severity: "med", fix: "delete or make it specific" },
+  { phrase: "commitment to", fix: "show the action, not the label" },
   // Wordy Latinate filler
   { phrase: "in order to", fix: "say 'to'" },
   { phrase: "due to the fact that", fix: "say 'because'" },
@@ -162,26 +151,6 @@ export const PHRASE_TELLS = [
   { phrase: "real talk", fix: "cut it; just say it" },
   // Whether-closer hedge-summary
   { phrase: "whether you're", fix: "if used to close a paragraph, cut the universal hedge" },
-  // Era/world throat-clearing
-  { phrase: "in an era of", fix: "cut the throat-clearing" },
-  { phrase: "in an era where", fix: "cut the throat-clearing" },
-  { phrase: "in a world where", fix: "cut the throat-clearing" },
-  { phrase: "deep dive", fix: "say 'close look' / just cover it" },
-  { phrase: "game-changer", fix: "say what actually changed" },
-  { phrase: "game changer", fix: "say what actually changed" },
-  { phrase: "unlock the full", fix: "name the concrete benefit" },
-  { phrase: "unlock the power", fix: "name the concrete benefit" },
-  { phrase: "unlock your potential", fix: "name the concrete benefit" },
-  { phrase: "unlock new", fix: "name the concrete benefit" },
-  // Manufactured warmth
-  { phrase: "thrilled to", fix: "manufactured warmth — match the real emotional register" },
-  { phrase: "excited to announce", fix: "manufactured warmth — match the real emotional register" },
-  { phrase: "excited to share", fix: "manufactured warmth — match the real emotional register" },
-  { phrase: "delighted to", fix: "manufactured warmth — match the real emotional register" },
-  // Rhetorical-question transitions
-  { phrase: "so what does this mean", fix: "cut the rhetorical-question transition; state the point" },
-  { phrase: "what does this mean for", fix: "cut the rhetorical-question transition; state the point" },
-  { phrase: "why does this matter", fix: "cut the rhetorical-question transition; state the point" },
 ];
 
 // Chatbot / assistant artifacts — high severity, near-certain tells when text
@@ -189,11 +158,13 @@ export const PHRASE_TELLS = [
 export const ARTIFACT_TELLS = [
   { phrase: "certainly!", fix: "delete the assistant preamble" },
   { phrase: "i hope this helps", fix: "delete the sign-off" },
+  { phrase: "let me know if you have", fix: "delete or make it specific" },
   { phrase: "feel free to", fix: "delete the filler" },
   { phrase: "as an ai", fix: "delete — never disclose the model in attributed text" },
   { phrase: "as a large language model", fix: "delete entirely" },
   { phrase: "i cannot fulfill", fix: "delete the refusal scaffolding" },
   { phrase: "as of my last", fix: "delete the cutoff disclaimer" },
+  { phrase: "here's a", fix: "consider cutting the framing preamble" },
   { phrase: "great question", fix: "delete the flattery" },
   { phrase: "you're absolutely right", fix: "delete the sycophancy" },
   { phrase: "of course!", fix: "delete the preamble" },
@@ -226,12 +197,6 @@ export const STRUCTURE_TELLS = [
     re: /\bfrom (?:its|the|a)\b[^.?!]*?\bto (?:its|the|a)\b/gi,
     severity: "low",
     fix: "'from X to Y' sweep — name the specific items",
-  },
-  {
-    name: "isnt-just",
-    re: /\b(?:isn|doesn|aren|don)['’]t (?:just|only|merely)\b[^.?!]{0,100}[.!?;—]\s*(?:it|they|that)['’]s\b/gi,
-    severity: "med",
-    fix: "negative parallelism — state what it is, directly",
   },
 ];
 
@@ -281,13 +246,11 @@ function scanYellow(text, findings) {
 
 function scanPhrases(text, list, category, severity, findings) {
   const lower = text.toLowerCase();
-  for (const entry of list) {
-    const { phrase, fix } = entry;
-    const entrySeverity = entry.severity ?? severity;
+  for (const { phrase, fix } of list) {
     let from = 0;
     let idx;
     while ((idx = lower.indexOf(phrase, from)) !== -1) {
-      pushMatch(findings, text, idx, text.slice(idx, idx + phrase.length), category, entrySeverity, fix);
+      pushMatch(findings, text, idx, text.slice(idx, idx + phrase.length), category, severity, fix);
       from = idx + phrase.length;
     }
   }
@@ -358,7 +321,6 @@ function scanFormatting(text, findings) {
 
   // Title Case Headings: markdown headings where most words are capitalized.
   const headingRe = /^#{1,6}\s+(.+)$/gm;
-  const colonHeadlineRe = /^#{1,6}\s+[^:\n]{2,60}:\s+(?:Why|How|What)\b/;
   while ((m = headingRe.exec(text)) !== null) {
     const heading = m[1].trim();
     const wordsInHeading = heading.split(/\s+/).filter((w) => /[a-z]/i.test(w));
@@ -368,10 +330,6 @@ function scanFormatting(text, findings) {
         pushMatch(findings, text, m.index, heading, "formatting:title-case-heading",
           "low", "use sentence case for headings unless the house style is Title Case");
       }
-    }
-    if (colonHeadlineRe.test(m[0])) {
-      pushMatch(findings, text, m.index, heading, "formatting:colon-headline",
-        "low", "'X: Why Y' headline formula — say the point as the title");
     }
   }
 }
@@ -387,80 +345,16 @@ function scanConjunctionOpeners(text, findings) {
   }
 }
 
-// Colon-fronted clauses in body prose: "The useful bit for us: consultants bill
-// the same median." One is ordinary punctuation. A document that keeps doing it
-// is running a template — the case that motivated this rule fronted 5 of its 8
-// paragraphs that way, while a two-colon draft read fine. So the rule fires on
-// density only: at least COLON_CLAUSE_MIN in the document AND at least one per
-// four paragraphs, which keeps a long piece with a few stray colons quiet. It
-// reports once, naming the count, because the repetition is the tell.
-const COLON_CLAUSE_MIN = 3;
-
-function scanColonClauses(text, findings) {
-  const lines = text.split("\n");
-  const hits = [];
-  let offset = 0;
-  let inFrontmatter = lines[0] !== undefined && lines[0].trim() === "---";
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const lineStart = offset;
-    offset += line.length + 1;
-    if (inFrontmatter) {
-      if (i > 0 && line.trim() === "---") inFrontmatter = false;
-      continue;
-    }
-    // Headings (covered by the colon-headline rule), list-item lead-ins, and
-    // table rows all use colons structurally rather than as prose punctuation.
-    if (/^\s*(?:#{1,6}\s|[-*+]\s|\d+[.)]\s|\|)/.test(line)) continue;
-    // Letter before the colon skips times (14:30); required whitespace after it
-    // skips URLs (https://) and `key:value` pairs. Fenced and inline code is
-    // already blanked out by maskCode before any scan runs.
-    const re = /[A-Za-z)\]"'’]:\s+(?=\S)/g;
-    let m;
-    while ((m = re.exec(line)) !== null) {
-      const colonIdx = lineStart + m.index + m[0].indexOf(":");
-      // A clause-fronting colon has a whole clause in front of it; short label
-      // lead-ins ("Note: ...", "Update: ...") are not the tell. Look back through
-      // the whole sentence, not just the line — prose is often hard-wrapped.
-      const back = text.slice(Math.max(0, colonIdx - 200), colonIdx);
-      const clause = back.split(/\n[ \t]*\n/).pop().split(/[.!?]\s/).pop();
-      const wordsBefore = clause.trim().split(/\s+/).filter(Boolean).length;
-      if (wordsBefore >= 4) hits.push(colonIdx);
-    }
-  }
-
-  const paragraphs = text.split(/\n\s*\n/).filter((p) => p.trim()).length || 1;
-  if (hits.length >= COLON_CLAUSE_MIN && hits.length * 4 >= paragraphs) {
-    pushMatch(findings, text, hits[0], `${hits.length} colon-fronted clauses`,
-      "structure:colon-clause-density", "low",
-      "repeating 'clause: clause' punctuation reads as a template — recast most as a period, a comma, or a rewrite");
-  }
-}
-
-// Blank out fenced code blocks and inline code spans before scanning, so code
-// content never trips a tell. Every non-newline character inside a masked
-// region becomes a space — length and newlines are untouched, so line/col
-// reporting still lines up with the original text. Blockquotes are left alone.
-function maskCode(text) {
-  let masked = text.replace(/^(```|~~~)[^\n]*\n[\s\S]*?\n\1[ \t]*$/gm, (block) =>
-    block.replace(/[^\n]/g, " ")
-  );
-  masked = masked.replace(/`[^`\n]+`/g, (span) => span.replace(/[^\n]/g, " "));
-  return masked;
-}
-
 // analyze — the single entrypoint. Returns { findings, summary }.
 export function analyze(text) {
-  const scanned = maskCode(text);
   const findings = [];
-  scanWords(scanned, findings);
-  scanYellow(scanned, findings);
-  scanPhrases(scanned, PHRASE_TELLS, "phrase", "med", findings);
-  scanPhrases(scanned, ARTIFACT_TELLS, "artifact", "high", findings);
-  scanStructure(scanned, findings);
-  scanFormatting(scanned, findings);
-  scanConjunctionOpeners(scanned, findings);
-  scanColonClauses(scanned, findings);
+  scanWords(text, findings);
+  scanYellow(text, findings);
+  scanPhrases(text, PHRASE_TELLS, "phrase", "med", findings);
+  scanPhrases(text, ARTIFACT_TELLS, "artifact", "high", findings);
+  scanStructure(text, findings);
+  scanFormatting(text, findings);
+  scanConjunctionOpeners(text, findings);
 
   findings.sort((a, b) => a.index - b.index);
 
@@ -558,12 +452,6 @@ async function main(argv) {
 }
 
 // Run only when executed directly, not when imported by the test file.
-// argv[1] is compared through realpath: the skill folder is reached via a symlink
-// (~/.claude/skills -> the repo), and a raw string compare fails there, leaving the
-// CLI to exit 0 with no output — a silent "clean" report.
-const invokedAs = process.argv[1]
-  ? pathToFileURL(realpathSync(process.argv[1])).href
-  : "";
-if (import.meta.url === invokedAs) {
+if (import.meta.url === `file://${process.argv[1]}`) {
   main(process.argv).then((code) => process.exit(code));
 }

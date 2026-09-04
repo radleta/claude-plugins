@@ -300,16 +300,16 @@ echo ""
 echo "=== PWD .wiki-memory walk-up legacy (Resolution 1) ==="
 # ============================================================
 
-# PWD .wiki-memory walk-up legacy — preserved for the PWD-local wiki use case
+# PWD .wiki-memory walk-up legacy — preserved for AKN use case
 pwd_legacy_root="$TMPDIR_ROOT/pwd-legacy"
-mkdir -p "$pwd_legacy_root/.wiki-memory/billing-data"
-echo "# Billing Data Wiki" > "$pwd_legacy_root/.wiki-memory/billing-data/index.md"
+mkdir -p "$pwd_legacy_root/.wiki-memory/akn-data"
+echo "# AKN Data Wiki" > "$pwd_legacy_root/.wiki-memory/akn-data/index.md"
 
-stdout_legacy=$(cd "$pwd_legacy_root" && bash "$WIKI_RESOLVE" billing-data 2>/dev/null)
-stderr_legacy=$(cd "$pwd_legacy_root" && bash "$WIKI_RESOLVE" billing-data 2>&1 >/dev/null) || true
-rc=0; (cd "$pwd_legacy_root" && bash "$WIKI_RESOLVE" billing-data >/dev/null 2>&1) || rc=$?
+stdout_legacy=$(cd "$pwd_legacy_root" && bash "$WIKI_RESOLVE" akn-data 2>/dev/null)
+stderr_legacy=$(cd "$pwd_legacy_root" && bash "$WIKI_RESOLVE" akn-data 2>&1 >/dev/null) || true
+rc=0; (cd "$pwd_legacy_root" && bash "$WIKI_RESOLVE" akn-data >/dev/null 2>&1) || rc=$?
 assert_exit 0 "$rc" "PWD .wiki-memory walk-up legacy exits 0"
-assert_contains "<!-- wiki: $pwd_legacy_root/.wiki-memory/billing-data/ -->" "$stdout_legacy" "PWD .wiki-memory walk-up legacy: stdout points to .wiki-memory/billing-data/"
+assert_contains "<!-- wiki: $pwd_legacy_root/.wiki-memory/akn-data/ -->" "$stdout_legacy" "PWD .wiki-memory walk-up legacy: stdout points to .wiki-memory/akn-data/"
 assert_contains "WARN:" "$stderr_legacy" "PWD .wiki-memory walk-up legacy: stderr has one WARN line"
 
 # ============================================================
@@ -318,8 +318,8 @@ echo "=== stderr WARN format pinned ==="
 # ============================================================
 
 # Any legacy resolution must emit WARN in exact format
-stderr_warn=$(cd "$pwd_legacy_root" && bash "$WIKI_RESOLVE" billing-data 2>&1 >/dev/null) || true
-assert_contains "WARN: wiki 'billing-data' resolved via legacy" "$stderr_warn" "stderr WARN format pinned: contains WARN prefix with domain"
+stderr_warn=$(cd "$pwd_legacy_root" && bash "$WIKI_RESOLVE" akn-data 2>&1 >/dev/null) || true
+assert_contains "WARN: wiki 'akn-data' resolved via legacy" "$stderr_warn" "stderr WARN format pinned: contains WARN prefix with domain"
 assert_contains "(see /wiki-memory migrate)" "$stderr_warn" "stderr WARN format pinned: contains migration hint"
 
 # ============================================================

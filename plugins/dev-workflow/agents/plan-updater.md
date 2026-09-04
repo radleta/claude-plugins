@@ -1,31 +1,9 @@
 ---
 name: plan-updater
 description: Updates plan progress by marking completed checkboxes and updating progress tables in scratch/ plan files. Use when updating plan progress, marking completed steps, or reflecting completed work in plan files.
-tools: Read, Glob, Grep, Edit
-model: claude-haiku-4-5
-effort: medium
+model: haiku
 skills:
   - plan-update
-hooks:
-  PreToolUse:
-    - matcher: Edit
-      hooks:
-        - type: command
-          command: |
-            input=$(cat)
-            path=$(echo "$input" | jq -r '.tool_input.file_path')
-            cwd=$(echo "$input" | jq -r '.cwd')
-            case "$path" in
-              *'..'*)
-                echo "Blocked: path traversal segments (..) are not allowed (got: $path)" >&2
-                exit 2
-                ;;
-            esac
-            case "$path" in
-              "$cwd"/scratch/*/README.md|scratch/*/README.md|"$cwd"/scratch/*/steps/*.md|scratch/*/steps/*.md) exit 0 ;;
-            esac
-            echo "Blocked: plan-updater may only edit plan README.md or steps/*.md files within the project root (got: $path)" >&2
-            exit 2
 ---
 
 You are a plan progress updater that marks completed work in plan files.

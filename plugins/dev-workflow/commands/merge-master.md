@@ -1,19 +1,18 @@
 ---
-description: Merge the repo's default branch through branch hierarchy to current branch, auto-resolving safe conflicts
+description: Merge origin/master through branch hierarchy to current branch, auto-resolving safe conflicts
 argument-hint: [options]
 context: fork
-background: false
 ---
 
 <role>
   <identity>Git merge specialist</identity>
   <purpose>
-    Merge the repo's detected default branch into current branch through the branch hierarchy,
+    Merge origin/master into current branch through the branch hierarchy,
     resolving conflicts automatically when safe and requesting user input only for uncertain cases
   </purpose>
   <scope>
     <in-scope>
-      <item>Fetching and merging from the detected default branch</item>
+      <item>Fetching and merging from origin/master</item>
       <item>Discovering branch hierarchy</item>
       <item>Automatic conflict resolution for safe cases</item>
       <item>Pushing successfully merged branches</item>
@@ -31,13 +30,10 @@ background: false
 Current branch:
 !`git branch --show-current`
 
-Default branch:
-!`d=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null); if [ -z "$d" ]; then echo master; else echo "${d#refs/remotes/origin/}"; fi`
-
 <workflow type="sequential">
   <step id="1-fetch" order="first">
-    <description>Fetch latest from origin's default branch</description>
-    <action>git fetch origin [default-branch]</action>
+    <description>Fetch latest from origin</description>
+    <action>git fetch origin master</action>
     <acceptance-criteria>
       <criterion priority="critical">Fetch completes without error</criterion>
     </acceptance-criteria>
@@ -47,12 +43,12 @@ Default branch:
   <step id="2-discover" order="second">
     <description>Discover branch hierarchy</description>
     <actions>
-      <action>Find merge base between current branch and [default-branch]</action>
+      <action>Find merge base between current branch and master</action>
       <action>Identify intermediate branches merged into current branch</action>
-      <action>Build ordered list: [default-branch] → intermediate branches → current branch</action>
+      <action>Build ordered list: master → intermediate branches → current branch</action>
     </actions>
     <investigation>
-      <command>git log --oneline --merges HEAD ^[default-branch] | head -20</command>
+      <command>git log --oneline --merges HEAD ^master | head -20</command>
       <purpose>Find merge commits and their source branches</purpose>
     </investigation>
     <acceptance-criteria>
@@ -68,11 +64,11 @@ Default branch:
 
   <step id="3-merge" order="third">
     <description>Merge each branch in hierarchy</description>
-    <for-each>branch in hierarchy (starting from [default-branch])</for-each>
+    <for-each>branch in hierarchy (starting from master)</for-each>
 
     <sub-step id="3a-check">
       <description>Check if branch needs updating</description>
-      <command>git rev-list --count [branch]..origin/[default-branch]</command>
+      <command>git rev-list --count [branch]..origin/master</command>
       <decision>
         <if>count = 0</if>
         <then>Skip to next branch (already up to date)</then>
@@ -84,7 +80,7 @@ Default branch:
       <description>Merge from parent branch</description>
       <actions>
         <action>Checkout the branch</action>
-        <action>Merge from parent ([default-branch] or intermediate branch)</action>
+        <action>Merge from parent (master or intermediate branch)</action>
       </actions>
 
       <conflict-resolution-protocol>
@@ -156,7 +152,7 @@ Default branch:
       <action>Summarize what was merged</action>
     </actions>
     <acceptance-criteria>
-      <criterion priority="critical">All branches in hierarchy up to date with origin/[default-branch]</criterion>
+      <criterion priority="critical">All branches in hierarchy up to date with origin/master</criterion>
       <criterion priority="high">All pushes succeeded</criterion>
     </acceptance-criteria>
   </step>
@@ -165,9 +161,9 @@ Default branch:
 ## Process Flow
 
 ```
-origin/[default-branch]
-    ↓ (fetch & fast-forward local [default-branch])
-local [default-branch]
+origin/master
+    ↓ (fetch & fast-forward local master)
+local master
     ↓ (merge into intermediate branches if any)
 intermediate branches
     ↓ (merge & push each, resolve conflicts as able)

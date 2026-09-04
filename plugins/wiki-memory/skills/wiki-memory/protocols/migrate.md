@@ -1,7 +1,3 @@
----
-summary: "convert an existing expert skill to wiki-backed format"
----
-
 # Migrate Workflow
 
 `/wiki-memory migrate <skill>`
@@ -18,10 +14,32 @@ in multiple agent files is dissolved (Constraint I4) — `knowledge-ingestor.md`
 
 ## Pre-check: is this skill wiki-natural? (D-IMPL-13)
 
-Before migrating a skill to wiki-backed format, run the shared 4-test heuristic +
-naming heuristics + carve-outs (see [wiki-natural-heuristic.md](wiki-natural-heuristic.md)).
-Methodology skills produce an over-engineered structure with the same content but more
-navigation overhead — migrating them is waste.
+Before migrating a skill to wiki-backed format, run the 4-test heuristic. Methodology
+skills produce an over-engineered structure with the same content but more navigation
+overhead — migrating them is waste.
+
+**4-test heuristic:**
+
+1. **Sequential test:** Does the agent need to read the SKILL.md top-to-bottom every
+   time? → methodology, SKIP
+2. **Query test:** Will an agent commonly load *one specific page* to answer *one
+   specific question*? → wiki-natural, proceed
+3. **Growth test:** Will this content grow over time as the LLM ingests new patterns?
+   → wiki-natural, proceed
+4. **Decomposition test:** Does decomposing the SKILL.md into pages require splitting
+   sequential narrative into out-of-order fragments? → methodology, SKIP
+
+**Naming heuristics:**
+- `-expert` suffix is a soft wiki signal (but see carve-outs)
+- `-methodology`, `-rollout`, `-update` (verb-form), `-management` are strong
+  methodology signals — default to SKIP unless all 4 tests clearly pass
+
+**Carve-outs:** `plan-expert`, `estimation-expert`, and `sdd-expert` carry `-expert`
+names but are sequential procedural content — SKIP despite the suffix.
+
+**Examples of confirmed-SKIP skills:** `handoff-methodology`, `code-change`,
+`analyzer-rollout`, `api-docs`, `brainstorming`, `commit-methodology`, `doc-update`,
+`knowledge-capture`, `scratch-management`, `user-docs`.
 
 **If the skill is methodology-flavored:** stop here. Do not proceed to the 8-step
 apply sequence.
@@ -42,8 +60,7 @@ apply sequence below.
 | State | What migrate does |
 |-------|------------------|
 | `healthy` | No-op — exit immediately at step 1 with "State: healthy — no migration needed." |
-| `not-a-wiki` | The folder has not declared itself and carries no structural wiki signal, so `audit` says nothing about it and writes no plan (D15/D17). For migrate this is the ordinary starting point, not an error: the skill is adopted in one pass at step 1, then re-classified — see step 1 |
-| `new` | An **adoption candidate** (D17): structurally wiki-shaped, but undeclared. Audit proposes the full conformance set — `wiki: true` in `SKILL.md` frontmatter, `.mditerc`, `schema.md`, `## Pages`, `## Meta` — plus decomposition of whatever body is trapped in `SKILL.md`; no existing pages to merge against; section keep-vs-promote heuristic applied fresh |
+| `new` | Audit proposes full decomposition + wiki scaffold (.mditerc, log.md, schema.md, ## Pages, ## Meta); no existing pages to merge against; section keep-vs-promote heuristic applied fresh |
 | `partial-migration` | Audit enumerates existing sibling pages AND trapped SKILL.md body; applies page-merge intelligence (MERGE-INTO vs PROMOTE-NEW) for each body section; fixes D34 placement violation if present |
 | `unhealthy` | Audit targets specific lint failures, schema violations, dangling-entry removals, tag-prefix mismatches, orphan page cleanup; body decomposition fires only if body weight also exceeds threshold (behaves as partial-migration for that component) |
 
@@ -58,30 +75,7 @@ wiki-health <skill>
 ```
 
 If state = `healthy`: print "State: healthy — no migration needed." and exit (no-op).
-Continue when state is `new`, `partial-migration`, or `unhealthy`.
-
-**`not-a-wiki` (exit 2) — the ordinary starting point for a deliberate migration.** Since
-identity became the `wiki: true` declaration (D15), a monolithic skill that has never been a
-wiki reports `not-a-wiki`, and `audit` deliberately says nothing about such a folder — so step 2
-would have no plan to read. Exit 2 covers two different situations; `wiki-health`'s own message
-tells them apart:
-
-- `ERROR: skill not found: {skill}` — there is nothing to migrate. Abort with that message.
-- `{skill}: not-a-wiki` — the folder exists and has not declared itself. This is precisely what
-  `/wiki-memory migrate <skill>` is for, and typing the command **is** the decision to adopt.
-  Bring the folder into conformance in **one pass**, writing only what is missing and never
-  overwriting existing body content, from the named template blocks in `protocols/init.md`:
-  `### Template: SKILL.md` (the `wiki: true` declaration plus the `## Pages` / `## Meta`
-  scaffold), `### Template: .mditerc`, and `### Template: schema.md`. Adoption is
-  all-or-nothing — a folder that gains the declaration without the artifacts turns a silently
-  ignored non-wiki into a loudly broken wiki (audit.md step 1c) — so the declaration lands
-  **with** the rest, never ahead of it. If the existing `SKILL.md` opens with anything other
-  than a `---` line, it has no frontmatter block to declare in: create one at the top of the
-  file before adding the key, because the declaration parser reads only a block whose first
-  line is line 1. Then re-run `wiki-health <skill>` and continue from
-  step 2 with the state it now reports: a freshly adopted folder whose body is still monolithic
-  classifies `unhealthy` or `partial-migration`, and the audit plan built from that state is
-  what carries the decomposition.
+Continue only when state is `new`, `partial-migration`, or `unhealthy`.
 
 ### Step 2 — Materialize the audit plan
 
@@ -97,15 +91,10 @@ consumption. The audit plan is overwritten on each **direct** invocation — sta
 never reused. (The auto-chain dispatcher MAY reuse a cached plan per the freshness contract
 documented in spec.md §9; see "Audit-cache reuse" below.)
 
-**Caller guard — two states emit no `Plan:` line.** Audit omits it for `state = healthy`
-(`State: healthy — no remediation needed.`) and for `state = not-a-wiki`
-(`State: not-a-wiki — nothing to audit.`). Before reading the plan path, callers MUST check for
-both prefixes — or, more robustly, guard on the **absence of a `Plan:` line** rather than on any
-particular state name, which is the form that survives a third such state being added.
-Unconditionally reading line 6 of audit stdout fails for either (per audit.md Step 1). Migrate
-itself reaches step 2 only for a state that does produce a plan, because step 1 gates on state
-first and adopts a `not-a-wiki` folder before it gets here; the guard is stated here because
-migrate is the worked example other callers copy.
+**Caller guard for healthy state:** Audit omits the `Plan:` line when `state = healthy`.
+Before reading the plan path, callers MUST check whether audit's first stdout line matches
+`State: healthy` — if so, skip plan reading entirely. Unconditionally reading line 6 of
+audit stdout will fail for healthy-state skills (per audit.md Step 1 healthy-state contract).
 
 **Audit-cache reuse (auto-chain only):** When migrate is dispatched by the auto-chain
 dispatcher (from a `WIKI_AUDIT_REQUIRED:` signal), the dispatcher may supply a cached
@@ -122,9 +111,7 @@ ${TMPDIR:-/tmp}/wiki-migrate/{skill}/{slug}.md
 
 Each payload MUST begin with a YAML frontmatter block containing all required fields (`tags`, `summary`, and any per-domain required fields declared in `schema.md`). `wiki-write` writes exactly what the payload contains — the caller owns correctness.
 
-**Payload cleanup is deliberately deferred, not exempt:** unlike the `mktemp` + `trap ... EXIT` idiom used elsewhere, this directory is intentionally NOT removed at the end of Step 4 — Step 5's failure path and the Partial-run recovery section both re-read these same payload files by fixed path (`${TMPDIR:-/tmp}/wiki-migrate/{skill}/{slug}.md`) to retry a failed or interrupted write without re-generating the plan. Deleting them eagerly would break that retry path. Cleanup instead happens once the migration is confirmed complete — see Step 7.
-
-**Meta page (`schema.md`):** Write directly to `.claude/skills/{skill}/` using the Write tool. Do NOT route it through `wiki-write` — `wiki-write` is for knowledge content pages indexed under `## Pages`; Meta pages live under `## Meta`.
+**Meta pages (schema.md, log.md):** Write directly to `.claude/skills/{skill}/` using the Write tool. Do NOT route these through `wiki-write` — `wiki-write` is for knowledge content pages indexed under `## Pages`; Meta pages live under `## Meta`.
 
 ### Step 4 — Mechanically apply the plan
 
@@ -143,13 +130,7 @@ table (if present) using the action code:
 | `MERGE-INTO` | Read the existing page, append section body to the payload, then `wiki-write <domain> <slug> --from <payload> --update`; do NOT create a new file |
 | `CROSS-REFERENCE` | Write new page via `wiki-write <domain> <slug> --from <payload>`; update related page body with bidirectional link via `wiki-write <domain> <related-slug> --from <payload> --update` |
 | `PATCH` | In-place edit — see PATCH rules below |
-
-**A migrate run records itself nowhere inside the wiki.** There is no `APPEND` action and no
-operations log to append to — that log was retired outright (D3), and `audit` never emits an
-`APPEND` row. The record of a migration is the state-transition line step 7 prints, the plan
-file retained under `%TEMP%`, and the commit that lands the run, whose diff shows every page
-written and every file removed. Do not invent a per-domain provenance file to carry it: a file
-that accumulates one entry per run is the retired log under a new name.
+| `APPEND` | Append migration log entry to `log.md`: `## [{today}] migrate | {state} → healthy` (write log.md directly — it is a Meta page, not routed through `wiki-write`) |
 
 **PATCH rules — what to do per target file:**
 
@@ -157,7 +138,7 @@ When `PATCH` targets `schema.md`: update the tag prefix throughout (all occurren
 prefix in examples or rules text) to the correct `{skill-name}/` prefix. This is the
 `WMF-D13` schema correction.
 
-When `PATCH` targets a **page** (any `.md` file other than `schema.md` and `SKILL.md`):
+When `PATCH` targets a **page** (any `.md` file other than `schema.md`, `SKILL.md`, `log.md`):
 the page's `tags:` frontmatter line must be rewritten to use the correct prefix. Apply as a
 single-pass frontmatter rewrite — do not alter the body. Pseudocode:
 
@@ -187,17 +168,8 @@ result: the page has the correct tag prefix, no `updated:` field, and all other 
 untouched.
 
 **SKILL.md hub rewrite rules (WMF-D9):**
-- Post-migrate canonical shape: YAML frontmatter (carrying `wiki: true`) → `<role>` stub →
-  optional landing prose (retained KEEP sections, ≤30 lines) → `## Pages` → `## Meta`
-- **The declaration is what makes the migrated folder a wiki (D15/D20), and its form is exact:**
-  `wiki: true`, bare and lowercase, unquoted, a top-level key inside the frontmatter block whose
-  first line is exactly `---`. `wiki: True`, `wiki: "true"`, `wiki: yes`, `wiki:true`, an
-  indented copy and a trailing comment all fail the test `wiki-health` applies
-  (`_wiki_is_declared` in `scripts/wiki-health.sh`) — and they fail it silently, since a
-  rejected declaration is indistinguishable from no declaration. A skill that ends a migration
-  undeclared is invisible to `/wiki-memory audit` and to every protocol that resolves a domain;
-  step 6's post-state check is what catches it, because an undeclared folder cannot report
-  `healthy`.
+- Post-migrate canonical shape: YAML frontmatter → `<role>` stub → optional landing
+  prose (retained KEEP sections, ≤30 lines) → `## Pages` → `## Meta`
 - `## Pages` placement:
   - `END` (after landing prose) when retained body > 30 non-frontmatter/non-role/non-index lines
   - `TOP` (directly after role stub) when SKILL.md becomes thin-wrapper after decomposition
@@ -207,7 +179,7 @@ untouched.
   heading. The post-em-dash text is derived from the page's `summary` frontmatter field
   (universally required per wiki-memory Page Conventions). The `summary` field is the
   authoritative source for `## Pages` index entry text — do not use arbitrary strings.
-- `## Meta` entries: always include a `schema.md` link
+- `## Meta` entries: always include `log.md` and `schema.md` links
 - **`## Pages` sub-sectioning (4+ groups rule):** Count the subdirectory groups in the
   post-migration layout. If the count is ≥ 4, split `## Pages` into:
   - `### Topic Areas` — list only group hub entries (`{group}/index.md`)
@@ -306,38 +278,11 @@ Parse the state from stdout (one-line output). Proceed to step 7 or step 8 based
 
 If `wiki-health` returns `healthy` (exit 0):
 - Print state transition: `{skill}: {prior-state} → healthy`
-- Migration is confirmed complete — the retry path (Step 5/8, Partial-run recovery) no longer
-  applies, so clean up the per-page payload directory now. `{skill}` is the raw
-  `/wiki-memory migrate <skill>` argument and is used unvalidated throughout this doc, so it
-  must be validated at the point of deletion. Three distinct hazards, all reachable from an
-  operator typo or a copy-pasted value:
-  - An **empty** value collapses a bare `rm -rf "${TMPDIR:-/tmp}/wiki-migrate/{skill}"` to the
-    staging root itself, wiping every in-flight skill's payload directory rather than one.
-  - A **`/`- or `..`-bearing** value escapes the staging root entirely.
-  - A value containing **`*`, `?`, or `[`** is a *pattern*, not a name, to any glob-interpreting
-    matcher such as `find -name` — `-name "*"` matches and deletes every sibling staging
-    directory. Note this hazard is specific to glob-interpreting matchers: a plain double-quoted
-    `rm -rf` path treats those characters literally.
-
-  Validate the token first, then delete a literal quoted path:
-  ```bash
-  case "{skill}" in
-    ''|*[!a-z0-9-]*)
-      echo "refusing payload cleanup: unsafe skill token" >&2 ;;
-    *)
-      rm -rf -- "${TMPDIR:-/tmp}/wiki-migrate/{skill}" ;;
-  esac
-  ```
-  The `*[!a-z0-9-]*` arm rejects any value containing a character outside lowercase letters,
-  digits, and `-`, which covers all three hazards at once without enumerating metacharacters.
-  Every skill folder name in this repo already conforms to that shape. The `--` guards against
-  a leading-`-` value being read as an `rm` option.
-- No further action.
+- Migration complete. No further action.
 
 ### Step 8 — Failure path (post-state ≠ healthy)
 
-If `wiki-health` returns any non-healthy state (exit 2/3/4/5 — exit 2 here means the
-declaration did not land, since a folder that reaches step 6 already exists):
+If `wiki-health` returns any non-healthy state (exit 3/4/5):
 1. Print: `Migration verification failed for {skill}: post-state = {state}`
 2. Run `wiki-health <skill> --verbose` to enumerate which specific pages or schema items are unhealthy.
 3. For each unhealthy item, re-run the corresponding `wiki-write` call with the corrected payload.

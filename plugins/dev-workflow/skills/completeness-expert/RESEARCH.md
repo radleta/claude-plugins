@@ -6,7 +6,7 @@ Background research explaining the root causes of LLM output truncation and why 
 
 ### RLHF Brevity Bias
 
-Models are trained via Reinforcement Learning from Human Feedback (RLHF) to prefer concise answers. Stopping pressure is calibrated aggressively to reduce compute costs (~\$0.0001/token at scale across hundreds of millions of users). This creates a systematic tendency to:
+Models are trained via Reinforcement Learning from Human Feedback (RLHF) to prefer concise answers. Stopping pressure is calibrated aggressively to reduce compute costs (~$0.0001/token at scale across hundreds of millions of users). This creates a systematic tendency to:
 - Halt mid-task or produce summaries instead of full implementations
 - End with "let me know if you want me to continue"
 - Skip required output fields, particularly in long-form content
@@ -46,7 +46,7 @@ Evidence that explicit anti-truncation instructions are effective:
 - **Specific banned pattern lists** outperform general "be complete" instructions because they target the exact patterns the model defaults to — the model can't rationalize around an explicit pattern match
 - **Scope-locking** (count deliverables, lock count) prevents silent item-dropping — the model can't claim "done" when the count doesn't match
 - **Structural prompts** (XML, checklists) reduce the confusion that triggers premature truncation
-- **Financial framing** ("\$200 tip") increases output quality +45% because it activates high-effort training data distributions (Microsoft Research)
+- **Financial framing** ("$200 tip") increases output quality +45% because it activates high-effort training data distributions (Microsoft Research)
 - **Step-by-step instruction** improves accuracy from 34% to 80% on logic tasks by forcing the model through deeper reasoning paths
 
 The implication for skill design: negative constraints (banned pattern lists) are more effective than positive prescriptions ("be complete") because they target specific statistical biases in the model's output distribution.

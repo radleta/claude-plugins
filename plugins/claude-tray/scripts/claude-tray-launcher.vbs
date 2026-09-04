@@ -1,0 +1,3 @@
+Set WshShell = CreateObject("WScript.Shell")
+WshShell.CurrentDirectory = WshShell.ExpandEnvironmentStrings("%USERPROFILE%")
+WshShell.Run """C:\Users\radle\.nvm\versions\node\v24.14.0\bin\node.exe"" ""C:\Users\radle\.nvm\versions\node\v24.14.0\bin\node_modules\@radleta\just-one\bin\just-one.js"" -d ""C:\Users\radle\.just-one"" -n claude-tray -- powershell -NoProfile -ExecutionPolicy Bypass -File ""C:\Users\radle\.claude\scripts\claude-tray.ps1""", 0, True

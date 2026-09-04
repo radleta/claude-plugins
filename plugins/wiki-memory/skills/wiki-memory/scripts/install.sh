@@ -36,19 +36,15 @@ BIN_DIR="$HOME/.local/bin"
 DATA_DIR="$HOME/.local/share/wiki-memory"
 REGISTRY="$DATA_DIR/paths.env"
 
-# --- Install wrapper helper (local-prefer walker OR plain direct-exec) ---
-# Usage: _install_wrapper <cmd-name> <target-rel-path> <runner> <baked-abs-path> [walker|plain]
+# --- Install local-prefer walker wrapper helper ---
+# Usage: _install_wrapper <cmd-name> <target-rel-path> <runner> <baked-abs-path>
 # Inline helper (not shared): each install.sh is self-contained per plugin encapsulation rules.
-# This is the canonical reference implementation for both wrapper shapes.
-# `walker` (default) emits the local-prefer walker; `plain` emits a direct
-# `exec` with no walker preamble — for commands with no project-local target
-# to prefer (e.g. an externally npx-fetched package).
+# This is the canonical reference implementation for the walker pattern.
 _install_wrapper() {
   local cmd_name="$1"
   local target_rel_path="$2"  # relative from repo root
   local runner="$3"            # node or bash
   local baked_abs_path="$4"   # absolute path baked at install time
-  local wrapper_flag="${5:-walker}"  # walker (local-prefer) or plain (direct exec)
   local wrapper="$BIN_DIR/$cmd_name"
 
   if [[ ! -f "$baked_abs_path" ]]; then
@@ -57,17 +53,7 @@ _install_wrapper() {
   fi
 
   local desired
-  if [[ "$wrapper_flag" == "plain" ]]; then
-    desired="$(cat <<PLAIN
-#!/usr/bin/env bash
-# Direct exec wrapper (no local-prefer walker) — this command wraps an
-# externally-fetched package with no project-local target to prefer.
-# Pattern reference: .claude/skills/wiki-memory/scripts/install.sh _install_wrapper()
-exec ${runner} "${baked_abs_path}" "\$@"
-PLAIN
-)"
-  else
-    desired="$(cat <<WALKER
+  desired="$(cat <<WALKER
 #!/usr/bin/env bash
 # Local-prefer wrapper. Walks up from CWD looking for a project-local install
 # of this script; falls back to the baked absolute path when none is found.
@@ -85,7 +71,6 @@ done
 exec ${runner} "${baked_abs_path}" "\$@"
 WALKER
 )"
-  fi
 
   if [[ -f "$wrapper" ]] && [[ "$(cat "$wrapper")" = "$desired" ]]; then
     echo "  $cmd_name: already correct"
@@ -107,32 +92,18 @@ WALKER
 
 # --- Check/Install wrappers ---
 
-# _check_wrapper — report drift status of an installed wrapper (read-only)
+# _check_wrapper — report drift status of a local-prefer walker wrapper (read-only)
 # Output: one line with [OK], [DRIFT], [MISSING], or [OTHER] prefix tag.
 # Inline helper (not shared): each install.sh is self-contained per plugin encapsulation rules.
-# Accepts the same walker|plain flag as _install_wrapper() and branches its
-# mismatch categorization on it — a `plain` entry's on-disk content never
-# contains the `Local-prefer wrapper` string, so it needs its own shape check.
 _check_wrapper() {
   local cmd_name="$1"
   local target_rel_path="$2"
   local runner="$3"
   local baked_abs_path="$4"
-  local wrapper_flag="${5:-walker}"
   local wrapper="$BIN_DIR/$cmd_name"
 
   local desired
-  if [[ "$wrapper_flag" == "plain" ]]; then
-    desired="$(cat <<PLAIN
-#!/usr/bin/env bash
-# Direct exec wrapper (no local-prefer walker) — this command wraps an
-# externally-fetched package with no project-local target to prefer.
-# Pattern reference: .claude/skills/wiki-memory/scripts/install.sh _install_wrapper()
-exec ${runner} "${baked_abs_path}" "\$@"
-PLAIN
-)"
-  else
-    desired="$(cat <<WALKER
+  desired="$(cat <<WALKER
 #!/usr/bin/env bash
 # Local-prefer wrapper. Walks up from CWD looking for a project-local install
 # of this script; falls back to the baked absolute path when none is found.
@@ -150,7 +121,6 @@ done
 exec ${runner} "${baked_abs_path}" "\$@"
 WALKER
 )"
-  fi
 
   if [[ ! -e "$wrapper" ]]; then
     echo "[MISSING] $cmd_name: not installed at ~/.local/bin/$cmd_name"
@@ -167,18 +137,6 @@ WALKER
 
   local baked_line
   baked_line="$(grep -m1 '^exec ' "$wrapper" 2>/dev/null || true)"
-
-  if [[ "$wrapper_flag" == "plain" ]]; then
-    if [[ -n "$baked_line" ]] && echo "$baked_line" | grep -qE '^exec [^ ]+ "[^"]*" "\$@"$'; then
-      local other_path
-      other_path="$(echo "$baked_line" | sed 's/^exec [^ ]* "\([^"]*\)" .*/\1/')"
-      echo "[DRIFT] $cmd_name: baked=$other_path expected=$baked_abs_path"
-    else
-      echo "[OTHER] $cmd_name: present but not a recognizable wrapper"
-    fi
-    return 0
-  fi
-
   if [[ -n "$baked_line" ]] && echo "$actual" | grep -q 'Local-prefer wrapper'; then
     local other_path
     other_path="$(echo "$baked_line" | sed 's/^exec [^ ]* "\([^"]*\)" .*/\1/')"
@@ -189,24 +147,18 @@ WALKER
   return 0
 }
 
-# Single source of truth — both --check and install branches iterate this
-# array. Entry format: "name:rel-path" (defaults to walker) or
-# "name:rel-path:walker|plain" (explicit). `plain` is for commands with no
-# project-local target to prefer (e.g. mdite, which wraps an externally
-# npx-fetched package).
+# Single source of truth — both --check and install branches iterate this array
 WRAPPERS=(
   "wiki-resolve:.claude/skills/wiki-memory/scripts/wiki-resolve.sh"
   "wiki-health:.claude/skills/wiki-memory/scripts/wiki-health.sh"
   "wiki-write:.claude/skills/wiki-memory/scripts/wiki-write.sh"
-  "churn-check:.claude/skills/wiki-memory/scripts/churn-check"
-  "mdite:.claude/skills/wiki-memory/scripts/mdite:plain"
 )
 
 if [[ "$_DO_CHECK" == true ]]; then
   for entry in "${WRAPPERS[@]}"; do
     name="${entry%%:*}"
-    rest="${entry#*:}"; rel="${rest%%:*}"; flag="${rest#*:}"; [[ "$flag" == "$rel" ]] && flag="walker"
-    _check_wrapper "$name" "$rel" "bash" "$SCRIPT_DIR/$(basename "$rel")" "$flag"
+    rel="${entry#*:}"
+    _check_wrapper "$name" "$rel" "bash" "$SCRIPT_DIR/$(basename "$rel")"
   done
   if [[ -f $REGISTRY ]]; then
     echo "[DEPRECATED] ~/.local/share/wiki-memory/paths.env exists and is no longer consulted — safe to delete with: rm ~/.local/share/wiki-memory/paths.env"
@@ -218,8 +170,8 @@ mkdir -p "$BIN_DIR"
 
 for entry in "${WRAPPERS[@]}"; do
   name="${entry%%:*}"
-  rest="${entry#*:}"; rel="${rest%%:*}"; flag="${rest#*:}"; [[ "$flag" == "$rel" ]] && flag="walker"
-  _install_wrapper "$name" "$rel" "bash" "$SCRIPT_DIR/$(basename "$rel")" "$flag"
+  rel="${entry#*:}"
+  _install_wrapper "$name" "$rel" "bash" "$SCRIPT_DIR/$(basename "$rel")"
 done
 
 # --- Verify PATH ---

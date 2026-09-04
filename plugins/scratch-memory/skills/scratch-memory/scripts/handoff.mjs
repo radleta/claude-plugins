@@ -2,26 +2,26 @@
 // handoff.mjs — handoff verb group for the scratch-memory CLI
 //
 // Exports:
-//   dispatch(argv)                 — route handoff subcommands (commit, path, validate, list, commit-session)
+//   dispatch(argv)                 — route handoff subcommands (commit, path, template, validate, list)
 //   resolveProjectRoot()           — walk cwd upward to find the .git anchor (D9)
 //   parseFrontmatter()             — parse YAML frontmatter block from file content
 //   parseSessionChain()            — parse session_chain YAML list from file content
 //   validateSessionId()            — validate a session_id string (throws on invalid)
 //   resolveSessionArg()            — resolve UUID / slug / prefix to { sessionId, folderPath, slug }
 //   atomicWriteSync()              — atomic write via tmp-sibling + rename
-//   detectShape()                  — four-state folder shape detection ('new'|'legacy'|'inconsistent'|'v3-pointer')
+//   detectShape()                  — three-state folder shape detection ('new'|'legacy'|'inconsistent')
 //   validateSessionFilePath()      — validate per-session file path (sandbox + basename regex)
 //   tsCompact()                    — compact ISO timestamp for filenames (20260417T143022Z)
 //   yamlSafeString()               — YAML-safe string quoting
 //   extractGoalOneLiner()          — first non-empty line after ## Goal heading
 //   appendAudit()                  — append an audit entry to audit.jsonl
 //   parseRelatedProjectsFromFm()   — parse related_projects YAML list from frontmatter
-//   EXPECTED_SECTIONS_V3           — v3 thin-pointer ordered section headings
+//   HANDOFF_TEMPLATE_V1            — legacy 10-section HANDOFF.md template (pre-v2)
+//   EXPECTED_SECTIONS_V1           — legacy ordered section headings (pre-v2)
+//   HANDOFF_TEMPLATE_V2            — v2 HANDOFF.md template (schema_version: 2)
+//   EXPECTED_SECTIONS_V2           — v2 ordered section headings
 //   SESSION_FILE_TEMPLATE          — per-session file template
 //   EXPECTED_SESSION_SECTIONS      — per-session ordered section headings
-//
-// V1/V2 legacy upgrade machinery (EXPECTED_SECTIONS_V1, HANDOFF_TEMPLATE_V2) lives in
-// handoff-legacy.mjs, consumed only by pickup.mjs's legacy-migration block.
 
 import {
   mkdirSync,
@@ -35,8 +35,8 @@ import {
   appendFileSync,
 } from 'node:fs';
 import { resolve, join, relative, sep, dirname, basename } from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { pathToFileURL } from 'node:url';
 
 // ---------------------------------------------------------------------------
 // resolveProjectRoot — D9: walk cwd upward to find .git (file or dir for worktrees)
@@ -130,6 +130,21 @@ export function yamlSafeString(s) {
   return cleaned;
 }
 
+// Extract top-level list item count from a named section of a markdown body.
+// "Top-level" means exactly column 0 or column 2 per spec — /^(?:  )?(- |\* )/.
+// Split body into sections on /^## / boundaries, find the target section, count.
+function countTopLevelItems(body, sectionHeading) {
+  const sections = body.split(/^(?=## )/m);
+  for (const sec of sections) {
+    const firstLine = sec.split('\n')[0];
+    if (firstLine.trim() === sectionHeading.trim()) {
+      const lines = sec.split('\n').slice(1); // drop the heading line
+      return lines.filter(l => /^(?:  )?(- |\* )/.test(l)).length;
+    }
+  }
+  return 0; // section not found
+}
+
 // Validate a session_id value. Throws on invalid with a descriptive message.
 export function validateSessionId(id, fieldName) {
   if (typeof id !== 'string' || id.length === 0) {
@@ -147,14 +162,33 @@ export function validateSessionId(id, fieldName) {
   if (/[\r\n]/.test(id)) {
     throw new Error(`PICKUP_INVALID_${fieldName.toUpperCase()}: must not contain newline characters: ${JSON.stringify(id)}`);
   }
-  if (!/^[A-Za-z0-9._-]+$/.test(id)) {
-    throw new Error(`PICKUP_INVALID_${fieldName.toUpperCase()}: must contain only letters, digits, dots, underscores, and hyphens: ${JSON.stringify(id)}`);
-  }
 }
 
 // ---------------------------------------------------------------------------
 // Helpers unique to the CLI (not ported from server.mjs)
 // ---------------------------------------------------------------------------
+
+// Git call helper — verbatim from server.mjs; third param is op label for diagnostics.
+// cwd is passed inline in the options object (CLI differs from server's module-level GIT_OPTS).
+function gitCall(args, fallback, op, cwd) {
+  try {
+    return execFileSync('git', args, {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      encoding: 'utf-8',
+      timeout: 2000,
+      cwd,
+    }).trim();
+  } catch (err) {
+    process.stderr.write(JSON.stringify({
+      ts: new Date().toISOString(),
+      tool: op,
+      op,
+      error: err.message,
+      stderr: err.stderr?.trim(),
+    }) + '\n');
+    return fallback;
+  }
+}
 
 // Atomic write: write to .tmp-<basename> sibling, then rename over final path.
 // Atomic on same-filesystem moves (scratch/ always is).
@@ -164,13 +198,106 @@ export function atomicWriteSync(filePath, data) {
   renameSync(tmp, filePath);
 }
 
-// V3 ordered section headings — strict validation for v3 thin pointer HANDOFF.md files.
-// 5 sections only (schema_version: 3 derived cache written by rewrite-pointer).
-export const EXPECTED_SECTIONS_V3 = [
-  '## Open questions (still open)',
+// Extract related projects from handoff body.
+// Scan for scratch/[^/\s]+/ tokens; exclude first segments starting with "S-".
+// Returns unique sorted array.
+function extractRelatedProjects(body) {
+  const pattern = /scratch\/([^\/\s]+)\//g;
+  const matches = new Set();
+  let m;
+  while ((m = pattern.exec(body)) !== null) {
+    const firstSeg = m[1];
+    if (!firstSeg.startsWith('S-') && firstSeg !== '.' && firstSeg !== '..') {
+      matches.add(firstSeg);
+    }
+  }
+  return Array.from(matches).sort();
+}
+
+// V1 (legacy) 10-section HANDOFF.md template body (no frontmatter).
+// Retained for legacy validation and migration reads. cmdValidate and cmdCommit
+// use EXPECTED_SECTIONS_V1 when operating on pre-v2 workstream folders.
+export const HANDOFF_TEMPLATE_V1 = `## Goal
+
+## Current state
+
+## Done this session
+
+## In progress
+
+## Decisions made
+
+## What to avoid
+
+## Open questions
+
+## Key files & artifacts
+
+## Next best step
+
+## Skills loaded
+`;
+
+// V1 (legacy) ordered section headings — strict validation for pre-v2 HANDOFF.md files.
+export const EXPECTED_SECTIONS_V1 = [
   '## Goal',
+  '## Current state',
+  '## Done this session',
+  '## In progress',
+  '## Decisions made',
+  '## What to avoid',
+  '## Open questions',
+  '## Key files & artifacts',
   '## Next best step',
-  '## Latest summary',
+  '## Skills loaded',
+];
+
+// V2 HANDOFF.md template: YAML frontmatter block + 10-section body per spec Data Model.
+// schema_version: 2, includes last_synthesized and the new section headings.
+export const HANDOFF_TEMPLATE_V2 = `---
+session_id: ''
+session_chain: []
+goal: ''
+first_written: ''
+last_updated: ''
+last_synthesized: ''
+schema_version: 2
+git_branch: ''
+session_name: ''
+related_projects: []
+---
+## Goal
+
+## Current state
+
+## Next best step
+
+## Active decisions
+
+## Active what-to-avoid
+
+## Open questions (still open)
+
+## Skills — Mandatory
+
+## Skills — Available
+
+## Projects
+
+## Sessions
+`;
+
+// V2 ordered section headings — strict validation for v2 HANDOFF.md files.
+export const EXPECTED_SECTIONS_V2 = [
+  '## Goal',
+  '## Current state',
+  '## Next best step',
+  '## Active decisions',
+  '## Active what-to-avoid',
+  '## Open questions (still open)',
+  '## Skills — Mandatory',
+  '## Skills — Available',
+  '## Projects',
   '## Sessions',
 ];
 
@@ -182,7 +309,6 @@ session_id: ''
 session_name: ''
 goal_at_time: ''
 parent_handoff_state: ''
-summary: ''
 ---
 ## Goal
 
@@ -219,11 +345,28 @@ export const EXPECTED_SESSION_SECTIONS = [
   '## Projects',
 ];
 
+// Sections that must not shrink between commits (D19 shrink-warning) — V1 schema.
+const APPEND_DEDUP_SECTIONS = [
+  '## Done this session',
+  '## Decisions made',
+  '## What to avoid',
+  '## Key files & artifacts',
+];
+
+// V2 HANDOFF.md sections that must not shrink between commits (D19 shrink-warning).
+// These are the synthesized accumulating sections in the v2 HANDOFF.md schema;
+// they map to the equivalent accumulating sections in V1 (Decisions made, What to avoid).
+// NOTE: these are HANDOFF.md v2 sections — not per-session file sections.
+const APPEND_DEDUP_SECTIONS_V2 = [
+  '## Active decisions',
+  '## Active what-to-avoid',
+  '## Open questions (still open)',
+  '## Sessions',
+];
+
 // ---------------------------------------------------------------------------
-// detectShape — four-state folder shape detection.
-// Returns 'new' | 'legacy' | 'inconsistent' | 'v3-pointer'.
-//   'v3-pointer'  — HANDOFF.md exists, frontmatter contains schema_version: 3
-//                   (checked before heading classification; v3 is a derived cache).
+// detectShape — three-state folder shape detection.
+// Returns 'new' | 'legacy' | 'inconsistent'.
 //   'new'         — HANDOFF.md exists, has ## Sessions heading, sessions/ exists.
 //   'legacy'      — HANDOFF.md exists, no ## Sessions heading, no sessions/ subfolder.
 //   'inconsistent'— any partial state (file missing, heading/folder mismatch, etc.).
@@ -245,10 +388,6 @@ export function detectShape(handoffMdPath, sessionsDirPath) {
   } catch {
     return 'inconsistent';
   }
-
-  // v3 thin pointer detection — checked before heading classification so that v3
-  // pointers (which do contain ## Sessions) are not misclassified as 'new'.
-  if (parseFrontmatter(body)['schema_version'] === '3') return 'v3-pointer';
 
   const hasSessionsHeading = /^## Sessions\s*$/m.test(body);
 
@@ -386,21 +525,14 @@ export function parseRelatedProjectsFromFm(content) {
 //   undefined/null/'' → hard-error (SESSION_ID_REQUIRED) — explicit arg required (D-7)
 //   full UUID          → treat as session_id
 //   slug               → scan scratch/S-*/HANDOFF.md frontmatter session_name
-//   prefix             → match folder name S-{prefix}* — skipped entirely when exact=true
+//   prefix             → match folder name S-{prefix}*
 //   any string         → when allowUnresolved=true, treat as raw session_id
-//
-// exact=true disables the prefix-glob fallback (UUID and exact-slug matches still
-// apply). A retired id that no longer names a folder then falls straight through to
-// the "no handoff found matching" error instead of silently resolving to whatever
-// folder happens to prefix-match it. Mutating callers (pickup) want this; read-only
-// callers (handoff commit/path/validate) pass allowUnresolved:true and keep the
-// prefix fallback.
 //
 // Returns { sessionId, folderPath, slug } on success.
 // Writes to stderr and process.exit(1) on failure (0 matches or 2+ matches).
 // ---------------------------------------------------------------------------
 
-export function resolveSessionArg(arg, projectRoot, { allowUnresolved = false, fieldName = 'session_id', exact = false } = {}) {
+export function resolveSessionArg(arg, projectRoot, { allowUnresolved = false, fieldName = 'session_id' } = {}) {
   const scratchRoot = join(projectRoot, 'scratch');
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
@@ -452,27 +584,24 @@ export function resolveSessionArg(arg, projectRoot, { allowUnresolved = false, f
     return { sessionId, folderPath, slug: arg };
   }
 
-  // Prefix glob: match S-{arg}* folders — skipped when exact=true (mutating callers
-  // must not silently rename whatever folder happens to prefix-match a retired id).
-  if (!exact) {
-    const prefixMatches = allFolders.filter(d => d.startsWith(`S-${arg}`));
-    if (prefixMatches.length === 1) {
-      const folderPath = join(scratchRoot, prefixMatches[0]);
-      const filePath = join(folderPath, 'HANDOFF.md');
-      const fm = parseFrontmatter(readFileSync(filePath, 'utf-8'));
-      // Guard against YAML empty-string placeholder "''" — treat as unset.
-      const rawId2 = fm['session_id'];
-      const slug = prefixMatches[0].slice(2); // strip 'S-'
-      const sessionId = (rawId2 && rawId2 !== "''") ? rawId2 : slug;
-      return { sessionId, folderPath, slug };
-    }
-    if (prefixMatches.length > 1) {
-      process.stderr.write(
-        `ERROR: '${arg}' matches multiple sessions — provide a longer prefix:\n` +
-        prefixMatches.map(d => `  ${d}`).join('\n') + '\n'
-      );
-      process.exit(1);
-    }
+  // Prefix glob: match S-{arg}* folders
+  const prefixMatches = allFolders.filter(d => d.startsWith(`S-${arg}`));
+  if (prefixMatches.length === 1) {
+    const folderPath = join(scratchRoot, prefixMatches[0]);
+    const filePath = join(folderPath, 'HANDOFF.md');
+    const fm = parseFrontmatter(readFileSync(filePath, 'utf-8'));
+    // Guard against YAML empty-string placeholder "''" — treat as unset.
+    const rawId2 = fm['session_id'];
+    const slug = prefixMatches[0].slice(2); // strip 'S-'
+    const sessionId = (rawId2 && rawId2 !== "''") ? rawId2 : slug;
+    return { sessionId, folderPath, slug };
+  }
+  if (prefixMatches.length > 1) {
+    process.stderr.write(
+      `ERROR: '${arg}' matches multiple sessions — provide a longer prefix:\n` +
+      prefixMatches.map(d => `  ${d}`).join('\n') + '\n'
+    );
+    process.exit(1);
   }
 
   // No folder found — for allowUnresolved=true, treat arg as raw session_id
@@ -524,17 +653,32 @@ function resolveSessionId(sessionId, scratchRoot) {
 }
 
 // ---------------------------------------------------------------------------
+// resolveEffectiveSchema — refine 'inconsistent' detectShape result by content.
+//
+// For 'inconsistent' folders (sessions/ vs HANDOFF.md heading mismatch), the body
+// content is the authoritative signal: if all V1 section headings appear in the
+// expected order, treat as 'legacy'. Otherwise treat as 'new' (v2 best-effort).
+// 'new' and 'legacy' pass through unchanged.
+// ---------------------------------------------------------------------------
+
+function resolveEffectiveSchema(shape, body) {
+  if (shape !== 'inconsistent') return shape;
+  const foundHeadings = (body.match(/^## .+/gm) || []).map(h => h.trim());
+  if (foundHeadings.length === EXPECTED_SECTIONS_V1.length &&
+      EXPECTED_SECTIONS_V1.every((s, i) => foundHeadings[i] === s)) {
+    return 'legacy';
+  }
+  return 'new';
+}
+
+// ---------------------------------------------------------------------------
 // cmdCommit — COMMIT phase: validate strict, regen frontmatter, atomic write
 // ---------------------------------------------------------------------------
 
 const COMMIT_HELP = `Usage: scratch-memory handoff commit [ID] [options]
 
-For a v3 thin pointer: prints an info message to stderr and exits 0. The pointer is a
-derived cache written by rewrite-pointer; committing it has no effect.
-
-For any non-v3 (legacy V1/V2) folder: prints a signpost to stderr directing you to run
-\`rewrite-pointer\` and exits 0 without mutating the file. The V1/V2 in-place write path
-is retired.
+Validate HANDOFF.md strict schema and regenerate frontmatter.
+Emits non-blocking shrink warnings when append-dedup sections shrank vs prior .bak.
 
 Arguments:
   ID    Session ID, slug, or prefix (required)
@@ -544,8 +688,8 @@ Options:
   -h, --help    Show this help
 
 Exit codes:
-  0  no-op (v3 pointer) or redirect signpost (non-v3 folder)
-  1  user error (session not found, HANDOFF.md missing)
+  0  success
+  1  user error (validation failure, session not found, HANDOFF.md missing)
   2  infrastructure error
 `;
 
@@ -555,6 +699,7 @@ async function cmdCommit(argv) {
     process.exit(0);
   }
 
+  const jsonMode = argv.includes('--json');
   const filtered = argv.filter(a => a !== '--json');
 
   const unknownFlag = filtered.find(
@@ -571,8 +716,9 @@ async function cmdCommit(argv) {
 
   const projectRoot = getProjectRoot();
 
-  const { folderPath } = resolveSessionArg(idArg, projectRoot, { allowUnresolved: true });
+  const { sessionId, folderPath } = resolveSessionArg(idArg, projectRoot, { allowUnresolved: true });
   const handoffPath = join(folderPath, 'HANDOFF.md');
+  const bakDir = join(folderPath, '.bak');
 
   if (!existsSync(handoffPath)) {
     process.stderr.write(
@@ -582,23 +728,211 @@ async function cmdCommit(argv) {
     process.exit(1);
   }
 
-  // Detect shape from the existing file. detectShape returns 'v3-pointer' for
-  // schema_version: 3 — the only shape maintained in place; every other shape redirects.
+  const currentContent = readFileSync(handoffPath, 'utf-8');
+  const body = stripFrontmatter(currentContent);
+
+  // Detect shape — branch validation to v2 or v1 sections.
+  // For 'inconsistent': check whether body section headings match V1 exactly (folder structure
+  // may not match, but body content determines which schema to validate against). Falls through
+  // to V2 when body does not match V1 (best-effort; surfaces meaningful missing-section errors).
   const sessionsDirPathForCommit = join(folderPath, 'sessions');
   const commitShape = detectShape(handoffPath, sessionsDirPathForCommit);
+  const effectiveShape = resolveEffectiveSchema(commitShape, body);
+  const expectedSections = effectiveShape === 'legacy' ? EXPECTED_SECTIONS_V1 : EXPECTED_SECTIONS_V2;
 
-  // v3 thin pointer is a derived cache written by rewrite-pointer — commit is a no-op.
-  if (commitShape === 'v3-pointer') {
-    process.stderr.write('v3 thin pointer is a derived cache; commit is a no-op\n');
-    process.exit(0);
+  // Strict schema validation: exactly 10 ## headings in the expected order
+  const headingMatches = body.match(/^## [^#]/gm) || [];
+  if (headingMatches.length !== 10) {
+    process.stderr.write(
+      `ERROR: HANDOFF.md must have exactly 10 '## ' sections; found ${headingMatches.length}\n` +
+      `  Expected sections:\n` +
+      expectedSections.map(s => `    ${s}`).join('\n') + '\n'
+    );
+    process.exit(1);
   }
 
-  // Legacy (V1/V2) in-place write paths are retired. A non-v3 HANDOFF.md is no longer
-  // maintained — point the caller at rewrite-pointer to regenerate a v3 pointer from the
-  // immutable per-session log. JIT signpost: it never mutates the artifact.
-  process.stderr.write(
-    `legacy HANDOFF.md is no longer maintained — run \`scratch-memory rewrite-pointer ${folderPath}\` to regenerate a v3 pointer\n`
+  // Verify sections are in the correct order
+  const foundHeadings = body.match(/^## .+/gm) || [];
+  for (let i = 0; i < expectedSections.length; i++) {
+    const found = foundHeadings[i] ? foundHeadings[i].trim() : null;
+    const expected = expectedSections[i];
+    if (found !== expected) {
+      process.stderr.write(
+        `ERROR: section ${i + 1} must be '${expected}', got '${found || '(missing)'}'\n`
+      );
+      process.exit(1);
+    }
+  }
+
+  // Read prior frontmatter to preserve first_written and session_chain
+  let priorFm = {};
+  let priorContent = null;
+  const priorChain = [];
+
+  // Try to read prior frontmatter from current file (if it had frontmatter before)
+  if (currentContent.startsWith('---\n')) {
+    priorFm = parseFrontmatter(currentContent);
+    priorContent = currentContent;
+    priorChain.push(...parseSessionChain(currentContent));
+  } else {
+    // No frontmatter — check if there's a prior version elsewhere
+    // (e.g. uuid-form folder when session has a slug)
+    const uuidFile = join(projectRoot, 'scratch', `S-${sessionId}`, 'HANDOFF.md');
+    if (existsSync(uuidFile) && uuidFile !== handoffPath) {
+      try {
+        const uuidContent = readFileSync(uuidFile, 'utf-8');
+        priorFm = parseFrontmatter(uuidContent);
+        priorChain.push(...parseSessionChain(uuidContent));
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  // Preserve first_written (D7). Guard against YAML empty-string placeholder "''":
+  // parseFrontmatter returns the literal two-char string "''" for `key: ''` entries.
+  const now = new Date();
+  const rawFirstWritten = priorFm['first_written'];
+  const first_written = (rawFirstWritten && rawFirstWritten !== "''")
+    ? rawFirstWritten
+    : now.toISOString();
+  const last_updated = now.toISOString();
+
+  // Compute session_chain: carry forward from prior; append prior session_id if it changed.
+  // Guard against YAML empty-string placeholder "''" (same issue as first_written above).
+  const carriedChain = [...priorChain];
+  const priorSessionId = priorFm['session_id'];
+  const priorSessionIdIsReal = priorSessionId && priorSessionId !== "''";
+  if (priorSessionIdIsReal && priorSessionId !== sessionId && !carriedChain.includes(priorSessionId)) {
+    carriedChain.push(priorSessionId);
+  }
+
+  // D19: Shrink warning — compare append-dedup section counts vs latest .bak snapshot.
+  // Use v2 sections when effective shape is v2; v1 sections when legacy.
+  const shrinkSections = effectiveShape === 'legacy' ? APPEND_DEDUP_SECTIONS : APPEND_DEDUP_SECTIONS_V2;
+  const shrinkWarnings = [];
+  if (existsSync(bakDir)) {
+    try {
+      const bakFiles = readdirSync(bakDir)
+        .filter(f => f.endsWith('.md.bak'))
+        .sort();
+      if (bakFiles.length > 0) {
+        const latestBak = join(bakDir, bakFiles[bakFiles.length - 1]);
+        const bakContent = readFileSync(latestBak, 'utf-8');
+        const bakBody = stripFrontmatter(bakContent);
+        for (const heading of shrinkSections) {
+          const priorCount = countTopLevelItems(bakBody, heading);
+          const newCount = countTopLevelItems(body, heading);
+          if (newCount < priorCount) {
+            const sectionName = heading.slice(3); // strip '## '
+            shrinkWarnings.push(
+              `WARNING: section '${sectionName}' shrank from ${priorCount} to ${newCount} items`
+            );
+          }
+        }
+      }
+    } catch {
+      // bak read failure — skip shrink check, non-blocking
+    }
+  }
+
+  // Emit shrink warnings to stderr (non-blocking per D19)
+  for (const w of shrinkWarnings) {
+    process.stderr.write(w + '\n');
+  }
+
+  // Extract related_projects from body (D5 — never from input args)
+  const related_projects = extractRelatedProjects(body);
+
+  // Capture git branch
+  const git_branch = gitCall(['symbolic-ref', '--short', 'HEAD'], 'unknown', 'handoff commit', projectRoot);
+
+  // session_name: caller-supplied sessionId is the display label (D-5, explicit-arg model)
+  const sessionName = sessionId;
+
+  // Extract goal_one_liner for frontmatter
+  const goal = extractGoalOneLiner(body);
+  const safeGoal = goal.replace(/[\r\n]/g, ' ');
+
+  // Compose frontmatter
+  const frontmatterLines = [
+    '---',
+    `session_id: ${yamlSafeString(sessionId)}`,
+    `first_written: ${first_written}`,
+    `last_updated: ${last_updated}`,
+    `git_branch: ${yamlSafeString(git_branch)}`,
+    `session_name: ${sessionName === null ? 'null' : yamlSafeString(sessionName)}`,
+  ];
+  if (related_projects.length > 0) {
+    frontmatterLines.push('related_projects:');
+    for (const rp of related_projects) {
+      frontmatterLines.push(`  - ${yamlSafeString(rp)}`);
+    }
+  } else {
+    frontmatterLines.push('related_projects: []');
+  }
+  if (carriedChain.length > 0) {
+    frontmatterLines.push('session_chain:');
+    for (const id of carriedChain) {
+      frontmatterLines.push(`  - ${yamlSafeString(id)}`);
+    }
+  }
+  frontmatterLines.push(
+    `goal: ${safeGoal}`,
+    `schema_version: ${effectiveShape === 'legacy' ? 1 : 2}`,
+    '---',
+    '',
   );
+  const frontmatter = frontmatterLines.join('\n');
+
+  // Atomic write: frontmatter + body
+  const newCommittedContent = frontmatter + body;
+  atomicWriteSync(handoffPath, newCommittedContent);
+
+  // Snapshot committed content to .bak/ so the next commit can detect shrinkage (D19).
+  // Runs after every successful commit so the next commit can compare against it.
+  // Non-blocking: bak failure never prevents the commit from being reported as succeeded.
+  try {
+    mkdirSync(bakDir, { recursive: true });
+    const bakTs = tsCompact(new Date(last_updated));
+    const bakPath = join(bakDir, `HANDOFF-${bakTs}.md.bak`);
+    if (!existsSync(bakPath)) {
+      atomicWriteSync(bakPath, newCommittedContent);
+    }
+  } catch {
+    // bak creation failure — non-blocking
+  }
+
+  // Audit
+  appendAudit(projectRoot, {
+    ts: last_updated,
+    tool: 'handoff commit',
+    session_id: sessionId,
+    path: handoffPath,
+  });
+
+  const result = {
+    path: handoffPath,
+    session_id: sessionId,
+    first_written,
+    last_updated,
+    sections_validated: 10,
+    related_projects,
+    git_branch,
+    shrink_warnings: shrinkWarnings,
+  };
+
+  if (jsonMode) {
+    process.stdout.write(JSON.stringify(result, null, 2) + '\n');
+  } else {
+    process.stderr.write(
+      `Committed: ${handoffPath}\n` +
+      `  session_id: ${sessionId}\n` +
+      `  last_updated: ${last_updated}\n` +
+      `  related_projects: [${related_projects.join(', ')}]\n`
+    );
+  }
+
   process.exit(0);
 }
 
@@ -647,18 +981,47 @@ async function cmdPath(argv) {
 }
 
 // ---------------------------------------------------------------------------
+// cmdTemplate — print fresh 10-section template to stdout
+// ---------------------------------------------------------------------------
+
+const TEMPLATE_HELP = `Usage: scratch-memory handoff template [options]
+
+Print a fresh 10-section HANDOFF.md template body to stdout.
+No arguments needed.
+
+Options:
+  -h, --help    Show this help
+
+Exit codes:
+  0  success
+`;
+
+async function cmdTemplate(argv) {
+  if (argv.includes('-h') || argv.includes('--help')) {
+    process.stdout.write(TEMPLATE_HELP);
+    process.exit(0);
+  }
+
+  const unknownFlag = argv.find(a => a.startsWith('-') && a !== '-h' && a !== '--help');
+  if (unknownFlag) {
+    process.stderr.write(`ERROR: unknown option: ${unknownFlag}\n\n`);
+    process.stderr.write(TEMPLATE_HELP);
+    process.exit(1);
+  }
+
+  process.stdout.write(HANDOFF_TEMPLATE_V1);
+  process.exit(0);
+}
+
+// ---------------------------------------------------------------------------
 // cmdValidate — read-only schema check (strict by default; --loose for hook)
 // ---------------------------------------------------------------------------
 
 const VALIDATE_HELP = `Usage: scratch-memory handoff validate [ID] [options]
 
-Strict mode (default): for a v3 thin pointer, validates the 5-section schema
-(EXPECTED_SECTIONS_V3 order) plus required frontmatter keys. For any non-v3 (legacy
-V1/V2) folder, prints a rewrite-pointer signpost to stderr and exits 0 — no validation
-error is raised.
-
---loose (PostToolUse hook): schema-agnostic check on any file shape — file non-empty,
->=1 '## ' heading, session_id present if frontmatter exists.
+Validate HANDOFF.md against the 10-section schema.
+Default: strict mode — full schema check.
+--loose: only check frontmatter parses, file non-empty, >=1 '## ' heading, session_id present.
 
 Arguments:
   ID    Session ID, slug, or prefix (required)
@@ -669,7 +1032,7 @@ Options:
   -h, --help    Show this help
 
 Exit codes:
-  0  clean (no findings) or non-v3 folder redirect signpost
+  0  clean (no findings)
   1  findings found
 `;
 
@@ -728,41 +1091,39 @@ async function cmdValidate(argv) {
       }
     }
   } else {
-    // Strict checks: only v3 thin pointers are validated in place; legacy (V1/V2)
-    // strict validation is retired. detectShape returns 'v3-pointer' for schema_version: 3.
-    const sessionsDirPathForValidate = join(folderPath, 'sessions');
-    const validateShape = detectShape(handoffPath, sessionsDirPathForValidate);
-
-    if (validateShape !== 'v3-pointer') {
-      // Non-v3 HANDOFF.md is no longer maintained — JIT signpost, never mutates the file.
-      process.stderr.write(
-        `legacy HANDOFF.md is no longer maintained — run \`scratch-memory rewrite-pointer ${folderPath}\` to regenerate a v3 pointer\n`
-      );
-      process.exit(0);
-    }
-
+    // Strict checks
     const body = stripFrontmatter(content);
 
-    // v3 thin pointer: frontmatter required keys + exactly 5 sections in EXPECTED_SECTIONS_V3 order.
+    // Detect shape — branch section validation to v2 or v1.
+    // For 'inconsistent': resolveEffectiveSchema() checks body content to determine
+    // which schema to validate against. Falls through to v2 when body doesn't match v1.
+    const sessionsDirPathForValidate = join(folderPath, 'sessions');
+    const validateShape = detectShape(handoffPath, sessionsDirPathForValidate);
+    const validateEffectiveShape = resolveEffectiveSchema(validateShape, body);
+    const validateExpectedSections =
+      validateEffectiveShape === 'legacy' ? EXPECTED_SECTIONS_V1 : EXPECTED_SECTIONS_V2;
+
+    // Must have frontmatter
     if (!content.startsWith('---\n')) {
       findings.push('no YAML frontmatter found (run commit first)');
     } else {
       const fm = parseFrontmatter(content);
-      const requiredKeys = ['session_id', 'schema_version', 'last_pointer_rewrite', 'session_count'];
+      const requiredKeys = ['session_id', 'first_written', 'last_updated', 'git_branch'];
       for (const key of requiredKeys) {
         if (!fm[key]) findings.push(`frontmatter missing required key: ${key}`);
       }
     }
 
+    // Exactly 10 ## headings
     const headingMatches = body.match(/^## [^#]/gm) || [];
-    if (headingMatches.length !== 5) {
-      findings.push(`expected exactly 5 '## ' sections; found ${headingMatches.length}`);
+    if (headingMatches.length !== 10) {
+      findings.push(`expected exactly 10 '## ' sections; found ${headingMatches.length}`);
     } else {
       // Check order
       const foundHeadings = body.match(/^## .+/gm) || [];
-      for (let i = 0; i < EXPECTED_SECTIONS_V3.length; i++) {
+      for (let i = 0; i < validateExpectedSections.length; i++) {
         const found = foundHeadings[i] ? foundHeadings[i].trim() : null;
-        const expected = EXPECTED_SECTIONS_V3[i];
+        const expected = validateExpectedSections[i];
         if (found !== expected) {
           findings.push(`section ${i + 1}: expected '${expected}', got '${found || '(missing)'}'`);
         }
@@ -861,7 +1222,7 @@ async function cmdList(argv) {
       const sessionName = fm['session_name'] && fm['session_name'] !== 'null'
         ? fm['session_name']
         : d.slice(2); // strip S- prefix as fallback
-      const last_updated = fm['last_updated'] || fm['last_pointer_rewrite'] || null;
+      const last_updated = fm['last_updated'] || null;
       const goal = extractGoalOneLiner(body) || '(no goal set)';
 
       // Sort key: last_updated ISO string (lexically comparable) or mtime
@@ -1080,14 +1441,15 @@ function printHelp(out = process.stdout) {
 Manage session handoff documents (HANDOFF.md).
 
 Subcommands:
-  commit [ID] [--json]     No-op for v3 pointers; legacy folders are redirected to rewrite-pointer
+  commit [ID] [--json]     Validate strict schema + regenerate frontmatter
   path [ID]                Print absolute path to HANDOFF.md (read-only)
-  validate [ID] [--loose] [--json]   Schema validation (v3 strict; --loose for hook use)
+  template                 Print fresh 10-section template body to stdout
+  validate [ID] [--loose] [--json]   Schema validation (--loose for hook use)
   list [--limit N] [--json]          List recent handoffs sorted by last_updated
   commit-session {session_file_path}  Validate a per-session file + append audit log (JSON output)
 
 Arguments:
-  ID    Session ID (UUID), session slug, or prefix. Required for mutating verbs (commit, validate, path); not accepted by read-only verbs (list).
+  ID    Session ID (UUID), session slug, or prefix. Required for mutating verbs (commit, validate, path); not accepted by read-only verbs (list, template).
 
 Options:
   -h, --help    Show this help
@@ -1126,6 +1488,9 @@ export async function dispatch(argv) {
     case 'path':
       await cmdPath(subArgv);
       break;
+    case 'template':
+      await cmdTemplate(subArgv);
+      break;
     case 'validate':
       await cmdValidate(subArgv);
       break;
@@ -1147,19 +1512,3 @@ export async function dispatch(argv) {
 }
 
 export default dispatch;
-
-// ---------------------------------------------------------------------------
-// Entry-point guard — forward to dispatch() on direct invocation (`node
-// handoff.mjs <subcommand> ...`), not just when imported by scratch-memory.mjs
-// or the other verb modules (cat-sessions.mjs, pickup.mjs, rewrite-pointer.mjs
-// all import handoff.mjs for shared helpers — their entry scripts have a
-// different import.meta.url, so this guard stays inert for them). Without
-// this, direct invocation silently exits 0 with no output (issue:
-// verb-modules-silent-noop-direct-invocation).
-// ---------------------------------------------------------------------------
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  dispatch(process.argv.slice(2)).catch(err => {
-    process.stderr.write(`${err.stack ?? err.message}\n`);
-    process.exit(2);
-  });
-}

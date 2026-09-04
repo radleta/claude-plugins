@@ -1,10 +1,6 @@
----
-summary: "merge N source skills into a target wiki atomically"
----
-
 # Consolidate Workflow
 
-> **DISABLED:** `/wiki-memory consolidate` is disabled pending migration of the staging-based write pipeline to `wiki-write`; do not invoke until migrated. The multi-page atomic write pattern required for this migration has not yet been designed. See the wiki-investigator migration waiver decision (D-PLAN-10) for the rationale.
+> **DISABLED:** `/wiki-memory consolidate` is disabled pending migration of the staging-based write pipeline to `wiki-write`; do not invoke until migrated. The multi-page atomic write pattern required for this migration has not yet been designed. See `scratch/wiki-investigator/decisions/010-consolidate-migration-waiver.md` (D-PLAN-10) for the waiver rationale.
 
 `/wiki-memory consolidate [--dry-run] <target-skill> <source1> [<source2> ...]`
 
@@ -208,11 +204,8 @@ For each entry in the page-routing manifest:
 After all pages are written, write the hub `SKILL.md` using the canonical `## Pages` block from
 the Page-Router (step 4). The hub shape: YAML frontmatter → `<role>` stub → optional retained
 landing prose (≤ 30 lines from pre-existing target SKILL.md content) → `## Pages` → `## Meta`.
-The hub's frontmatter must carry `wiki: true` — the target wiki is a wiki because it declares
-itself (D15), and a consolidation that produces an undeclared hub produces a folder every
-protocol and the audit will refuse to see.
 
-**`## Meta` entries:** always include a `schema.md` link.
+**`## Meta` entries:** always include `log.md` and `schema.md` links.
 
 **Partial-run failure (mid-page-write, before cross-ref rewrite begins):**
 If a failure occurs after some pages have been written but before cross-reference rewrite starts:
@@ -271,16 +264,13 @@ wiki-health "$target_skill"
 Parse the state from stdout.
 
 **Success path (state = healthy):**
-1. Carry the page-routing manifest from step 4 into this run's report, so provenance of
-   source section → target page routing is traceable post-merge. Report line format:
+1. Append the page-routing manifest from step 4 to the target wiki's `log.md` (append, NOT
+   overwrite) — so provenance of source section → target page routing is traceable post-merge.
+   Log entry format:
    ```
-   consolidate | <N> sources → <target>: <M> pages written
+   ## [YYYY-MM-DD] consolidate | <N> sources → <target>: <M> pages written
    <page-routing manifest inline or as attached reference>
    ```
-   The durable record is the commit that lands the merge — its diff shows every page written
-   and every source folder removed. Do not write the manifest into a file inside the wiki:
-   the operations log it used to land in was retired (D3), and re-creating it under another
-   name rebuilds exactly what that retirement removed.
 2. Push staged target wiki to live. (**Migration pending (D-PLAN-10):** This step previously invoked a staging-push tool to atomically promote the staging directory to the live skill folder. Replacement write pattern not yet designed — see disable note at top of this file.)
 3. Delete the source skill folders (irreversible). Run only after the push step exits 0.
    **Validation required:** Before executing `rm -rf`, verify `$source` is a non-empty string
@@ -428,3 +418,5 @@ Steps 1–9 are designed to be safe to re-run after interruption. Recovery entry
 ## See Also
 
 - `protocols/migrate.md` — per-skill single-source migration (the structural template for this document)
+- `scratch/wiki-fleet-conversion/spec.md` — authoritative design spec (Audit Report Contract: lines 121-158; exit codes: lines 202-206; rollback rules: lines 277-285; shell entry-point invariants: lines 438-439)
+- `scratch/wiki-fleet-conversion/migrate-workflow.md` — Phase 3 per-skill flow and batch coordination context

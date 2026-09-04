@@ -1,6 +1,6 @@
 {
   "name": "security-verification",
-  "version": "1.0.3",
+  "version": "1.0.2",
   "description": "OWASP Top 10 security verification methodology with detection patterns",
   "author": {
     "name": "Richard Adleta",

@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // test-write-issue.mjs — Zero-framework end-to-end test harness for the write_issue MCP tool.
-// Usage: node test-write-issue.mjs    (no args; 49 tests run in-process; exit 0 on all-pass)
+// Usage: node test-write-issue.mjs    (no args; 35 tests run in-process; exit 0 on all-pass)
 
-import { spawn, execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, existsSync, readFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { spawn, execFileSync } from 'node:child_process';
+import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs';
 import { join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
@@ -11,15 +11,9 @@ import { createInterface } from 'node:readline';
 import { deepStrictEqual, strictEqual, ok, match, fail } from 'node:assert';
 import process from 'node:process';
 
-// Imported, never restated: asserting the schema's enums against these is
-// what proves the MCP schema and the corpus lint share one source (Contracts:
-// "never duplicated -- the single-source rule the task status enum already
-// follows").
-import { ISSUE_ROLES, SPIKE_TYPES } from './tasks.mjs';
-
 const argv = process.argv.slice(2);
 if (argv.includes('--help') || argv.includes('-h')) {
-  process.stdout.write('Usage: node test-write-issue.mjs\n\nRuns 49 automated tests against server.mjs. Exit 0 on all-pass, 1 otherwise.\n');
+  process.stdout.write('Usage: node test-write-issue.mjs\n\nRuns 35 automated tests against server.mjs. Exit 0 on all-pass, 1 otherwise.\n');
   process.exit(0);
 }
 for (const a of argv) {
@@ -33,7 +27,6 @@ for (const a of argv) {
 }
 
 const SERVER_PATH = fileURLToPath(new URL('./server.mjs', import.meta.url));
-const CLI_PATH = fileURLToPath(new URL('./scratch-memory.mjs', import.meta.url));
 let passCount = 0;
 let failCount = 0;
 const activeDrivers = new Set();  // registered drivers; used by SIGINT guard
@@ -82,7 +75,7 @@ async function createDriver(projectRoot) {
   });
   activeDrivers.add(child);
 
-  const pending = new Map(); // id -> { resolve, timer }
+  const pending = new Map(); // id -> { resolve, reject, timer }
   let nextId = 1;
   const stderrLog = [];
 
@@ -93,10 +86,11 @@ async function createDriver(projectRoot) {
     try {
       const msg = JSON.parse(trimmed);
       if (msg.id !== undefined && pending.has(msg.id)) {
-        const { resolve, timer } = pending.get(msg.id);
+        const { resolve, reject, timer } = pending.get(msg.id);
         clearTimeout(timer);
         pending.delete(msg.id);
-        resolve(msg); // always the raw frame; call() below unwraps/throws
+        if (msg.error) reject(new Error(`JSON-RPC error ${msg.error.code}: ${msg.error.message}`));
+        else resolve(msg.result);
       }
     } catch {
       // malformed line — ignore
@@ -106,40 +100,21 @@ async function createDriver(projectRoot) {
   const rlErr = createInterface({ input: child.stderr, crlfDelay: Infinity });
   rlErr.on('line', (line) => stderrLog.push(line));
 
-  // callRaw()/callToolRaw() resolve with the WHOLE JSON-RPC frame and never
-  // reject on an error frame, so a test can assert on error.code and
-  // error.data.error directly instead of only on a thrown Error's message
-  // string. Ported from test-write-task.mjs:130-166.
-  function callRaw(method, params) {
+  function call(method, params) {
     return new Promise((resolve, reject) => {
       const id = nextId++;
       const timer = setTimeout(() => {
         pending.delete(id);
         reject(new Error(`JSON-RPC call timed out after 10s: ${method}`));
       }, 10_000);
-      pending.set(id, { resolve, timer });
+      pending.set(id, { resolve, reject, timer });
       const msg = { jsonrpc: '2.0', id, method, params: params ?? {} };
       child.stdin.write(JSON.stringify(msg) + '\n');
     });
   }
 
-  async function call(method, params) {
-    const msg = await callRaw(method, params);
-    if (msg.error) {
-      const err = new Error(`JSON-RPC error ${msg.error.code}: ${msg.error.message}`);
-      err.code = msg.error.code;
-      err.data = msg.error.data;
-      throw err;
-    }
-    return msg.result;
-  }
-
   async function callTool(name, args) {
     return await call('tools/call', { name, arguments: args });
-  }
-
-  async function callToolRaw(name, args) {
-    return await callRaw('tools/call', { name, arguments: args });
   }
 
   function stderrLines() {
@@ -165,7 +140,7 @@ async function createDriver(projectRoot) {
 
   // MCP initialize handshake — fail fast if the server doesn't respond.
   await call('initialize', { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'test-harness', version: '0' } });
-  return { call, callTool, callRaw, callToolRaw, stderrLines, shutdown, child };
+  return { call, callTool, stderrLines, shutdown, child };
 }
 
 function createRealRepoFixture() {
@@ -1107,405 +1082,6 @@ function parseFrontmatter(content) {
       });
       const payload = JSON.parse(result.content[0].text);
       ok(typeof payload.path === 'string' && payload.path.length > 0, 'path returned without rejection for legitimate prose');
-    } finally {
-      if (drv) await drv.shutdown();
-      fx.cleanup();
-    }
-  });
-
-  // -------------------------------------------------------------------------
-  // E1-E3: structured error channel (ProtocolError → code + error.data.error)
-  // The T8/T12/T13/T14 cases above only regex-match err.message; these assert
-  // the machine-readable half callers are told to branch on.
-  // -------------------------------------------------------------------------
-
-  await runTest('E1: validation failures are -32602 and carry the matching data.error', async () => {
-    const fx = createNonRepoFixture(); // every case below throws before the first git call
-    let drv;
-    try {
-      drv = await createDriver(fx.projectRoot);
-      drv.stderrLines(); // drain baseline
-      const cases = [
-        ['KIND_INVALID', { kind: 'bug', title: 'Bad kind' }],
-        ['TITLE_INVALID', { kind: 'issue', title: 'x'.repeat(81) }],
-        ['SLUG_OVERRIDE_INVALID', { kind: 'issue', title: 'Bad slug', slug_override: 'Not-Valid' }],
-        ['FIELD_INVALID', { kind: 'issue', title: 'Bad field', summary: 123 }],
-      ];
-      for (const [expected, args] of cases) {
-        const msg = await drv.callToolRaw('write_issue', args);
-        ok(msg.error !== undefined, `${expected}: an error frame is present`);
-        strictEqual(msg.error.code, -32602, `${expected}: error.code === -32602`);
-        strictEqual(msg.error.data?.error, expected,
-          `error.data.error === "${expected}": ${JSON.stringify(msg.error.data)}`);
-        ok(msg.error.message.startsWith(`${expected}: `),
-          `error.message keeps the "${expected}: " prefix: "${msg.error.message}"`);
-      }
-    } finally {
-      if (drv) await drv.shutdown();
-      fx.cleanup();
-    }
-  });
-
-  await runTest('E2: MALFORMED_TOOL_CALL_XML carries data.error too', async () => {
-    const fx = createNonRepoFixture();
-    let drv;
-    try {
-      drv = await createDriver(fx.projectRoot);
-      drv.stderrLines(); // drain baseline
-      const msg = await drv.callToolRaw('write_issue', {
-        kind: 'issue',
-        title: 'Malformed XML structured shape',
-        summary: 'Some text</summary>\n<parameter name="impact">leaked</parameter>',
-      });
-      ok(msg.error !== undefined, 'an error frame is present');
-      strictEqual(msg.error.code, -32602, 'error.code === -32602');
-      strictEqual(msg.error.data?.error, 'MALFORMED_TOOL_CALL_XML',
-        `error.data.error === "MALFORMED_TOOL_CALL_XML": ${JSON.stringify(msg.error.data)}`);
-    } finally {
-      if (drv) await drv.shutdown();
-      fx.cleanup();
-    }
-  });
-
-  await runTest('E3: filesystem branch — FS_FAILURE is -32000 with data.error', async () => {
-    const fx = createNonRepoFixture();
-    let drv;
-    try {
-      drv = await createDriver(fx.projectRoot);
-      drv.stderrLines(); // drain baseline
-      // scratch/issues occupied by a regular file: existsSync(finalPath) is false
-      // (so no collision suffix), the sandbox check passes, and mkdirSync then
-      // fails EEXIST — the first filesystem mutation writeIssue attempts.
-      mkdirSync(join(fx.projectRoot, 'scratch'), { recursive: true });
-      writeFileSync(join(fx.projectRoot, 'scratch', 'issues'), 'blocker', 'utf-8');
-
-      const msg = await drv.callToolRaw('write_issue', { kind: 'issue', title: 'FS failure path' });
-      ok(msg.error !== undefined, 'an error frame is present');
-      strictEqual(msg.error.code, -32000, 'error.code === -32000 for a runtime failure');
-      strictEqual(msg.error.data?.error, 'FS_FAILURE',
-        `error.data.error === "FS_FAILURE": ${JSON.stringify(msg.error.data)}`);
-      ok(!/^FS_FAILURE:?$/.test(msg.error.message.trim()),
-        `error.message still carries the native cause text: "${msg.error.message}"`);
-    } finally {
-      if (drv) await drv.shutdown();
-      fx.cleanup();
-    }
-  });
-
-  // =========================================================================
-  // K -- the four optional epic/spike keys (D14). Shape validation, the two
-  // cross-field rules, conditional emission after the ten required keys, and
-  // the schema the calling model reads.
-  // =========================================================================
-
-  // Run `scratch-memory tasks lint` against a fixture path. Used to close
-  // acceptance outcome 5 end-to-end: the writer's output must satisfy the
-  // corpus lint, which is the only thing that proves the two agree.
-  function runTasksLint(projectRoot, target) {
-    const res = spawnSync('node', [CLI_PATH, 'tasks', 'lint', '--', target], {
-      cwd: projectRoot, encoding: 'utf-8', stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    return { status: res.status, stdout: res.stdout ?? '', stderr: res.stderr ?? '' };
-  }
-
-  await runTest('K1: acceptance outcome 5 — a research spike writes all 10 required keys plus its 3, and tasks lint exits 0 silently', async () => {
-    const fx = createRealRepoFixture();
-    let drv;
-    try {
-      drv = await createDriver(fx.projectRoot);
-      drv.stderrLines(); // drain baseline
-
-      // The epic first: E3 requires a spike's `epic` to resolve to a file
-      // carrying role: epic, so the lint half of this outcome needs it present.
-      await drv.callTool('write_issue', {
-        kind: 'idea', title: 'Foo epic', slug_override: 'foo', role: 'epic',
-      });
-      const result = await drv.callTool('write_issue', {
-        kind: 'issue',
-        title: 'Decide the retry policy',
-        slug_override: 'decide-retry-policy',
-        summary: 'Which retry policy the client should use.',
-        role: 'spike',
-        epic: 'foo',
-        spike_type: 'research',
-      });
-
-      const payload = JSON.parse(result.content[0].text);
-      const filePath = join(fx.projectRoot, 'scratch', 'issues', 'decide-retry-policy.md');
-      strictEqual(payload.path, filePath, 'the returned path is the spike file');
-      const { fields } = parseFrontmatter(readFileSync(filePath, 'utf-8'));
-
-      const requiredFields = ['tool', 'kind', 'title', 'slug', 'status', 'captured', 'repo', 'branch', 'commit', 'working_tree'];
-      for (const f of requiredFields) ok(f in fields, `required frontmatter key "${f}" present`);
-      strictEqual(fields.role, 'spike', 'role emitted');
-      strictEqual(fields.epic, 'foo', 'epic emitted');
-      strictEqual(fields.spike_type, 'research', 'spike_type emitted');
-      ok(!('blocked_by' in fields), 'blocked_by NOT emitted — it was not supplied');
-
-      const lint = runTasksLint(fx.projectRoot, filePath);
-      strictEqual(lint.status, 0, `tasks lint exits 0 (got: ${lint.status}, stdout: ${lint.stdout}, stderr: ${lint.stderr})`);
-      strictEqual(lint.stdout, '', `with no output (got: ${JSON.stringify(lint.stdout)})`);
-    } finally {
-      if (drv) await drv.shutdown();
-      fx.cleanup();
-    }
-  });
-
-  await runTest('K2: all four keys are emitted after the ten, in Contracts order, unquoted, with comma lists intact', async () => {
-    const fx = createRealRepoFixture();
-    let drv;
-    try {
-      drv = await createDriver(fx.projectRoot);
-      drv.stderrLines(); // drain baseline
-      await drv.callTool('write_issue', {
-        kind: 'issue',
-        title: 'Multi-epic spike',
-        slug_override: 'multi-epic-spike',
-        role: 'spike',
-        epic: 'alpha-epic,beta-epic',
-        spike_type: 'prototype',
-        blocked_by: 'first-blocker,second-blocker',
-      });
-
-      const content = readFileSync(join(fx.projectRoot, 'scratch', 'issues', 'multi-epic-spike.md'), 'utf-8');
-      const keyOrder = content.split('\n---\n')[0].split('\n').slice(1).map(l => l.split(':')[0]);
-      deepStrictEqual(
-        keyOrder,
-        ['tool', 'kind', 'title', 'slug', 'status', 'captured', 'repo', 'branch', 'commit', 'working_tree',
-          'role', 'epic', 'spike_type', 'blocked_by'],
-        'the four optional keys follow the ten required ones, in the Contracts table order'
-      );
-      // Comma-separated scalars, never a YAML flow sequence: the frontmatter
-      // parser splits at the first colon and stores the raw string, so "[a, b]"
-      // would round-trip as that literal.
-      ok(content.includes('\nepic: alpha-epic,beta-epic\n'), `epic is an unquoted comma list (got: ${JSON.stringify(content.slice(0, 400))})`);
-      ok(content.includes('\nblocked_by: first-blocker,second-blocker\n'), 'blocked_by is an unquoted comma list');
-      ok(!content.includes('epic: "'), 'epic is not quoted');
-      ok(!content.includes('['), 'no YAML flow sequence anywhere in the file');
-    } finally {
-      if (drv) await drv.shutdown();
-      fx.cleanup();
-    }
-  });
-
-  await runTest('K3: a call supplying none of the four is byte-for-byte the old ten-key frontmatter', async () => {
-    // The 144-existing-files invariant: /capture-issue and researcher's D6
-    // auto-heal pass none of these, and their output must not move at all.
-    const fx = createRealRepoFixture();
-    let drv;
-    try {
-      drv = await createDriver(fx.projectRoot);
-      drv.stderrLines(); // drain baseline
-      await drv.callTool('write_issue', {
-        kind: 'idea', title: 'Ordinary capture', slug_override: 'ordinary-capture',
-        summary: 'Nothing epic about it.',
-      });
-
-      const content = readFileSync(join(fx.projectRoot, 'scratch', 'issues', 'ordinary-capture.md'), 'utf-8');
-      const { fields } = parseFrontmatter(content);
-      deepStrictEqual(
-        Object.keys(fields),
-        ['tool', 'kind', 'title', 'slug', 'status', 'captured', 'repo', 'branch', 'commit', 'working_tree'],
-        'exactly the ten required keys, no empty optional ones'
-      );
-      for (const key of ['role', 'epic', 'spike_type', 'blocked_by']) {
-        ok(!content.includes(`\n${key}:`), `no ${key}: line anywhere in the file`);
-      }
-    } finally {
-      if (drv) await drv.shutdown();
-      fx.cleanup();
-    }
-  });
-
-  await runTest('K4: tools/list advertises the four keys, sourced from tasks.mjs, with required unchanged', async () => {
-    const fx = createRealRepoFixture();
-    let drv;
-    try {
-      drv = await createDriver(fx.projectRoot);
-      drv.stderrLines(); // drain baseline
-      const result = await drv.call('tools/list', {});
-      const schema = result.tools.find(t => t.name === 'write_issue').inputSchema;
-
-      deepStrictEqual(schema.required, ['kind', 'title'], 'required is still exactly kind and title');
-      deepStrictEqual(schema.properties.role.enum, ISSUE_ROLES, 'role.enum IS tasks.mjs ISSUE_ROLES');
-      deepStrictEqual(schema.properties.spike_type.enum, SPIKE_TYPES, 'spike_type.enum IS tasks.mjs SPIKE_TYPES');
-      const listPattern = '^[a-z0-9]([a-z0-9-]*[a-z0-9])?(,[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$';
-      strictEqual(schema.properties.epic.pattern, listPattern, 'epic carries the comma-joined slug pattern');
-      strictEqual(schema.properties.blocked_by.pattern, listPattern, 'blocked_by carries the same pattern');
-      // The schema is what conveys the format to the calling model, so the
-      // "omit rather than pass empty" rule has to be in the description too.
-      match(schema.properties.blocked_by.description, /[Oo]mit/);
-    } finally {
-      if (drv) await drv.shutdown();
-      fx.cleanup();
-    }
-  });
-
-  await runTest('K5: E7 mirror — role "spike" without epic is rejected with EPIC_REQUIRED', async () => {
-    const fx = createRealRepoFixture();
-    let drv;
-    try {
-      drv = await createDriver(fx.projectRoot);
-      drv.stderrLines(); // drain baseline
-      const msg = await drv.callToolRaw('write_issue', {
-        kind: 'issue', title: 'Orphan spike', role: 'spike', spike_type: 'task',
-      });
-      ok(msg.error !== undefined, 'an error frame is present');
-      strictEqual(msg.error.code, -32602, 'validation failures are -32602');
-      strictEqual(msg.error.data?.error, 'EPIC_REQUIRED', `data.error names the rule (got: ${JSON.stringify(msg.error.data)})`);
-      ok(!existsSync(join(fx.projectRoot, 'scratch', 'issues')), 'and nothing was written');
-    } finally {
-      if (drv) await drv.shutdown();
-      fx.cleanup();
-    }
-  });
-
-  await runTest('K6: E10 mirror — spike_type or blocked_by without role "spike" is rejected with ROLE_SPIKE_REQUIRED', async () => {
-    const fx = createRealRepoFixture();
-    let drv;
-    try {
-      drv = await createDriver(fx.projectRoot);
-      drv.stderrLines(); // drain baseline
-      for (const extra of [{ spike_type: 'task' }, { blocked_by: 'some-spike' }, { spike_type: 'task', role: 'epic' }]) {
-        const msg = await drv.callToolRaw('write_issue', {
-          kind: 'issue', title: 'Stray key', ...extra,
-        });
-        ok(msg.error !== undefined, `an error frame for ${JSON.stringify(extra)}`);
-        strictEqual(msg.error.data?.error, 'ROLE_SPIKE_REQUIRED',
-          `data.error names the rule for ${JSON.stringify(extra)} (got: ${JSON.stringify(msg.error.data)})`);
-      }
-    } finally {
-      if (drv) await drv.shutdown();
-      fx.cleanup();
-    }
-  });
-
-  await runTest('K7: the deliberate asymmetry — a spike with an epic but no spike_type is ACCEPTED at write time', async () => {
-    // E8 requires spike_type in the file, but mirroring it here was rejected
-    // as over-strict for a two-rule mirror; E8 catches it on the first edit.
-    // This test exists so a later "hardening" of the server trips a gate
-    // rather than silently reversing the decision.
-    const fx = createRealRepoFixture();
-    let drv;
-    try {
-      drv = await createDriver(fx.projectRoot);
-      drv.stderrLines(); // drain baseline
-      const result = await drv.callTool('write_issue', {
-        kind: 'issue', title: 'Typeless spike', slug_override: 'typeless-spike',
-        role: 'spike', epic: 'foo',
-      });
-      const payload = JSON.parse(result.content[0].text);
-      ok(existsSync(payload.path), 'the file was written');
-      const { fields } = parseFrontmatter(readFileSync(payload.path, 'utf-8'));
-      strictEqual(fields.role, 'spike');
-      strictEqual(fields.epic, 'foo');
-      ok(!('spike_type' in fields), 'and no spike_type key was invented');
-    } finally {
-      if (drv) await drv.shutdown();
-      fx.cleanup();
-    }
-  });
-
-  await runTest('K8: an ordinary capture may carry epic alone — the server does not foreclose in-place promotion', async () => {
-    // E10 covers spike_type and blocked_by but deliberately NOT epic, so a
-    // server rule requiring role: "spike" for a bare epic: would disagree with
-    // the lint.
-    const fx = createRealRepoFixture();
-    let drv;
-    try {
-      drv = await createDriver(fx.projectRoot);
-      drv.stderrLines(); // drain baseline
-      const result = await drv.callTool('write_issue', {
-        kind: 'issue', title: 'Capture in an epic', slug_override: 'capture-in-an-epic', epic: 'foo',
-      });
-      const payload = JSON.parse(result.content[0].text);
-      const { fields } = parseFrontmatter(readFileSync(payload.path, 'utf-8'));
-      strictEqual(fields.epic, 'foo', 'epic emitted on a capture carrying no role');
-      ok(!('role' in fields), 'and no role key was invented');
-    } finally {
-      if (drv) await drv.shutdown();
-      fx.cleanup();
-    }
-  });
-
-  await runTest('K9: an out-of-enum role or spike_type is rejected against the tasks.mjs enums', async () => {
-    const fx = createRealRepoFixture();
-    let drv;
-    try {
-      drv = await createDriver(fx.projectRoot);
-      drv.stderrLines(); // drain baseline
-
-      const badRole = await drv.callToolRaw('write_issue', { kind: 'issue', title: 'Bad role', role: 'story' });
-      strictEqual(badRole.error?.data?.error, 'ROLE_INVALID', `got: ${JSON.stringify(badRole.error?.data)}`);
-      for (const value of ISSUE_ROLES) ok(badRole.error.message.includes(value), `the message lists ${value}`);
-
-      const badType = await drv.callToolRaw('write_issue', {
-        kind: 'issue', title: 'Bad type', role: 'spike', epic: 'foo', spike_type: 'spike-solution',
-      });
-      strictEqual(badType.error?.data?.error, 'SPIKE_TYPE_INVALID', `got: ${JSON.stringify(badType.error?.data)}`);
-      for (const value of SPIKE_TYPES) ok(badType.error.message.includes(value), `the message lists ${value}`);
-    } finally {
-      if (drv) await drv.shutdown();
-      fx.cleanup();
-    }
-  });
-
-  await runTest('K10: malformed slug lists are rejected, including the empty string — "none" is expressed by omission', async () => {
-    const fx = createRealRepoFixture();
-    let drv;
-    try {
-      drv = await createDriver(fx.projectRoot);
-      drv.stderrLines(); // drain baseline
-
-      for (const bad of ['', 'Has-Caps', 'a,,b', 'a, b', '-leading', 'trailing-', 'has/slash', 'has space']) {
-        const msg = await drv.callToolRaw('write_issue', {
-          kind: 'issue', title: 'Bad epic list', role: 'spike', epic: bad,
-        });
-        strictEqual(msg.error?.data?.error, 'EPIC_INVALID',
-          `epic ${JSON.stringify(bad)} is rejected (got: ${JSON.stringify(msg.error?.data)})`);
-      }
-      const badBlocked = await drv.callToolRaw('write_issue', {
-        kind: 'issue', title: 'Bad blocker list', role: 'spike', epic: 'foo', blocked_by: '',
-      });
-      strictEqual(badBlocked.error?.data?.error, 'BLOCKED_BY_INVALID',
-        `an empty blocked_by is rejected rather than emitted (got: ${JSON.stringify(badBlocked.error?.data)})`);
-
-      // The valid multi-element case still passes the same validator.
-      const good = await drv.callTool('write_issue', {
-        kind: 'issue', title: 'Good lists', slug_override: 'good-lists',
-        role: 'spike', epic: 'a1,b-2', blocked_by: 'c3',
-      });
-      ok(existsSync(JSON.parse(good.content[0].text).path), 'a well-formed list is accepted');
-    } finally {
-      if (drv) await drv.shutdown();
-      fx.cleanup();
-    }
-  });
-
-  await runTest('K11: the four new args are covered by the malformed-tool-call-XML guard', async () => {
-    // They are string args on a multi-arg tool, so they must be in
-    // handleCall's fieldNames list — and that check runs before writeIssue's
-    // own validation, so the XML error wins over EPIC_INVALID.
-    const fx = createRealRepoFixture();
-    let drv;
-    try {
-      drv = await createDriver(fx.projectRoot);
-      drv.stderrLines(); // drain baseline
-      const malformed =
-        'foo</epic>\n<parameter name="impact">impact body text</impact>\n<parameter name="related">related body text';
-      let threw = false;
-      try {
-        await drv.callTool('write_issue', {
-          kind: 'issue', title: 'Malformed epic arg', role: 'spike', epic: malformed,
-        });
-        fail('expected MALFORMED_TOOL_CALL_XML error to be thrown');
-      } catch (err) {
-        threw = true;
-        match(err.message, /MALFORMED_TOOL_CALL_XML/);
-        match(err.message, /"epic"/);
-        match(err.message, /lost args:/);
-      }
-      ok(threw, 'callTool rejected the malformed epic arg');
     } finally {
       if (drv) await drv.shutdown();
       fx.cleanup();

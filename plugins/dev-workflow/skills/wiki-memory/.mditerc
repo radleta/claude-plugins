@@ -1,3 +1,0 @@
-entrypoint: SKILL.md
-exclude:
-  - scripts/fixtures/**

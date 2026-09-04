@@ -1,77 +1,60 @@
 ---
 name: handoff-methodology
-description: 'Captures session state into per-session files, assembles the HANDOFF.md pointer via `rewrite-pointer`, and produces the resume brief at /pickup. Use when writing a handoff, picking up a prior session, handling a legacy HANDOFF.md folder, or deciding which skills to re-load — even for short sessions where /compact looks tempting.'
+description: 'Captures Claude Code session state into a per-session file under `scratch/S-{slug}/sessions/`, synthesizes the workstream''s HANDOFF.md index, and produces the resume brief at /pickup. Use when writing a handoff, picking up a prior session, migrating an old-shape HANDOFF.md, or deciding which mandatory or available skills to re-load on resume — even for short sessions where /compact looks tempting.'
 user-invocable: false
 ---
 
 # Handoff Methodology
 
-Backing reference for the `/handoff` and `/pickup` commands, which inline their executable mechanics; reaches context via auto-discovery or an explicit Skill load. Defines the v3 HANDOFF.md schema, per-session file schema, skills loading at /pickup, recovery procedures, local-memory boundary, and session name resolution.
+Methodology loaded by `/handoff` and `/pickup`. Defines the v2 HANDOFF.md schema, per-session file schema, Mandatory/Available skills triage, brief format contract, recovery procedures, local-memory boundary, and session name resolution.
 
-## Upgrading older folders to v3
+## Migration Notice
 
-Legacy V1/V2 folders upgrade just-in-time to v3 — per-folder, no bulk sweep. For the V1-vs-V2 procedures and the `rewrite-pointer` escape hatch, Read [legacy-and-recovery.md](legacy-and-recovery.md).
+The old 10-section `HANDOFF.md` schema (Done this session, Decisions made, Merge Policy table, Dedup Algorithm, Answered-Question Criterion, `## Skills loaded` content rules) is replaced by the v2 schema below. Auto-migration runs on the first `/pickup` of an old-shape folder: the CLI performs a mechanical byte-copy to `sessions/{ts}-legacy.md` (with `_legacy: true` frontmatter added), writes a skeleton v2 `HANDOFF.md`, then the `handoff-manager` agent synthesizes content over the legacy file. After migration, the folder is permanently v2.
 
-## HANDOFF.md Schema (v3 — thin pointer)
-
-`HANDOFF.md` is a **derived cache** over the immutable per-session log. Deleting it loses nothing — `scratch-memory rewrite-pointer <session-dir>` regenerates it from the `sessions/` directory. It is written mechanically — `write_session` regenerates it inline right after the session file is durably written; the `rewrite-pointer` CLI is the manual/recovery path. LLM synthesis is not involved.
+## HANDOFF.md Schema (v2)
 
 **Frontmatter:**
 
 ```yaml
 ---
-session_id: <slug>
-schema_version: 3
-last_pointer_rewrite: <ISO-8601-Z>
-session_count: <N>
+session_id: <string — UUID pre-redesign, slug post-redesign>
+session_chain: [<UUID>, ...]   # ordered prior owners; appended on /pickup
+goal: <one-line current goal>
+first_written: <ISO-8601-with-Z>   # immutable; carried over from v1
+last_updated: <ISO-8601-with-Z>    # bumped on every mode=synthesize write
+last_synthesized: <ISO-8601-with-Z>  # used by synthesis to skip already-processed files
+schema_version: 2
+git_branch: <branch name>
+session_name: <slug or empty>
+related_projects: [<slug>, ...]
 ---
 ```
+
+`first_written` is preserved verbatim from v1 during migration (falls back to file mtime if absent). `last_synthesized` is initialized to `now` at migration time.
+
+**Legacy divergence:** For pre-redesign workstreams whose HANDOFF.md was written before the explicit-arg redesign (handoff-sid-fix, 2026-05-05), the frontmatter `session_id` may be a UUID while the folder slug (`S-{slug}`) is the PID-file-derived session name. These two values may diverge. Post-redesign, `session_id` in frontmatter matches the folder slug exactly — both equal the caller-supplied `session_id` argument passed to `/handoff` or `/pickup`.
 
 **Body sections (in order):**
 
 | Heading | Content |
 |---|---|
-| `## Open questions (still open)` | Carry-forward set: still-open questions computed across the whole log per the ordering-aware algorithm (see Open-questions carry-forward). Each row: `- [q-XXXXXX] <question> → [sessions/{file}](sessions/{file}) (age: N)`. Empty list renders `none`. |
-| `## Goal` | Verbatim `goal_at_time` from the newest session file. |
-| `## Next best step` | Verbatim `## Next best step` body from the newest session file. |
-| `## Latest summary` | Verbatim `summary:` frontmatter value from the newest session file (or the read-side derived fallback if absent). |
-| `## Sessions` | One row per session, newest first. Format: `\| timestamp \| summary \| file \|`. |
-
-**Full v3 template:**
-
-```
----
-session_id: <slug>
-schema_version: 3
-last_pointer_rewrite: <ISO-8601-Z>
-session_count: <N>
----
-
-## Open questions (still open)
-- [q-XXXXXX] <question> → [sessions/{file}](sessions/{file}) (age: N)
-
-## Goal
-<verbatim newest goal_at_time>
-
-## Next best step
-<verbatim newest ## Next best step>
-
-## Latest summary
-<verbatim newest summary>
-
-## Sessions
-| timestamp | summary | file |
-|---|---|---|
-| <ts> | <summary> | [sessions/{file}](sessions/{file}) |
-```
-
-**Legacy divergence:** pre-redesign folders may have UUID frontmatter `session_id` diverging from the folder slug — see [legacy-and-recovery.md](legacy-and-recovery.md).
+| `## Goal` | Current 1-line direction (mirrors frontmatter `goal`). |
+| `## Current state` | Synthesized "what's true now" from latest session(s). 1-3 sentences. |
+| `## Next best step` | Synthesized current action handle. Imperative voice. |
+| `## Active decisions` | Synthesized: latest decision per topic + supersession links. Row format: `- <short label>[: <optional one-clause rationale>] → [sessions/{file}#decisions-made](path)`. |
+| `## Active what-to-avoid` | Synthesized still-relevant entries + anchors. Row format: `- <short label>[: <optional one-clause rationale>] → [sessions/{file}#what-to-avoid](path)`. |
+| `## Open questions (still open)` | Synthesized; resolved questions drop out. Row format: `- <question>[: <optional one-clause hint>] → [sessions/{file}#open-questions-raised](path)`. |
+| `## Skills — Mandatory` | Always-preload at `/pickup`. **Hard cap of 3.** One skill name per line, optional one-line rationale. Agent emits a `## Migration` warning in the brief if the parsed list exceeds 3. |
+| `## Skills — Available` | Listed with one-line rationale; loaded at pickup via skills-router High tier (≤3). No cap on input list size — skills-router caps the output. |
+| `## Projects` | Synthesized rollup: per-project status + activity summary; each entry has anchors to per-session detail. |
+| `## Sessions` | Chronological table: `\| timestamp \| session_name \| goal_at_time \| done summary \| file \|`. One row per session file. |
 
 ## Per-Session File Schema
 
 **Path:** `sessions/{ISO-8601-timestamp-with-Z}-{8-char-shortid}.md`
 Timestamps colon-replaced for filesystem compatibility (e.g., `T14:03:12Z` → `T14-03-12Z`).
-**Filenames are immutable** — HANDOFF.md links depend on them. **Section headings are a versioned contract** the assembly parser depends on.
+**Filenames are immutable. Section headings are a versioned contract** — anchor links from HANDOFF.md depend on both.
 
 **Frontmatter:**
 
@@ -86,7 +69,6 @@ started: <ISO-8601-with-Z>    # Server-injected on write — caller omits this f
 ended: <ISO-8601-with-Z>      # Server-injected on write — same semantics as started.
 session_name: <slug or empty>
 goal_at_time: <one-line goal as of this session>
-summary: <one-line authored summary>   # composed at /handoff; read-side fallback in cat-sessions
 parent_handoff_state: <path to prior HANDOFF.md, optional>
 _legacy: <true if migrated, otherwise omitted>
 ---
@@ -96,104 +78,63 @@ _legacy: <true if migrated, otherwise omitted>
 
 | Heading | Content |
 |---|---|
-| `## Goal` | The workstream goal — persistent across sessions, restated (and updated if the goal shifted) each session. Not a per-session snapshot; the per-session one-liner lives in `goal_at_time`. |
-| `## Next best step` | This session's last view of next (preserves reasoning even after the index advances). **No working-tree assertions.** Uncommitted file counts, "the commit is still owed", and stray-file baselines all go stale when anyone commits between sessions, and the resuming agent reads them as current fact. Name the command that produces the state (`git status`, `git log --oneline {BASE}..HEAD`) instead of its output. Observed twice in this repo. |
-| `## Done` | **Per-session delta**: what was accomplished this session only. Do not restate prior sessions' items — `cat-sessions` accumulates them across the whole log. |
-| `## Decisions made` | **Per-session delta**: architectural and implementation decisions made this session only, with full rationale. Do not restate prior sessions' items — `cat-sessions` accumulates them across the whole log. |
-| `## What to avoid` | **Per-session delta**: gotchas, dead ends, and anti-patterns discovered this session only. Do not restate prior sessions' items — `cat-sessions` accumulates them across the whole log. |
-| `## Open questions raised` | **Per-session delta**: new questions surfaced this session only. Each entry is a `- ` bullet (one entry per bullet). Leave the section empty when there is nothing to raise — never a placeholder bullet such as `- none` or `- (none new …)`. |
-| `## Open questions resolved` | **Per-session delta**: questions answered this session — restate the question kernel verbatim before the answer (see Open-questions carry-forward). Each entry is a `- ` bullet (one entry per bullet). Leave the section empty when there is nothing to resolve — never a placeholder bullet such as `- none` or `- N/A`. |
-| `## Key files & artifacts` | Paths to source files, plans, specs, and scratch artifacts central to the workstream. |
-| `## Skills used` | Flat list of skills loaded or relied on this session. |
-| `## Projects` | Scratch project slugs active in this workstream (e.g. `handoff-sid-fix`). |
+| `## Goal` | What this session was pursuing (snapshot; may differ from current). |
+| `## Next best step` | This session's last view of next (preserves reasoning even after the index advances). |
+| `## Done` | What this session accomplished. |
+| `## Decisions made` | Raw entries with full rationale. |
+| `## What to avoid` | Raw entries (what we tried/learned this session). |
+| `## Open questions raised` | New questions surfaced this session. |
+| `## Open questions resolved` | Questions answered this session (with the answer summary). |
+| `## Key files & artifacts` | Touched/created this session. |
+| `## Skills used` | List with proposed tier (Mandatory/Available) per skill. |
+| `## Projects` | Per-project done-list raw. |
 
-**Why per-session deltas:** all five list sections — `Done`, `Decisions made`, `What to avoid`, `Open questions raised`, `Open questions resolved` — are authored as per-session deltas: each session records only what happened in that session, never restating prior sessions' entries. `cat-sessions` derives the mechanical union at read time — the still-open question set via ID-based carry-forward (see [Open-questions carry-forward](#open-questions-carry-forward)) and the three cumulative lists via dedup-on-read (see [cumulative sections carry-forward](#cumulative-sections-carry-forward)) — both computed across the whole log, not authored by hand. This keeps session files small and preserves per-session attribution that a hand-maintained cumulative list would lose.
+## Mandatory / Available Skills Triage
 
-## Tasks
+At `/handoff` time, the author assigns each skill in `## Skills used` a tier:
 
-`scratch/S-{slug}/tasks/t-{6hex}-{title-slug}.md` — one file per workstream work item, written exclusively by the `write_task` MCP tool (`scratch-memory`'s [mcp-tools.md](../scratch-memory/mcp-tools.md), `## Tool: write_task`). This section covers the file schema, who writes tasks, how `/pickup`'s resume brief renders them, the mutable-zone carve-out this directory needs on Invariant 4, the questions-versus-tasks boundary, the manual promotion flow to `scratch/issues/`, and why age is computed from frontmatter rather than mtime.
+**Mandatory** — skills the next session MUST have to avoid context loss. These are continuity-essentials: without them, the resumed session would lack the methodology to continue the work. **Hard cap of 3** — if more than 3 feel essential, pick the top 3 by consequence of absence.
 
-### File schema
+**Available** — skills that may be useful depending on the next action. No cap on the input list. The `skills-router` agent trims the Available list to ≤3 High-tier picks at pickup time, using `## Next best step` and `## Current state` as match context.
 
-**Path:** `scratch/S-{session_id}/tasks/t-{6hex}-{title-slug}.md` — `t-{6hex}` is the server-minted id (e.g. `t-3f9a2c`), followed by a `-` and the title's `deriveSlug()`-derived slug.
+At synthesis, `handoff-manager mode=synthesize` reads `## Skills used` from the session file, splits entries by tier label, and writes the result into `## Skills — Mandatory` and `## Skills — Available` in HANDOFF.md.
 
-**Frontmatter:**
+## Brief Format Contract
 
-| Key | Optionality | Notes |
-|---|---|---|
-| `id` | required | `t-` + 6 hex chars — see ID minting below |
-| `title` | required | 1–80 characters |
-| `status` | required | one of `open \| blocked \| done \| dropped \| promoted` |
-| `created` | required | server-stamped ISO-8601 timestamp at creation |
-| `updated` | required | server-stamped at creation, hand-bumped on every subsequent edit (see Age is not mtime below) |
-| `blocked_on` | optional | 1–120 characters; meaningful only when `status: blocked` |
-| `promoted_to` | optional | issue slug; added by hand only after manual promotion (see Manual promotion flow below) — never a `write_task` parameter |
+> **DEPRECATED — see retirement notice below.**
 
-**Body:** optional freeform markdown, ≤ 1 MB (`MAX_BODY_BYTES`).
-
-**ID minting — mint-once random, never content-hashed.** `id` is a random 6-hex string minted once at creation and never recomputed. Contrast the `q-` question IDs documented in [Open-questions carry-forward](#open-questions-carry-forward) above, which *are* hashed — `'q-' + sha256(kernel).hex.slice(0, 6)` — a pure function of the question text. The reason for the difference: questions have no file to anchor identity to (a question's only durable existence is text buried inside a session file's body), so hashing the kernel is what makes the id reproducible across reads. A task, by contrast, *is* a file — the filename already anchors identity — so hashing would buy nothing and would break the moment the title changed (spec T2).
-
-### Who writes tasks
-
-The main session is the **only** writer of `tasks/`. `write_task` is called ad hoc by the main session directly when a work item surfaces in conversation — there is no command gate, and no `/capture-task` command exists yet (it is a growth-path candidate, not built). Neither `/handoff` nor `/pickup` ever creates a task. Sub-agents do not write tasks — a sub-agent needing to persist structured output uses `write_report`, `write_review`, or `write_issue` instead.
-
-This is **Invariant 2** ("main session is the only writer for its own folder") applied to the new `tasks/` directory.
-
-Exactly as for `write_session`, Invariant 2 is enforced here by **caller-wiring convention**, not by a code-level ownership check on `session_id`. Say this plainly, because it is the assumption most likely to mislead a reader: `write_task`'s only gates are the `session_id` charset check and the scratch-sandbox containment check — nothing on the server validates that the calling session actually owns the workstream named in `session_id`. A reader who assumes otherwise would be wrong, and that wrong assumption is exactly what this paragraph exists to prevent (decisions.md D15).
-
-### Brief rendering contract
-
-`/pickup`'s resume brief (via `cat-sessions --with-tasks`) and the standalone `scratch-memory tasks list <session-dir>` verb both render the identical `## Tasks` block through one shared renderer, `renderTasksBlock` in `tasks.mjs` — see the `--with-tasks` flag in [cat-sessions contract](#cat-sessions-contract) below, and the Sync Map row that ties the two together.
-
-- **Row format:** `- [t-{6hex}] <title> (<status-clause>, <age>)`, where `<status-clause>` is `blocked on: <blocked_on>` when the task is blocked and carries a `blocked_on` value, otherwise the bare status word.
-- **Ordering:** blocked tasks first, then open tasks; within each group, oldest `updated:` first (largest age first); `id` ASC as the final tiebreak.
-- **Age rule:** UTC calendar-day age computed from `updated:` (see Age is not mtime below). A task updated the same UTC calendar day renders `updated today`; otherwise `updated Nd ago`; an unparseable `updated:` renders `updated unknown`.
-- **Closed-count line:** when any task is `done`, `dropped`, or `promoted`, a trailing line reads `N done, N dropped, N promoted — see tasks/`.
-- **Empty case:** a workstream with no open or blocked tasks — including one that has never had a `tasks/` directory at all — renders `- none`, never an empty block and never an error.
-- **Warnings embedded:** one `WARN: <file-basename>: <problem>` line per malformed task file is appended after the closed-count line — the same `WARN:` shape `tasks lint` and the `scratch-lint.sh` hook emit.
-
-### Mutable-zone carve-out on Invariant 4
-
-Invariant 4 below says per-session files are immutable and a post-write mtime change is a defect. As written, that invariant already scopes to files under `sessions/`, so the new sibling `tasks/` directory does not strictly need an exemption — the carve-out added to Invariant 4's text is **defensive documentation**, not a weakening of the immutability guarantee. It exists so a reader who lands on Invariant 4 first sees the boundary stated rather than having to infer the scope from the wording. `sessions/` immutability is untouched, and `HANDOFF.md` remains a derived cache (Invariant 3).
-
-### Questions versus tasks
-
-Questions and tasks are two independent machineries answering two different needs. A **question** is a decision needing an answer — it lives inside a session file's `## Open questions raised` / `## Open questions resolved` sections and is carried forward by the whole-log algorithm in [Open-questions carry-forward](#open-questions-carry-forward) above. A **task** is a work item — it lives in its own file under `tasks/` and is mutated by hand-editing that file directly.
-
-The practical test: if the next action on it is "find out," it's a question; if the next action is "do," it's a task. The two machineries are independent — a question is never auto-converted into a task, and a task is never auto-converted into a question. An author who wants both must create both by hand.
-
-### Manual promotion flow
-
-A task that outgrows its workstream is promoted to a standalone issue via a manual two-step (decisions.md D5):
-
-1. Run `/capture-issue` to file the issue in `scratch/issues/`.
-2. Hand-edit the task's frontmatter: set `status: promoted` and add `promoted_to: <issue-slug>`.
-
-`capture-issue.md` has no write-back mechanism to the source task and gains none — the two invocations are genuinely separate. The `scratch-lint.sh` hook lints the hand-edit like any other `tasks/` edit (its T7 rule validates `status` against the enum, which includes `promoted`). The window between step 1 and step 2 — where the issue exists but the task still reads `open` — is accepted, not guarded against.
-
-### Age is not mtime
-
-A task's rendered age is computed from its `updated:` frontmatter value, never from the file's filesystem mtime. Git does not preserve mtimes across a clone, checkout, or worktree creation — every task's age would silently reset to "just modified" the moment a workstream folder is cloned or checked out fresh, which is precisely the drift this rule exists to prevent. `updated:` is bumped by hand on every edit that should reset the age clock, and the `scratch-lint.sh` hook's H1 rule mechanically guards this — it requires `updated:` to equal today's UTC date on any hook-observed edit to a `tasks/` file, catching the case where an editor forgets to bump it.
-
-## Skills Loading at /pickup
-
-The v3 flow carries no Mandatory/Available tiering — the tier system was retired with the synthesized index and the handoff-manager agent (its last consumers). `## Skills used` is a flat list.
-
-At `/pickup`, the resume brief reads `## Skills used` from the newest session file (via `cat-sessions`) and applies pushy-load judgment against `## Next best step` and recent state: load each skill whose description plausibly applies to the upcoming work, preferring a false-positive over a false-negative. Hard cap: 5 skills.
-
-## Stale-Question Triage Nudge at /pickup
-
-`/pickup` Step 6a scans the `## Open questions (still open)` block assembled in Step 6 for rows whose `(age: N)` annotation — the `age_sessions` field from the `cat-sessions` json contract, rendered inline in `full` — has `N >= 3`. When one or more rows meet that threshold, Step 6a prints exactly one `TRIAGE:` line naming the count before Step 7 runs; when none do, it prints nothing.
-
-The nudge is deliberately **non-blocking**: it never awaits a response and never opens an interactive question prompt, so it cannot stall an unattended resume that goes straight to Step 8's NBS execution. The actual disposition — answering or closing a stale question — happens later, at the next `/handoff`'s Step 1b (see [Handoff disposition pass (Step 1b)](#handoff-disposition-pass-step-1b)), which is the write path where a disposition can be recorded. See decisions.md D17 for the rejected interview-based alternatives.
+The Brief Format Contract (schema_version: 1, seven-section structured brief returned by `mode=resume`) is retired. `handoff-manager mode=resume` is removed. `/pickup` reads HANDOFF.md sections directly. This section is preserved for historical reference only.
 
 ## Recovery Procedures
 
-`HANDOFF.md` is a derived cache — any corrupt/missing pointer is rebuilt by re-running `scratch-memory rewrite-pointer <session-dir>`. For the full recovery runbook (stale-pointer warning, legacy folder, full rebuild), see [legacy-and-recovery.md](legacy-and-recovery.md).
+**HANDOFF.md unexpectedly empty after `/handoff`:**
+```bash
+ls -t scratch/S-{id}/.bak/
+cp scratch/S-{id}/.bak/HANDOFF-{ts}.md.bak scratch/S-{id}/HANDOFF.md
+# Then manually dispatch: handoff-manager mode=synthesize
+```
+
+**Auto-migration produced wrong content:**
+```bash
+cp scratch/S-{id}/.bak/HANDOFF-{ts}.md.bak scratch/S-{id}/HANDOFF.md
+rm -rf scratch/S-{id}/sessions/
+# Re-run /pickup — agent re-attempts synthesis
+```
+
+**`/handoff` run before post-deploy restart** (`Agent()` dispatch fails with "Agent type 'handoff-manager' not found"): the session file at `sessions/{ts}-{shortid}.md` is already written and valid. Recovery: restart Claude Code, then manually dispatch `handoff-manager mode=synthesize` with `session_file_path` pointing at the already-written file. Do not re-run `/handoff` first — the pre-write `Read` guard aborts at step 3 (file exists) and cannot overwrite the prior file.
+
+## Restart Caveat (handoff-manager)
+
+**Restart IS needed for:**
+- **New MCP verbs** (e.g., `write_session`): the TOOLS array in the scratch-memory MCP server is read at session start. A new verb added to `server.mjs` will not appear until Claude Code is restarted in that project.
+- **New agent registration**: when `handoff-manager.md` is first deployed (or any new agent file is created), `@handoff-manager` autocomplete and `Agent({subagent_type: "handoff-manager", ...})` programmatic dispatch both read from the session-start registration index. Until restart, both paths fail with "Agent type 'handoff-manager' not found."
+
+**Restart is NOT needed for:**
+- **Edits to the existing handoff-manager agent**: existing-agent edits hot-reload per project CLAUDE.md ("Edits: yes"). The next `Agent({subagent_type: "handoff-manager", ...})` dispatch picks up the change live — no restart required.
 
 ## Boundary with `local-memory`
 
-Automated dispatches of `local-memory-updater` are **removed** (decision D6 of the lean-handoff redesign). With that removal, `CLAUDE.local.md` Active Projects is no longer auto-updated during `/implement-code` runs — it goes stale until the user manually invokes `Skill({skill: "local-memory"})` or the `/local-memory` command explicitly. Cross-session active-project state now lives in HANDOFF.md, discovered via `scratch-memory handoff list`. The `local-memory` skill and `local-memory-updater` agent were archived to `.claude-archive/` on 2026-09-04 (`scratch/issues/cut-local-memory.md`); nothing updates `CLAUDE.local.md` Active Projects now.
+Automated dispatches of `local-memory-updater` are **removed** (D6). With that removal, `CLAUDE.local.md` Active Projects is no longer auto-updated during `/implement-code` runs — it goes stale until the user manually invokes `Skill({skill: "local-memory"})` or the `/local-memory` command explicitly. Cross-session active-project state now lives in HANDOFF.md, discovered via `scratch-memory handoff list`. The `local-memory` skill and `local-memory-updater` agent are **preserved** — no file deletions — and remain callable for explicit use.
 
 | Concern | `local-memory` | `handoff-methodology` |
 |---|---|---|
@@ -208,8 +149,10 @@ Automated dispatches of `local-memory-updater` are **removed** (decision D6 of t
 
 1. One workstream = one `scratch/S-{slug-or-uuid}/` folder = one `HANDOFF.md`.
 2. Main session is the only writer for its own folder.
-3. `HANDOFF.md` is a **derived cache**, regenerated automatically by `write_session` immediately after the session file is durably written — no separate agent step. The `rewrite-pointer` CLI verb is the manual/recovery path. No agent or LLM synthesizes the body. The per-session log in `sessions/` is the immutable source of truth; `HANDOFF.md` is always reconstructable from it.
-4. Per-session files under `sessions/` are **immutable** post-write. A post-write mtime change to a `sessions/` file is a defect. **`tasks/` is a documented mutable zone** — task files (see `## Tasks` above) are hand-edited after creation (status changes, `blocked_on` updates, promotion), so post-write mutation there is expected behavior, not a defect. This clause is defensive documentation, not a weakening: Invariant 4 as originally scoped only ever covered `sessions/`, so `tasks/` never technically violated it — naming the boundary here means a reader lands on the answer instead of having to infer it from the wording.
+3. `HANDOFF.md` is owned by `handoff-manager` (mode=synthesize). The CLI writes only the empty skeleton during legacy migration.
+
+   > **Exception:** when `/pickup` auto-migrates a legacy V1 folder, main session (Opus) reads `sessions/{ts}-legacy.md` and composes the synthesized sections, then writes HANDOFF.md directly. This is a documented single-path relaxation; all non-migration `/handoff` runs still go through handoff-manager.
+4. Per-session files are **immutable** post-write. A post-write mtime change is a defect.
 5. `S-` prefix distinguishes session-scoped folders from project-scoped folders in `scratch/`.
 6. Sessions cross-cut projects; the session folder enumerates related project folders, never the reverse.
 
@@ -217,7 +160,9 @@ Automated dispatches of `local-memory-updater` are **removed** (decision D6 of t
 
 **Post-redesign (handoff-sid-fix, 2026-05-05):** The canonical source shifted from PID files to caller-supplied argument. The user types `session_id` at `/handoff <session_id>` and `/pickup <from_session_id>`; this value becomes the workstream label directly — no slugification, no PID-file lookup. The `session_id` is passed verbatim to `write_session({session_id, body})` via MCP, and the folder is created as `S-{session_id}` directly.
 
-For the pre-redesign PID-file naming mechanism and its restart limitation, see [legacy-and-recovery.md](legacy-and-recovery.md).
+**Pre-redesign history:** PID files at `~/.claude/sessions/{pid}.json` provided the session name via the `.name` field, written by `/rename`. The server resolved the name by matching the calling PID to the correct JSON file via cwd comparison plus `.sessionId ∈ {session_id} ∪ session_chain`. When multiple PID files matched, the one with the most-recent `updatedAt` won. The slug was then normalized to `[a-z0-9-]`, max 64 chars, whitespace → `-`, leading/trailing hyphens stripped. That mechanism is preserved in Claude Code itself (the `/rename` command still writes PID files) but is no longer used by scratch-memory for workstream folder naming.
+
+- **Known limitation:** after a process restart the `/rename`-assigned name is gone unless the user runs `/rename` again. The `session_name` field in HANDOFF.md frontmatter is the durable record — the interactive picker reads it to show a human-readable label for long-exited sessions. This limitation still applies to the `/rename` mechanism even though scratch-memory no longer reads PID files for workstream naming.
 
 ## Troubleshooting: scratch subrepo rename churn
 
@@ -225,131 +170,288 @@ After `/pickup`, `cd scratch && git status` shows `S-{old}/` → `S-{new}/` as a
 
 ## Growth Path
 
-`write_session` is the landed MCP verb for this flow (per-session file write + inline pointer regeneration). The other scratch-memory verbs (`write_report`, `write_review`, `write_issue`) and the full verb inventory live in the `scratch-memory` SKILL.
+**Landed MCP verbs** (available in current scratch-memory server):
 
-Future candidates (not implemented): `fork_handoff` CLI verb (copy — not rename — a workstream folder to a new session, preserving the original), `mark_criterion`, `append_decision`.
+| Surface | Purpose | Status |
+|---|---|---|
+| `write_report` | Step-based coder/verifier verdict writes (`/implement-code`) | Landed |
+| `write_review` | Phase-based brainstorming reviewer verdict writes | Landed |
+| `write_issue` | Issue/idea captures — user-initiated via `/capture-issue`, or sub-agent-initiated by `researcher` during D6 auto-heal drift filing | Landed |
+| `write_session` | Per-session file write for `/handoff` (MCP verb; session state, not code verdicts) | **Landed** |
 
-## Assembly Protocol
+**Future candidates:**
 
-`HANDOFF.md` is assembled mechanically — no LLM synthesis involved. The two CLI verbs that implement this protocol are:
+| Surface | Purpose |
+|---|---|
+| `fork_handoff` (CLI verb) | Copy (not rename) a handoff folder from one session to another, preserving the original. Verb: `/fork {from} → new-session`. Not yet implemented. |
+| `mark_criterion` (MCP tool) | Flip a plan acceptance-criterion checkbox in a step file |
+| `append_decision` (MCP tool) | Structured entry in a project's `decisions.md` |
 
-- **`scratch-memory cat-sessions <session-dir> [--max-chars N] [--format full|summary|json]`** — assembles a bounded brief from the session log (used by `/pickup` for the resume brief, and internally by `rewrite-pointer`).
-- **`scratch-memory rewrite-pointer <session-dir>`** — (re)generates the v3 thin-pointer `HANDOFF.md` from the immutable session log. `write_session` invokes this same regeneration inline on every write (see Invariant 3); the CLI verb is for manual/recovery use.
+## Index Synthesis Protocol
 
-### Recency ordering
+This protocol is executed by `handoff-manager mode=synthesize`. Its job is to update HANDOFF.md so it reflects the new (or legacy) session file plus any superseded prior content. The agent does NOT write to session files. It writes to HANDOFF.md exactly once. (This protocol may be reached via `mode=synthesize` dispatch directly, or executed inline from `mode=resume` during legacy migration — in either case the steps and constraints are identical.)
 
-Sessions are sorted newest-first by the ISO timestamp prefix of the session filename. Filenames are immutable and timestamp-prefixed, so this ordering is stable and deterministic. Fallback: file mtime if the prefix is unparseable; if mtime values are equal (FAT32 / NFS with coarse-grained timestamps), sort by filename lexicographic order as a final tiebreaker.
+### Inputs
 
-### Budget algorithm (cat-sessions)
+- `session_file_path` — absolute path to the just-written per-session `.md` file (the file that triggers this synthesis pass)
+- `handoff_md_path` — absolute path to the workstream's `HANDOFF.md` (the file this protocol writes)
 
-Budget B defaults to **30000 characters** (roughly ~7500 tokens). Chars, not tokens — the CLI has no tokenizer.
+### Step 1: Read both files in full.
 
-1. **Always-inline-newest floor:** the newest session is always fully inlined, even if its body alone exceeds B.
-2. Inline older sessions in recency order, accumulating char count, as long as `cumulative + body ≤ B` (hard cap — a non-newest session is never inlined when doing so would push cumulative over B). The first older session that would exceed the cap stops inlining; to keep the included window contiguous (newest-first), all remaining older sessions are then summary-only — even if a later one would individually fit.
-3. All remaining (older) sessions render as `summary + link` rows only — their full bodies are not included in the brief.
+Call `Read({file_path: session_file_path})` to load the session file. Call `Read({file_path: handoff_md_path})` to load HANDOFF.md. If either Read fails (file not found or permission error), emit `Synthesis failed: could not read <path>` and stop. Do not proceed with partial data.
 
-This guarantees current truth (newest session) is always present while bounding the output for a near-full context.
+### Step 2: Detect legacy.
 
-### Open-questions carry-forward
+Inspect the session file frontmatter. If the frontmatter contains `_legacy: true`, jump to the `### Legacy session translation` sub-section below before continuing. That sub-section maps the 10 v1 sections to v2 schema; after translation, return here and continue from Step 3.
 
-Computed across the **whole log**, independent of the budget window:
+### Step 3: Synthesize Active decisions / what-to-avoid / Open questions still-open.
 
-- **Input:** union of all `## Open questions raised` entries from every session.
-- **Resolved set:** union of all `## Open questions resolved` entries from every session.
-- **Still-open set (ordering-aware):** a kernel is still-open iff it was never resolved, OR its most-recent raise is chronologically newer than its most-recent resolve. This means a question that was raised, resolved, then genuinely re-raised in a later session surfaces again instead of staying suppressed — a plain raised-minus-resolved set difference would wrongly hide it.
-- **Normalization:** each entry is reduced to its **question kernel** — markdown emphasis and backticks stripped, a leading `[q-<hex6>]` token removed, then the question text up to the first `?`, with any appended `→ RESOLVED:` answer removed — then trimmed, lowercased, and whitespace-collapsed. Dedup by kernel.
-- **Question ID:** each kernel has a stable ID, `'q-' + sha256(kernel).hex.slice(0, 6)` — a pure function of the kernel alone, so it is retroactively computable for every existing question and never renumbers when sessions are inserted. An author may resolve a carried-forward question by ID instead of restating its kernel verbatim: `- q-<hex6> → RESOLVED: <answer>`.
-- **Resolve precedence (guard → ID → kernel):** for each `## Open questions resolved` entry, three conditions are computed independently, then the entry is matched by the first that applies:
-  1. **STILL-OPEN guard.** The substring from the first `→` / `->` / `RESOLVED:` delimiter to the end of the bullet — or the whole bullet, when no delimiter is present — is scanned for `STILL OPEN`, `UNRESOLVED`, or `NOT RESOLVED` (case-insensitive, hyphen/space-tolerant). A match **vetoes cancellation unconditionally**: the entry sets nothing — no resolve, no re-raise, no attribution change — regardless of whether an ID or a kernel also matches. This lets an author acknowledge a carried-forward question without answering it, without resetting its age.
-  2. **ID match.** Otherwise, if the bullet contains a `q-<hex6>` token that maps to exactly one kernel across the whole log, that kernel resolves — regardless of what text the bullet also restates.
-  3. **Kernel match.** Otherwise, if the bullet's own kernel exists among the raised kernels, that kernel resolves (the verbatim-restatement behavior above).
+Walk all `sessions/*.md` whose `started` frontmatter field is newer than HANDOFF.md frontmatter `last_synthesized`. If `last_synthesized` is absent from HANDOFF.md frontmatter, walk all session files in the `sessions/` folder.
 
-  An entry matching none of the three cancels nothing (orphan resolution — the majority case in practice). Every entry cancels **at most one** kernel: an ID match never additionally cancels the kernel its restated text would otherwise have matched.
-- **Ambiguous-ID fallback:** an ID that maps to more than one kernel (a collision) is treated as if no ID were present on that entry — resolution falls through to kernel matching rather than cancelling any of the colliding kernels. A collision costs only the ID as a usable handle for that entry; a question already reachable by kernel match remains resolvable, and nothing is ever silently cancelled by an ambiguous ID.
-- **Attribution:** if the kernel was never resolved, display the original text from, and link to, the **oldest** (chronologically earliest) session that raised it. If it was resolved at some point and then re-raised, attribute to the **newest** raise instead — the re-raise is the one still open.
-- **Age:** each still-open entry also carries `age_sessions = session_count − attributingRaiseOrder`, where `attributingRaiseOrder` is the 1-based oldest-to-newest position of the same attributing raise used above (`firstRaise` for a never-resolved kernel, `lastRaise` for a resolved-then-re-raised one) — an integer in `[0, session_count − 1]`. A genuine re-raise resets the clock: attribution moves to the newest raise, so age is measured from there, not from the original raise.
-- **Ordering:** `still_open_questions` is sorted `age_sessions` DESC (oldest first), then `id` ASC, then kernel ASC. `attributingRaiseOrder` is deliberately not a sort level of its own — it is a linear function of `age_sessions`, so a level on both would just re-apply the same ordering twice. The kernel is unique per entry by construction, which makes the key total (no two entries can tie on all three levels); it is a sort input only and never appears in rendered or json output.
-- **Safe direction:** a kernel not found in the resolved set, or resolved-then-re-raised, stays still-open — a real question is never dropped by a reword or a stale resolution.
-- **Authoring note:** author each entry as a `- ` bullet (one entry per bullet); restate the question kernel (text up to the first `?`) verbatim, then the answer — e.g. `<question>? → RESOLVED: <answer>` — or resolve by ID (see Question ID above) when restating the kernel is inconvenient. To acknowledge a carried-forward question without resolving it, annotate `→ STILL OPEN` (or `UNRESOLVED` / `NOT RESOLVED`) — this is never treated as a resolution, whether or not the bullet also carries a matching ID or kernel. A resolution that matches neither an ID nor a kernel stays still-open. Leave `## Open questions raised` / `## Open questions resolved` **empty** when there is nothing to record — never author a placeholder bullet such as `- none`, `- N/A`, or `- (none new …)`; `extractBullets` filters any such bullet on read, so an authored placeholder is silently dropped rather than preserved.
-- **Empty list:** renders an explicit `none` line.
+**Use the `started` field (NOT the filename-embedded ISO timestamp).** Rationale: a `commit-session` retry produces a new filename timestamp but preserves the same `started` moment — using `started` avoids double-processing the same session content when filenames differ.
 
-Row format: `- [q-XXXXXX] <question> → [sessions/{file}](sessions/{file}) (age: N)`. Both `cat-sessions` (brief) and `rewrite-pointer` (pointer) render this identical shape (decisions.md D9). Path separators are normalized to `/` at the link-building chokepoint (`relLink` in `cat-sessions.mjs`; the equivalent inline form in `rewrite-pointer.mjs`) regardless of the platform-native separator `source_file` carries.
+For each session file in the walk:
 
-Legacy session files lacking `summary:` are handled by a read-side derivation fallback in `cat-sessions` — see [legacy-and-recovery.md](legacy-and-recovery.md).
+**Decisions:** A decision row in HANDOFF.md `## Active decisions` is superseded when the new session's `## Decisions made` section contains an entry whose topic label matches an existing row's label. On supersession, replace the existing row's anchor with the new session file's anchor; keep the label; update the optional one-clause rationale only if the new entry provides one. Emit format per D3:
+```
+- <short label>[: <optional one-clause rationale>] → [sessions/{file}#decisions-made](path)
+```
 
-### Handoff disposition pass (Step 1b)
+**What-to-avoid:** Apply the same supersession logic to `## Active what-to-avoid` entries. Replace the anchor on label match; keep the label; update rationale only when the new entry provides one. Emit format:
+```
+- <short label>[: <optional one-clause rationale>] → [sessions/{file}#what-to-avoid](path)
+```
 
-`/handoff` Step 1b runs `cat-sessions 'scratch/S-{session_id}/' --format json` before body composition (Step 2) and walks the returned `still_open_questions`, deciding per entry `Q` whether Step 2 authors a `## Open questions resolved` line:
+**Open questions:** An open question drops from HANDOFF.md `## Open questions (still open)` if it appears in the new session's `## Open questions resolved` section. No partial supersession: an entire row is either kept as-is or removed. New questions from the new session's `## Open questions raised` are appended to HANDOFF.md `## Open questions (still open)`. Emit format:
+```
+- <question>[: <optional one-clause hint>] → [sessions/{file}#open-questions-raised](path)
+```
 
-| Answered this session | Moot this session | `Q.id` usable | Line authored |
-|---|---|---|---|
-| yes | — | yes | `q-<id> → RESOLVED: <answer>` |
-| yes | — | no | `<question kernel verbatim> → RESOLVED: <answer>` |
-| no | yes | yes | `q-<id> → RESOLVED: closed — <reason>` |
-| no | yes | no | `<question kernel verbatim> → RESOLVED: closed — <reason>` |
-| no | no | — | *(no line — still open; carry-forward is automatic)* |
+### Step 4: Synthesize Projects rollup.
 
-**Acknowledging without resolving:** a question reviewed this session but deliberately left open (not answered, not moot) may optionally be recorded as `q-<id> → STILL OPEN — <note>` (or the kernel-verbatim form). This is never treated as a resolution and never resets the question's age — see the STILL-OPEN guard under [Open-questions carry-forward](#open-questions-carry-forward) for the engine-side mechanics. It distinguishes "reviewed and consciously left open" from a question nobody looked at this session; carry-forward remains automatic either way.
+Aggregate per-session `## Projects` entries into HANDOFF.md `## Projects` section. For each project mentioned across session files, write a per-project line with current status and a one-sentence activity summary, each with an anchor linking to the source session file where the most recent activity appears. Format:
+```
+- **{project-name}**: {status} — {activity summary} → [sessions/{file}#projects](path)
+```
 
-`<question kernel verbatim>` copies `Q.text` from its start up to and including the first `?` (or the whole kernel when there is none) — a `?` is never appended, since doing so to an imperative kernel produces a string the next read won't match, silently reopening the question. A carried-forward question is never restated in `## Open questions raised` — that section is a per-session delta of genuinely new questions only.
+### Step 5: Update Sessions index table.
 
-On any non-zero `cat-sessions` exit, Step 1b skips disposition and proceeds to Step 2 without failing the handoff, but names which exit occurred: exit 1 (no prior log — the expected first-handoff case) vs exit 2 (FS/infra failure — worth investigating before the next handoff), per decisions.md D16. Step 1b is read-only — it writes nothing; the only write in `/handoff` remains the Step 3 `write_session` call.
+Append a new row to the HANDOFF.md `## Sessions` table for the session file that triggered this synthesis pass. Do not add duplicate rows for session files already represented in the table. Row format:
+```
+| {timestamp} | {session_name} | {goal_at_time} | {done summary (≤1 sentence)} | [sessions/{file}](path) |
+```
 
-### Cumulative sections carry-forward
+`{timestamp}` is the `started` value from the session file frontmatter. `{session_name}` is the `session_name` frontmatter field (empty string if absent). `{goal_at_time}` is the `goal_at_time` frontmatter field. `{done summary}` is a ≤1-sentence distillation of the session's `## Done` body.
 
-`cat-sessions` computes three read-side cumulative sets — Decisions made, What to avoid, Done — from the **whole log**, the same oldest-first traversal used for open-questions accumulation, independent of the `--max-chars` budget window (decisions.md D12).
+### Step 6: Refresh Replace-in-place sections.
 
-- **Whole-log accumulation:** each session's `## Decisions made` / `## What to avoid` / `## Done` bullets are folded into a running set as the log is walked oldest-to-newest, regardless of whether that session's body is inlined or trimmed to summary-only in the brief.
-- **Dedup key:** each bullet is reduced to a normalized key — markdown emphasis/backticks stripped, trimmed, lowercased, whitespace-collapsed, then truncated to its first 80 characters — before being folded into the set (decisions.md D13). Two bullets sharing the same 80-char-normalized prefix collapse to one entry.
-- **Oldest-wins attribution:** when two bullets collide on the same key, the **first (oldest) occurrence** is kept — its text and source file are the ones that render — mirroring the oldest-wins attribution rule for still-open questions.
-- **Render order:** `cumulative_done` / `cumulative_decisions` / `cumulative_avoid` are newest-first by the order of each entry's oldest occurrence — the most recently introduced surviving entries render first (decisions.md D14).
-- **Per-block char cap, `--format full` only:** `cumulativeBlock` renders newest-first rows and stops before the running total would exceed `--max-cumulative-chars` (default 6000), appending a `_… N more (see sessions/)_` elision line whenever any entry is omitted. `--format json` emits `cumulative_done` / `cumulative_decisions` / `cumulative_avoid` as complete, untruncated arrays regardless of the cap — the cap is a `full`-format rendering concern only.
-- **No minimum-entries floor:** unlike the always-inline-newest floor in the [budget algorithm](#budget-algorithm-cat-sessions), the cumulative renderer guarantees nothing analogous. A cap smaller than the first row's rendered length renders **zero rows plus the elision line** — an empty-looking block despite content existing in the log. This asymmetry is deliberate (decisions.md D14, amended): the cumulative view is a convenience over an immutable log that `source_file` links back to, whereas the newest session body is the resume payload itself.
-- **`--format summary` never gains these blocks** (decisions.md D15) — `summary` exists only to feed the pointer Sessions table and stays byte-stable.
+These sections are always overwritten from the latest session (the session file that triggered this synthesis pass):
 
-### rewrite-pointer contract
+- `## Goal` — copy from latest session `## Goal` body verbatim.
+- `## Next best step` — copy from latest session `## Next best step` body verbatim.
+- `## Current state` — synthesize from latest session `## Done` in 1-3 sentences describing what is now true about the codebase or workstream.
 
-`rewrite-pointer <session-dir>` renders the v3 thin pointer by calling the assembly module (`cat-sessions --format json`) to obtain:
-- `newest.goal` → `## Goal`
-- `newest.next_best_step` → `## Next best step`
-- `newest.summary` → `## Latest summary`
-- `still_open_questions[]` → `## Open questions (still open)` — same row format as the brief: `- [q-XXXXXX] <question> → [sessions/{file}](sessions/{file}) (age: N)` (see Row format above)
-- `sessions[]` → `## Sessions` table (one row per session, newest first; format: `| timestamp | summary | file |`)
+Derive `## Skills — Mandatory` and `## Skills — Available`:
+- Read latest session `## Skills used` section.
+- For each entry, read its proposed tier label (`Mandatory` or `Available`). **If an entry has no tier label, treat it as `Available`** — same fallback as the legacy migration rule for tierless `## Skills loaded` input (see Legacy session translation sub-section below).
+- Write `## Skills — Mandatory`: one skill name per line (strip rationale — only the skill name).
+- Write `## Skills — Available`: one skill name per line, preserving any one-line rationale annotation after the name.
 
-Writes atomically via tmp + rename (`.HANDOFF-{pid}-{random}.tmp` in the same `<session-dir>`). On any write/sync failure, the prior `HANDOFF.md` is untouched. Post-rename stale-sweep removes orphaned tmp files from prior crashed invocations using PID-liveness check.
+### Step 7: Validate anchors.
 
-**Exit codes:**
-- `0` — pointer written; status line on stderr: `N sessions processed, pointer written: <path>`.
-- `1` — user/argument error (missing arg, empty sessions dir, out-of-sandbox path, unknown flag).
-- `2` — FS write or read failure.
+For each `→ sessions/{file}#section` link present anywhere in HANDOFF.md after the updates, confirm two things:
+1. The file exists — Glob `sessions/` for the filename.
+2. The heading exists in that file — Read the session file and search for the heading string.
 
-If `write_session` reports `pointer.written === false` (inline regeneration failed) — or a manual `rewrite-pointer` re-run exits non-zero — `/handoff` surfaces a STALE-POINTER WARNING but does NOT fail the handoff; the per-session file is already durably flushed.
+On any validation failure, emit a one-line warning in agent output (not in HANDOFF.md):
+```
+WARN: broken anchor → {link}
+```
+Proceed regardless — anchor validation is best-effort. Full link-linting is scoped out per spec.
 
-### cat-sessions contract
+### Step 8: Update frontmatter.
 
-`cat-sessions <session-dir> [--max-chars N] [--max-cumulative-chars N] [--format full|summary|json] [--with-tasks]`
+Set both `last_updated` and `last_synthesized` to the current ISO 8601 timestamp with Z suffix (UTC). Preserve the following fields verbatim from the existing HANDOFF.md frontmatter — do not modify them:
 
-`--max-cumulative-chars` (default 6000) is the per-block char cap for the three cumulative sections described below. The cap applies to `--format` full only; `--format json` always emits the three cumulative arrays untruncated, so a caller who passes the flag expecting a smaller JSON payload is silently ignored (decisions.md D14, amended).
+- `session_chain[]`
+- `related_projects[]`
+- `first_written`
+- `goal`
+- `git_branch`
+- `session_id`
+- `session_name`
+- `schema_version` (must remain `2`)
 
-`--with-tasks` appends a `## Tasks` block — rendered by the same `renderTasksBlock` the standalone `scratch-memory tasks list` verb uses (see `## Tasks` above) — listing a workstream's open and blocked tasks. It applies to `--format full` and `--format json`; `--format summary` silently ignores it, the same way `--format json` silently ignores `--max-cumulative-chars` above — `summary` exists only to feed the pointer Sessions table and stays byte-stable regardless of either flag (decisions.md D15).
+### Step 9: Write HANDOFF.md using the Write tool.
 
-**Output formats:**
-- `full` (default) — `## Open questions (still open)` block, then the three cumulative blocks — `## Decisions (cumulative)`, `## What to avoid (cumulative)`, `## Done (cumulative)` — each newest-first under the `--max-cumulative-chars` cap (see [Cumulative sections carry-forward](#cumulative-sections-carry-forward) below), then — only when `--with-tasks` is passed — the `## Tasks` block, then newest-first inlined session bodies with header lines, then `summary + link` tail for trimmed older sessions. Used as the resume brief by `/pickup`.
-- `summary` — open-questions block + one `summary + link` row per session (no full bodies, no cumulative blocks, no tasks block even with `--with-tasks` — decisions.md D15). Row source for the pointer Sessions table.
-- `json` — `{ session_dir, budget_chars, cumulative_cap_chars, session_count, still_open_questions: [{id, text, source_file, age_sessions}], newest: {goal, next_best_step, summary, file}, sessions: [{ts, file, summary, inlined: bool, body?}], cumulative_done: [{text, source_file}], cumulative_decisions: [{text, source_file}], cumulative_avoid: [{text, source_file}] }`, plus — only when `--with-tasks` is passed — `tasks: [{id, title, status, blocked_on?, created, updated, age_days, file}]` and `task_warnings: [string]`. `tasks` is the complete, unfiltered task list across every status; the `full`-format `## Tasks` block, by contrast, renders only `open`/`blocked` rows plus a closed-count summary. `body` present only for inlined sessions. `still_open_questions` is sorted `age_sessions` DESC, then `id` ASC, then kernel ASC (see Ordering above) — the kernel itself is not a field in this shape. The three `cumulative_*` arrays are always complete and untruncated, regardless of `--max-cumulative-chars` — the cap is a `full`-format render-time concern only. Consumed programmatically by `rewrite-pointer` and `/pickup`.
+Call `Write({file_path: handoff_md_path, content: <updated full content>})` with the complete regenerated HANDOFF.md content (frontmatter + all body sections). Note: `atomicWriteSync` is CLI-only; the agent uses the `Write` tool directly. The agent's exclusive HANDOFF.md ownership (Key Invariant 3) plus single-pass Write semantics provides sufficient atomicity at the agent layer. Do not make a second Write call to HANDOFF.md in this synthesis pass.
 
-**Contracts:**
-- `requires`: `<session-dir>` provided; `<session-dir>/sessions/` exists and contains ≥1 `*.md` file.
-- `ensures`: deterministic output for identical inputs; newest session body always present in `full`/`json`; still-open block never drops a raised-and-unresolved question.
-- `invariants`: read-only — never writes, never mutates session files; malformed task files (`--with-tasks` only) never change the exit code — a bad `tasks/` entry surfaces as an embedded `WARN:` line, never a failure; bounded brief (`full` size ≤ ~`B` + 3 × `C` + **tasks block** + per-session summary tail, where `B` is `--max-chars` and `C` is `--max-cumulative-chars`) regardless of session count — the tasks term is **uncapped in v1**, linear in the number of open/blocked tasks (roughly 100 bytes per row), deliberately: consistent with T8's no-thresholds/no-policy stance, the documented escape hatch — a cap mirroring `--max-cumulative-chars` — is named but not yet built (decisions.md D14).
+### Legacy session translation
 
-**Exit codes:** `0` success; `1` user/argument error; `2` FS read failure.
+A session file with `_legacy: true` in its frontmatter represents the entire prior HANDOFF.md byte-copied from before migration. The CLI places this file at `sessions/{ts}-legacy.md` with `_legacy: true` added to the frontmatter before synthesis runs.
+
+Treat the legacy session file as a single retroactive session. Map the 10 v1 body sections to v2 HANDOFF.md sections and per-session file schema as follows:
+
+| v1 section | v2 HANDOFF.md target | v2 per-session target |
+|---|---|---|
+| `## Done this session` | (not in HANDOFF.md) | `## Done` |
+| `## Decisions made` | `## Active decisions` (synthesized) | `## Decisions made` (raw) |
+| `## What to avoid` | `## Active what-to-avoid` (synthesized) | `## What to avoid` (raw) |
+| `## Open questions` | `## Open questions (still open)` (synthesized) | `## Open questions raised` (raw) |
+| `## Key files & artifacts` | (not in HANDOFF.md directly) | `## Key files & artifacts` |
+| `## Skills loaded` | split by Mandatory/Available tier → `## Skills — Mandatory` + `## Skills — Available` | `## Skills used` |
+
+All other v1 sections (Merge Policy table, Dedup Algorithm, Answered-Question Criterion, etc.) are discarded — they were meta-instructions, not state.
+
+For `## Skills loaded` tier assignment during migration: if the legacy file has no tier labels, treat all listed skills as `Available`. The author can promote to `Mandatory` at next `/handoff`.
+
+After completing the mapping, return to Steps 3-8 using the translated content as the session file's contribution. The legacy session file itself is immutable — never write back to it.
+
+## Resume Brief Protocol
+
+This protocol is executed by `handoff-manager mode=resume`. The CLI has already done any mechanical migration. The job is to read state, run skills-router over the Available list, and emit a structured brief that pickup parses verbatim. The only output to the caller is the brief.
+
+### Inputs
+
+- `from_session_id` — UUID of the session being picked up from (the session that ran `/handoff` last)
+- `to_session_id` — UUID of the new session taking ownership
+- `handoff_md_path` — absolute path to the workstream's `HANDOFF.md`
+- `migrated_from_legacy` — optional boolean; `true` if the CLI just ran a v1-to-v2 mechanical migration before dispatching this agent
+
+### Step 1: Read HANDOFF.md.
+
+Call `Read({file_path: handoff_md_path})`. If Read fails (file not found or permission error), emit a brief with all sections empty and add `## Migration` section containing `read-error` as its only content, then stop. The minimal error brief still uses the 7-section format so the caller can parse it without branching.
+
+### Step 2: Legacy synthesis if needed.
+
+If `migrated_from_legacy=true` AND HANDOFF.md body is a skeleton (all body sections contain only the section header — no non-empty content beyond section headers), execute the Index Synthesis Protocol inline (see `## Index Synthesis Protocol` above):
+
+1. Glob `sessions/` relative to the HANDOFF.md directory for files matching `*-legacy.md`.
+2. Follow the Index Synthesis Protocol Steps 1-9 over the located `_legacy: true` session file, with `handoff_md_path` as the write target.
+3. Re-read HANDOFF.md after synthesis completes before continuing to Step 3.
+
+**Do NOT dispatch a second agent.** This must be done inline within this agent's execution to avoid a second-agent dispatch from a sub-agent context.
+
+### Step 3: Parse Mandatory and Available skill lists.
+
+Read `## Skills — Mandatory` from HANDOFF.md. Collect skill names, one per line (strip the `- ` prefix and any trailing rationale text). Collect the first 3 in list order; if the list exceeds 3 entries, emit a warning line in the brief's `## Migration` section:
+
+```
+WARN: Mandatory list had N entries; capped at 3
+```
+
+(Use `first 3 in list order` — preserve the ordering as written, do not rank or re-sort.)
+
+Read `## Skills — Available` from HANDOFF.md. Collect all skill names with their associated rationale text (one skill per line). No cap on the collected list size; skills-router caps the output in Step 4.
+
+### Step 4: Run skills-router over Available.
+
+Call `Skill({skill: "skills-router"})` to load the skills-router skill content into context. Construct the matching context string:
+
+```
+Next best step: <body of HANDOFF.md ## Next best step>
+
+Current state: <body of HANDOFF.md ## Current state>
+
+Available skills: <comma-separated Available skill names>
+```
+
+Then apply skills-router's matching guidance to this intent string. Capture the `## High` section of the resulting match output; collect up to 3 skill names from that section.
+
+If skills-router returns no `## High` section or the response shape is malformed (missing expected headers), emit an empty `## Skills-Router High Tier` section in the brief and add a warning line to the brief's `## Migration` section:
+
+```
+WARN: skills-router returned no High tier
+```
+
+### Step 5: Determine Recommended Reading.
+
+Pick at most 2 per-session files for the new session owner to read directly. Selection criteria in order:
+
+1. The most recent session file (highest `started` timestamp in frontmatter across all `sessions/*.md`).
+2. Any session file referenced by an unresolved open question in HANDOFF.md `## Open questions (still open)` that is not already the most recent file.
+
+If only one file qualifies, emit one path. Do not pad to 2.
+
+### Step 6: Compose brief.
+
+Emit the 7-section markdown brief in this exact order. The first content line of the entire brief (before any section header) must be:
+
+```
+schema_version: 1
+```
+
+Then the seven sections in order:
+
+**`## Mandatory Skills`**
+One skill name per line, prefixed `- `. Up to 3 names (from Step 3).
+
+**`## Skills-Router High Tier`**
+Skills-router High-tier names, one per line prefixed `- `. Up to 3 names (from Step 4).
+
+**`## Available Skills`**
+Full Available list — all names collected in Step 3, one per line prefixed `- `, with rationale appended if present (format: `- {name} — {rationale}`).
+
+**`## Next Best Step`**
+Verbatim copy of HANDOFF.md `## Next best step` body. Do not summarize or paraphrase.
+
+**`## Current State Brief`**
+Agent-synthesized 2-4 sentence summary of current state, derived from HANDOFF.md `## Current state` plus the most recent session file's `## Done` section.
+
+**`## Recommended Reading`**
+At most 2 paths, one per line. Format:
+```
+- sessions/<file>.md — <one-line reason why this file is relevant>
+```
+
+**`## Migration`**
+If no migration occurred and no warnings were emitted in Steps 3-4: `none`.
+If `migrated_from_legacy=true`: `completed-from-legacy`.
+Plus any `WARN:` lines from Steps 3-4, one per line after the status word.
+
+### Step 7: Return brief as agent output.
+
+Emit only the brief text produced in Step 6. Do not add explanatory prose, preamble, or commentary outside the brief sections. The caller (`/pickup`) parses the brief verbatim using the D10 tolerant-parsing rules defined in the `## Brief Format Contract` section of this skill.
+
+### Acceptance criterion
+
+Any agent following only Steps 1-7 with the four variable inputs (`from_session_id`, `to_session_id`, `handoff_md_path`, `migrated_from_legacy`) must produce a brief sufficient for pickup to call `Skill()` and execute Next Best Step without requiring additional context from the user. This protocol is self-contained; the dispatch prompt supplies only the four variable inputs.
+
+## handoff-manager Agent Tool Constraints
+
+The `handoff-manager` agent currently has restricted tool access: `Read, Glob, Write, Skill` — **Bash is NOT in the list**. This creates a structural boundary between what the agent can dispatch.
+
+**Hard constraint in agent body:** "Never write to `sessions/*.md`. HANDOFF.md is your only write target."
+
+### Architectural Implications
+
+**Current pattern (supported):**
+- Agent reads session files and HANDOFF.md state via Read/Glob
+- Agent synthesizes and writes to HANDOFF.md only via Write
+- CLI (`scratch-memory` verbs) handles all mechanical work that requires Bash
+
+**Proposed pattern (would require tool changes):**
+- Agent dispatches Bash to call `scratch-memory` CLI verbs
+- Requires: Bash added to agent's tool list (ideally hook-gated to `scratch-memory *` only)
+- Requires: relaxing "never write sessions/*.md" constraint if agent gains ownership of per-session file writes
+
+### Tool Change Impact
+
+- **Tool grant addition:** hot-reloaded immediately on edit
+- **New agent creation:** requires session restart for `@` autocomplete to index the agent
+- **Existing agent tool edits:** land live (no restart needed)
+
+### Design Decision
+
+Per the `handoff-pickup-redesign` completion (April 2026): per-session files are **immutable post-write**, owned exclusively by the main session at write-time, and validated by the CLI. This boundary enforces a clear architectural split: the CLI handles I/O ceremony, the agent handles synthesis logic. Any redesign that moves file ownership to the agent also requires updating the body constraint and justifying the change against the immutability invariant.
 
 ## scratch-memory CLI Capability Audit
 
 The `scratch-memory` CLI exposes the `handoff` and `pickup` verb groups for session lifecycle management. Both handle workstream folder resolution and ownership transfer.
 
-`scratch-memory handoff list` prints the workstream inventory newest-first (consumed by `/pickup`'s interactive picker). `handoff commit` / `handoff validate` on a non-v3 folder print a JIT signpost pointing at `rewrite-pointer` and exit 0 without mutating the artifact. Only the `pickup` verb contract is detailed below.
+### Current Gap — RESOLVED
+
+**RESOLVED (handoff-sid-fix):** The architectural gap — inline `node -e` block in `/handoff` reimplementing PID resolution — is eliminated. The `/handoff` slash command now calls `write_session({session_id, body})` directly via MCP, passing the user-typed slug as `session_id`. No CLI verb delegation needed for session-path generation. The per-session file path is computed by the MCP server from the caller-supplied `session_id`; the slash command receives the path in the `write_session` return value.
 
 ### CLI verb: pickup
 
@@ -361,28 +463,7 @@ scratch-memory pickup <from-session-id> --to-session-id <to-session-id> [--json]
 Both arguments are required at the CLI boundary. The `--to-session-id = from-session-id` default is implemented in the `/pickup` slash command body, not in the CLI verb itself.
 
 **Exit code semantics:**
-- **Exit 1** — application-level pickup errors: `PICKUP_COLLISION`, `PICKUP_SOURCE_MISSING`, `PICKUP_INVALID_FROM_SESSION_ID`, `PICKUP_INVALID_TO_SESSION_ID`, `SESSION_ID_REQUIRED`, `PICKUP_IDEMPOTENT_SOURCE_NOT_EMPTY`. These are recoverable by correcting inputs or resolving the session identity conflict. `PICKUP_IDEMPOTENT_SOURCE_NOT_EMPTY` fires on the idempotent-repickup path when the source folder's `sessions/` still holds real session files — a reused slug could otherwise have its data silently deleted by the stale-source cleanup; resolve the slug conflict manually rather than retrying. `PICKUP_SOURCE_MISSING` fires specifically for a UUID-shaped from-id that resolves to no folder; a plain-slug miss instead surfaces the resolver's `no handoff found matching '<arg>'` error (from `resolveSessionArg` in `handoff.mjs`) — two different error paths for "source not found" depending on whether the from-id looked like a UUID or a slug. `resolveSessionArg` resolves pickup's `<from-session-id>` via UUID or exact-slug match only (`exact: true`) — the prefix-glob fallback available to the read-only verbs (`handoff list`/`path`/`validate`) is disabled for pickup, so a retired id that merely prefixes a live folder name (e.g. after a rename to `S-<id>-2`) now errors instead of silently resolving to that folder.
-- **Exit 2** — infrastructure error (OS-level rename failure). Not recoverable by retry. If the rename fails after the source file's frontmatter was already rewritten to claim the target `session_id`, pickup best-effort restores the source file to its pre-pickup content before exiting, so the folder isn't left claiming an owner it doesn't physically have.
+- **Exit 1** — application-level pickup errors: `PICKUP_COLLISION`, `PICKUP_SOURCE_MISSING`, `PICKUP_INVALID_FROM_SESSION_ID`, `PICKUP_INVALID_TO_SESSION_ID`, `SESSION_ID_REQUIRED`. These are recoverable by correcting inputs or resolving the session identity conflict.
+- **Exit 2** — infrastructure error (OS-level rename failure). Not recoverable by retry.
 
-On a v3 source folder, pickup regenerates the target's v3 pointer after a successful rename/takeover (best-effort; on regeneration failure the pointer remains ownership-claiming but non-v3 until `rewrite-pointer` is run manually). Legacy (V1) folders keep the documented V1→V2 two-hop — pickup does not jump a legacy source straight to v3.
-
-**`--json` flag:** emits the full JSON response to stdout (see `scratch-memory`'s [cli-verbs.md](../scratch-memory/cli-verbs.md) for the complete field list). Without `--json`, the verb prints a human-readable summary.
-
-## Sync Map
-
-The executable mechanics are inlined in the commands (hot-path token savings); this skill is the reference. These pairs must move together — drift here has caused real breakage before:
-
-| Contract | Normative copies |
-|---|---|
-| 10 per-session section headings | `EXPECTED_SESSION_SECTIONS` in `scratch-memory/scripts/handoff.mjs` ↔ `/handoff` Step 2 list ↔ Per-Session File Schema table here (enforced by PAR tests in `test-handoff.mjs`) |
-| Section semantics (cumulative vs delta) | `/handoff` Step 2 descriptions ↔ Per-Session File Schema table here (enforced by PAR3 in `test-handoff.mjs`) |
-| Open-question disposition pass (decision table, kernel-fallback rule, exit-code skip notes, STILL-OPEN acknowledgment) | `/handoff` Step 1b ↔ Handoff disposition pass (Step 1b) here (enforced by PAR4 in `test-handoff.mjs`) |
-| pickup exit-1 error codes | `/pickup` Step 5 ↔ `### CLI verb: pickup` here ↔ `pickup.mjs` |
-| Skills loading (flat list, cap 5) | `/pickup` Step 7 ↔ `## Skills Loading at /pickup` here |
-| Resolve-pass matcher (guard → ID → kernel precedence) | `cat-sessions.mjs`'s resolve pass inside `assembleSessions` ↔ `### Open-questions carry-forward` here |
-| `--max-cumulative-chars` flag: default (6000), validation, `--format full` only scope | `CAT_HELP` in `cat-sessions.mjs` ↔ `### cat-sessions contract` here ↔ `### Cumulative sections carry-forward` here |
-| Stale-question triage nudge (non-blocking, `age_sessions >= 3` threshold) | `/pickup` Step 6a ↔ `## Stale-Question Triage Nudge at /pickup` here ↔ `age_sessions` field in `### cat-sessions contract` here (enforced by PAR5 in `test-handoff.mjs`) |
-| Still-open question row format (`[q-XXXXXX]` id, kernel text, session link, `(age: N)` annotation; blank line follows the heading before the first row) | `openQuestionsBlock` in `cat-sessions.mjs` ↔ `### Open-questions carry-forward` here (enforced by CAT10a in `test-handoff.mjs`) |
-| `cat-sessions --format json` output shape (never truncated, unlike the capped `full` format) | `assembleSessions`'s return shape in `cat-sessions.mjs` ↔ `json` bullet under `### cat-sessions contract` here (enforced by CAT10c in `test-handoff.mjs`) |
-| Tasks row format, ordering, and age rule | `renderTasksBlock` in `scratch-memory/scripts/tasks.mjs` ↔ `/pickup` Step 6 ↔ `## Tasks` here (enforced by PAR6 in `test-handoff.mjs`) |
-| Handoff tasks-lint pass (read-only, non-blocking, exit-code notes) | `/handoff` Step 1c ↔ `## Tasks` here ↔ `scratch-memory tasks lint` (enforced by PAR7 in `test-handoff.mjs`) |
+**`--json` flag:** emits the full JSON response to stdout (see `scratch-memory` SKILL.md for the complete field list). Without `--json`, the verb prints a human-readable summary.

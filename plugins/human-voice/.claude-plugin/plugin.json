@@ -1,6 +1,6 @@
 {
   "name": "human-voice",
-  "version": "1.0.2",
+  "version": "1.0.1",
   "description": "Strips AI tells from text so emails, posts, and copy read as genuinely human-authored",
   "author": {
     "name": "Richard Adleta",

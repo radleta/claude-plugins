@@ -1,23 +1,9 @@
 ---
 name: code-verification
-description: "Unified code quality and requirements verification with 13 detection categories (10 core + 3 contract-artifact), traceability against idea.md's Contracts & Acceptance, and AI-specific pattern detection. Use when reviewing code changes for quality issues, convention violations, over-engineering, requirements coverage, or decision conformance — even for small diffs, even when the changes are markdown only."
+description: "Unified code quality and requirements verification with 13 detection categories (10 core + 3 spec-artifact), traceability matrix, and AI-specific pattern detection. Use when reviewing code changes for quality issues, convention violations, over-engineering, requirements coverage, or plan-decision conformance — even for small diffs."
 ---
 
 # Code Verification Methodology
-
-## Contract
-
-This skill supplies the *categories* — what to look for. The `reviewer-contract`
-skill supplies the *conduct* — kill-mandate framing, quote-plus-consequence
-findings, the `would-ship-bug | real-minor | nit` severity scale, clean context,
-the mandatory dimensions-checked-clean list, and the undeliverable-vs-undecided
-split. Load both. Where this skill and the reviewer contract appear to differ on
-how a finding is reported, the reviewer contract wins.
-
-**Binding document.** The authority on what the changes had to achieve is
-`idea.md` — its `## Contracts & Acceptance` section for behavior and its
-`## Decisions` table for the choices the implementation must not contradict.
-There is no separate spec document.
 
 ## AI Awareness
 
@@ -102,40 +88,35 @@ Backwards compatibility shims (old interface preserved alongside new) without
 an approved decision in the plan's decision table.
 Extension by copy-paste rather than by modifying the original.
 
-### decision-conformance (HIGH)
-Code that contradicts a decision recorded in `idea.md`'s `## Decisions` table.
-**When active:** whenever the dispatch supplies a binding document. Read that document's `## Decisions` table.
+### plan-decision-conformance (HIGH)
+Code that contradicts decisions recorded in the plan's decision table.
+**When active:** Only when a plan with decisions exists (REVIEW_DEPTH = light, plan path provided). Read `decisions.md` or `decisions/` from the plan path.
 
 Checklist:
-- Each decision's "Decision" cell is reflected in the implementation — code doesn't contradict the ruling
+- Each plan decision's "Choice" is reflected in the implementation — code doesn't contradict the selected option
 - Data models match decision specifications (types, field names, storage formats match what decisions describe)
 - Architectural approach matches decisions (extend vs create, which file to modify, integration pattern)
-- No implementation of a rejected alternative (code implements the approach the Decisions table ruled against)
+- No implementation of a rejected alternative (code implements Option B when decision chose Option A)
 
 **Scope boundary:** Does NOT check structural completeness (completeness-verifier's job). Only checks: given that the code exists, does it match what the decisions said to build?
 
-### Contract Artifact Categories
+### Spec Artifact Categories
 
-These three apply against `idea.md`'s `## Contracts & Acceptance` section — the
-interface contracts between ownership units and the acceptance outcomes stated
-there. Skip a category when the binding document states nothing of that kind,
-and say so in `## Dimensions Checked` rather than omitting the line.
+**contract-conformance** (HIGH): Method implementation violates its spec contract
+- Every method with a `requires` clause has corresponding input validation that rejects violating inputs — not silently proceeds
+- Every `ensures` clause is achievable from every valid input path — trace all paths through the method
+- Thrown exception types match `throws` clauses exactly — no catching a declared exception and re-throwing as generic
+- Anti-pattern: reading the `requires` clause and implementing only the happy path
 
-**contract-conformance** (HIGH): Implementation violates an interface contract the binding document declares
-- Every declared boundary (module seam, CLI/API shape, data format, file layout) matches what the code actually produces or consumes
-- Where a contract states a precondition, the code rejects violating input rather than silently proceeding
-- Where a contract states a resulting state, that state is reachable from every valid input path — trace the paths
-- Anti-pattern: reading the contract and implementing only the happy path
-
-**invariant-preservation** (HIGH): A stated invariant has no enforcement in code
-- Each invariant the binding document asserts has at least one enforcement point (runtime check, guard clause, or documented structural enforcement)
+**invariant-preservation** (HIGH): Spec invariants have no enforcement in code
+- Each spec invariant has at least one enforcement point (runtime assertion, guard clause, or documented structural enforcement)
 - For security-relevant invariants, verify absence-of-violation across all relevant call sites
-- Anti-pattern: invariants that appear in comments or in the design document but have no executable enforcement
+- Anti-pattern: invariants that appear in comments but have no executable enforcement
 
-**acceptance-trace** (HIGH): Code does not produce what an Acceptance Outcome states
-- For each acceptance outcome expressed as a real-input observable behavior, the code produces the stated behavior for the stated input
-- For each stated failure path, the code fails the stated way (right exit code, right error, right state) — not a different failure, not a silent success
-- Anti-pattern: code satisfying the prose description of an outcome while producing a different observable result
+**example-trace** (HIGH): Code produces different output than spec examples state
+- For each `✓` Concrete Example in spec, code produces the stated output for the stated input
+- For each `✗` Concrete Example, code throws the stated exception type (not different exception, not success return)
+- Anti-pattern: code satisfying prose description but producing different value than the example
 
 ## Out of Scope
 
@@ -148,15 +129,15 @@ and say so in `## Dimensions Checked` rather than omitting the line.
 ### Step 1: Gather Context (SINGLE PASS)
 
 1. Read project instruction files (CLAUDE.md, .claude/CLAUDE.md, .claude/rules/*.md, README.md) to extract project conventions, coding standards, file naming rules, and build/test/lint commands. Use documented patterns as the authority.
-2. Read the dispatch prompt's inputs: which files changed, the coder report path(s), and the binding document path. Read the binding document directly — never a summary of it. Do NOT read the session transcript (reviewer contract, clause 4).
+2. Read session context (provided in task prompt): what was implemented, which files changed, why, and any plan path or acceptance criteria. If a plan path is mentioned, read the plan for structured requirements.
 3. List all files created or modified (from session context)
 4. Read all changed files (SINGLE PASS — these reads serve both requirements and quality analysis)
 5. Identify project conventions (from instruction files first, supplemented by examining existing code near changed files)
-6. Extract the requirements from the binding document (contracts, acceptance outcomes, decisions) — not from conversation summary
+6. Extract all requirements from context (plan steps, conversation summary, acceptance criteria)
 
 ### Step 2: Requirements Analysis
 
-1. Read the binding document's `## Decisions` table for decision-conformance checks and its `## Contracts & Acceptance` section for the contract-artifact categories
+1. If a plan path with decisions is provided, read `decisions.md` or `decisions/` for plan-decision-conformance checks
 2. For each requirement: find corresponding implementation
 3. For each acceptance criterion: verify it's satisfied
 4. Check for context drift (implementation vs intent)
@@ -172,30 +153,135 @@ and say so in `## Dimensions Checked` rather than omitting the line.
 
 ### Step 4: Unified Verdict
 
-Label every finding `would-ship-bug`, `real-minor`, or `nit` per the reviewer
-contract's severity scale, then set status: `FINDINGS` when at least one
-`would-ship-bug` or `real-minor` fired, `APPROVED` otherwise — a verdict
-carrying only nits is APPROVED, and nits are recorded rather than iterated on.
-
-Write the `## Dimensions Checked` list either way. On an APPROVED verdict it is
-the only evidence the review was performed; a clean verdict without it is a
-rubber stamp.
-
-Emit no grade, score, or percentage.
+Determine APPROVED or ISSUES_FOUND with combined report.
 
 **Key principle:** Read files ONCE. Analyze TWICE (requirements + quality). Report ONCE.
 
 ## Output Format
 
-The literal headings and the MCP `role`/`status` values are owned by the
-dispatching agent's `<verdict-body-structure>`. The mandatory content is owned by
-the `reviewer-contract` skill: every finding carries a location, a verbatim quote,
-a concrete consequence, and exactly one severity label; every verdict carries a
-`## Dimensions Checked` list; anything the changes deliberately leave open goes
-under `## Undecided` rather than being reported as a finding.
+```
+## Code Verification Report
 
-Traceability is reported per requirement (requirement → implementation location →
-met / not-met / partial). Quality findings are grouped by detection category
-(almost-right, over-engineering, convention-violations, code-smells,
-codebase-alignment, decision-conformance, and the three contract-artifact
-categories) with `file:line` citations.
+**VERDICT: [APPROVED|ISSUES_FOUND]**
+
+---
+
+### Scope Summary
+**Files examined:**
+[List of files reviewed]
+
+**Project conventions identified:**
+[Key conventions discovered from existing code]
+
+---
+
+### Requirements Coverage
+
+**Traceability Matrix:**
+
+| # | Requirement | Status | Implementation | Notes |
+|---|-------------|--------|----------------|-------|
+| 1 | [Requirement] | ✅ MET / ❌ NOT MET / ⚠️ PARTIAL | [file:function] | [Details] |
+
+**Context Drift:** [None detected / Details of drift]
+**Scope Creep:** [None detected / Details of unrequested additions]
+
+---
+
+### Code Quality
+
+**✅ Good Patterns Found:**
+- [Pattern]: [Where observed and why it's good]
+
+**❌ Issues Found:**
+
+**Almost-Right Patterns:**
+| File | Line | Code | Issue | Fix |
+|------|------|------|-------|-----|
+
+**Over-Engineering:**
+| File | Line | Pattern | Issue | Simplification |
+|------|------|---------|-------|----------------|
+
+**Convention Violations:**
+| File | Line | Violation | Convention | Fix |
+|------|------|-----------|-----------|-----|
+
+**Code Smells:**
+| File | Line | Smell | Severity | Recommendation |
+|------|------|-------|----------|----------------|
+
+---
+
+### Recommendations
+
+**Critical (must fix):**
+1. [Specific action with file:line]
+
+**High Priority (should fix):**
+1. [Specific action with file:line]
+
+**Medium Priority (consider):**
+1. [Specific action with file:line]
+
+---
+
+### Summary
+
+**Overall Assessment:**
+[Detailed paragraph explaining both requirements status and code quality]
+
+**Requirements Coverage:** [X of Y] requirements met ([Z%])
+**Quality Issues:** [count] critical, [count] high, [count] medium
+**Recommendation:** [PROCEED to security review / ADDRESS issues first]
+```
+
+## Examples
+
+### ISSUES_FOUND Example
+
+```
+## Code Verification Report
+
+**VERDICT: ISSUES_FOUND**
+
+### Requirements Coverage
+
+| # | Requirement | Status | Implementation | Notes |
+|---|-------------|--------|----------------|-------|
+| 1 | Profile with avatar, name, bio | ✅ MET | UserProfile.tsx:15-45 | All fields present |
+| 2 | Edit mode toggle | ✅ MET | UserProfile.tsx:8 | useState for editMode |
+| 3 | Validate bio length | ❌ NOT MET | Not found | No validation exists |
+| 4 | Save to backend API | ⚠️ PARTIAL | UserProfile.tsx:52 | Local only, no API call |
+
+### Code Quality
+
+**Over-Engineering:**
+| File | Line | Pattern | Issue | Simplification |
+|------|------|---------|-------|----------------|
+| src/utils/validator.ts | 15 | `AbstractValidatorFactory` | Factory pattern for single validator | Use direct function |
+
+**Requirements Coverage:** 2 of 4 met (50%)
+**Quality Issues:** 0 critical, 2 high, 0 medium
+**Recommendation:** ADDRESS issues first
+```
+
+### APPROVED Example
+
+```
+## Code Verification Report
+
+**VERDICT: APPROVED**
+
+### Requirements Coverage
+
+| # | Requirement | Status | Implementation | Notes |
+|---|-------------|--------|----------------|-------|
+| 1 | User authentication | ✅ MET | src/auth.ts:authenticate() | JWT-based |
+| 2 | Rate limiting | ✅ MET | src/middleware/rateLimit.ts | 100 req/min |
+| 3 | Session management | ✅ MET | src/auth.ts:createSession() | 24hr expiry |
+
+**Requirements Coverage:** 3 of 3 met (100%)
+**Quality Issues:** 0 critical, 0 high, 0 medium
+**Recommendation:** PROCEED to security review
+```

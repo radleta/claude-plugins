@@ -54,12 +54,52 @@ Run fingerprints 11-13 when a spec file path is provided alongside the changed f
 
 Steps with status containing "SUPERSEDED" are skipped entirely — not checked, not reported. Match pattern: `COMPLETED` followed by `SUPERSEDED by` in the step's status field or progress table.
 
-## Verdict Determination
+## Status Protocol
+
+The **first line** of output MUST be the verdict in this exact format:
+
+```
+**Verdict:** COMPLETE
+```
+or
+```
+**Verdict:** INCOMPLETE
+```
+
+Callers parse this line to determine gate pass/fail. No other text before the verdict.
 
 **COMPLETE** = all fingerprints PASS (or only plan-mode fingerprints skipped due to no plan).
 **INCOMPLETE** = any fingerprint FAIL.
 
-Output format is owned by the dispatching agent's contract.
+## Output Format
+
+```
+**Verdict:** COMPLETE | INCOMPLETE
+
+## Completeness Verification Report
+
+### Plan Conformance (if plan provided)
+| # | Fingerprint | Status | Details |
+|---|------------|--------|---------|
+| 1 | STRUCTURAL-DRIFT | PASS/FAIL | [specifics] |
+| 2 | UNEXPECTED-FILE | PASS/FAIL | [specifics] |
+| 3 | UNCHECKED-CRITERIA | PASS/FAIL | [specifics] |
+| 4 | MISSING-FILE | PASS/FAIL | [specifics] |
+| 5 | UNMODIFIED-FILE | PASS/FAIL | [specifics] |
+| 6 | SKIPPED-STEP | PASS/FAIL | [specifics] |
+
+### Stub Detection
+| # | Fingerprint | Status | Details |
+|---|------------|--------|---------|
+| 7 | STUB-MARKER | PASS/FAIL | [file:line if found] |
+| 8 | DEFERRAL-LANGUAGE | PASS/FAIL | [file:line if found] |
+| 9 | TRUNCATION | PASS/FAIL | [file:line if found] |
+| 10 | STRUCTURAL-SHORTCUT | PASS/FAIL | [file:line if found] |
+
+### Summary
+**Blocking Issues:** [count]
+**Gate Signal:** COMPLETE — proceed to code review | INCOMPLETE — return to implementation
+```
 
 ## Workflow
 
@@ -71,7 +111,7 @@ Output format is owned by the dispatching agent's contract.
 6. Check for skipped steps (fingerprint 6)
 7. Grep changed files for stub patterns (fingerprints 7-10)
 8. Compile report with per-fingerprint PASS/FAIL
-9. Determine the verdict per `## Verdict Determination` above and report the per-fingerprint results to the dispatching agent
+9. Output verdict as first line, then full report
 
 ## No-Plan Fallback
 

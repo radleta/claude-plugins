@@ -16,7 +16,6 @@ import { execFileSync } from 'node:child_process';
 import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { extractGoalOneLiner } from './handoff.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -54,109 +53,45 @@ export function runCli(argv, opts = {}) {
 }
 
 /**
- * Scan a handoff body for related projects: `scratch/<seg>/` tokens, excluding `S-*`.
- * @param {string} body
- * @returns {string[]} unique sorted segment names
- */
-function extractRelatedProjectsFromBody(body) {
-  const pattern = /scratch\/([^/\s]+)\//g;
-  const set = new Set();
-  let m;
-  while ((m = pattern.exec(body)) !== null) {
-    const seg = m[1];
-    if (!seg.startsWith('S-') && seg !== '.' && seg !== '..') set.add(seg);
-  }
-  return Array.from(set).sort();
-}
-
-/**
- * Compose a VALID committed V1 (schema_version: 1) HANDOFF.md fixture directly.
- *
- * The retired `handoff commit` V1/V2 write path is gone — committing a non-v3 folder is
- * now a no-op redirect — so this helper writes the committed file in-process instead of
- * shelling out to the CLI. It preserves the pickup-facing contract: schema_version: 1
- * frontmatter (exercising the kept pickup V1→V2 migration), first_written carried across
- * writes, related_projects extracted from the body, and a `.bak/` snapshot on the 2nd+
- * write so the rename-carries-bak pickup test stays green.
- *
+ * Execute the handoff flow: fixture setup (mkdir + write body) → commit.
+ * Creates scratch/S-{sessionId}/ and HANDOFF.md directly (no `handoff init` — verb deleted in Step 4).
+ * Preserves existing frontmatter when present, so commit recovers first_written across writes.
  * @param {{ sessionId: string, body: string, env?: object, cwd?: string }} opts
  * @returns {{ commitExitCode, commitStderr, commitStdout, handoffPath, json }}
- *
- * NOTE: `sessions/` is created unconditionally, making the fixture folder shape
- * `inconsistent` (sessions/ present, no `## Sessions` heading). Pickup's V1-heading
- * refinement block handles this by re-classifying it as `legacy` before migrating.
- * Callers passing a body without the 10 exact V1 headings would receive
- * `INCONSISTENT_FOLDER_STATE` rather than a legacy migration.
  */
-export function runHandoffFlow({ sessionId, body, cwd }) {
+export function runHandoffFlow({ sessionId, body, env, cwd }) {
   const projectRoot = cwd || process.cwd();
   const folderPath = join(projectRoot, 'scratch', `S-${sessionId}`);
   const handoffPath = join(folderPath, 'HANDOFF.md');
   const sessionsDirPath = join(folderPath, 'sessions');
-  const bakDir = join(folderPath, '.bak');
 
-  // Create folder structure (no `handoff init` — verb deleted in an earlier cycle).
+  // Step 1: create folder structure
   mkdirSync(sessionsDirPath, { recursive: true });
 
-  // Preserve first_written from a prior committed file; snapshot prior content to .bak/
-  // (mirrors the retired commit's D19 baseline so the pickup .bak round-trip test passes).
-  let firstWritten = null;
+  // Step 2: write body, preserving any existing frontmatter.
+  // On second+ writes, the file already has frontmatter from a prior commit.
+  // Preserving it allows commit to recover first_written and session_chain.
+  let existingFrontmatter = '';
   if (existsSync(handoffPath)) {
-    const priorContent = readFileSync(handoffPath, 'utf-8');
-    const fwMatch = priorContent.match(/^first_written:\s*(.+)$/m);
-    if (fwMatch) firstWritten = fwMatch[1].trim();
-    try {
-      mkdirSync(bakDir, { recursive: true });
-      const bakTs = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
-      const bakPath = join(bakDir, `HANDOFF-${bakTs}.md.bak`);
-      if (!existsSync(bakPath)) writeFileSync(bakPath, priorContent, 'utf-8');
-    } catch { /* non-blocking, mirrors commit's bak behavior */ }
+    const existing = readFileSync(handoffPath, 'utf-8');
+    const fmEnd = existing.indexOf('\n---\n');
+    if (existing.startsWith('---\n') && fmEnd !== -1) {
+      existingFrontmatter = existing.slice(0, fmEnd + 5); // include trailing '\n---\n'
+    }
   }
+  writeFileSync(handoffPath, existingFrontmatter + body, 'utf-8');
 
-  const now = new Date().toISOString();
-  if (!firstWritten) firstWritten = now;
-
-  let gitBranch = 'unknown';
-  try {
-    gitBranch = execFileSync('git', ['symbolic-ref', '--short', 'HEAD'], {
-      cwd: projectRoot, encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'],
-    }).trim() || 'unknown';
-  } catch { /* detached HEAD or no git — leave 'unknown' */ }
-
-  const related = extractRelatedProjectsFromBody(body);
-  const goal = extractGoalOneLiner(body).replace(/[\r\n]/g, ' ');
-
-  const fmLines = [
-    '---',
-    `session_id: ${sessionId}`,
-    `first_written: ${firstWritten}`,
-    `last_updated: ${now}`,
-    `git_branch: ${gitBranch}`,
-    `session_name: ${sessionId}`,
-  ];
-  if (related.length > 0) {
-    fmLines.push('related_projects:');
-    for (const rp of related) fmLines.push(`  - ${rp}`);
-  } else {
-    fmLines.push('related_projects: []');
+  // Step 3: commit
+  const commitResult = runCli(['handoff', 'commit', sessionId, '--json'], { env, cwd });
+  let json = null;
+  if (commitResult.stdout) {
+    try { json = JSON.parse(commitResult.stdout); } catch { /* ignore */ }
   }
-  fmLines.push(`goal: ${goal}`, 'schema_version: 1', '---', '');
-  writeFileSync(handoffPath, fmLines.join('\n') + body, 'utf-8');
-
-  const json = {
-    path: handoffPath,
-    session_id: sessionId,
-    first_written: firstWritten,
-    last_updated: now,
-    sections_validated: 10,
-    related_projects: related,
-    git_branch: gitBranch,
-  };
 
   return {
-    commitExitCode: 0,
-    commitStderr: '',
-    commitStdout: JSON.stringify(json),
+    commitExitCode: commitResult.exitCode,
+    commitStderr: commitResult.stderr,
+    commitStdout: commitResult.stdout,
     handoffPath,
     json,
   };

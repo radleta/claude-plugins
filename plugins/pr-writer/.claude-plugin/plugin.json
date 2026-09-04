@@ -1,6 +1,6 @@
 {
   "name": "pr-writer",
-  "version": "1.0.2",
+  "version": "1.0.1",
   "description": "Framework for creating well-structured pull request descriptions",
   "author": {
     "name": "Richard Adleta",

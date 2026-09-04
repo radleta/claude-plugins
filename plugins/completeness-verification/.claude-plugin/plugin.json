@@ -1,6 +1,6 @@
 {
   "name": "completeness-verification",
-  "version": "1.0.3",
+  "version": "1.0.2",
   "description": "Structural completeness methodology with named fingerprint detection",
   "author": {
     "name": "Richard Adleta",

@@ -1,7 +1,6 @@
 ---
 name: estimation-expert
 description: "Calibrated effort estimation for AI-augmented development — classifies work by type, accounts for parallel Claude sessions (6-8), CDD front-loading, and discovery risk. Use when estimating how long something will take, planning sprint scope, sizing milestones, predicting completion dates, or when asked 'how long will this take' — even for quick tasks or rough guesses."
-wiki: true
 ---
 
 <role>
@@ -28,14 +27,8 @@ wiki: true
   </scope>
 </role>
 
-**No install, no tooling.** The formula, the profiles and the checklists are prose, so they work
-anywhere Claude runs — Claude Cowork or any packaged copy included. Calibrating velocity from git
-history is the sharpest input where a repository is at hand; without one, use the default velocity
-profile, which needs no repository.
-
 ## Pages
 
-<!-- BEGIN:PAGES -->
 - [How the User Works](how-user-works.md) — How the user runs 6-8 parallel Claude sessions and what that means for velocity and parallelism
 - [Work Type Classification](work-type-classification.md) — Classification of work into 6 types with velocity multipliers and parallelizability ratings
 - [Estimation Formula](estimation-formula.md) — The core estimation formula: base hours × type multiplier ÷ parallelism factor × discovery risk ÷ hours per day
@@ -47,7 +40,7 @@ profile, which needs no repository.
 - [Recalibration](recalibration.md) — When and how to recalibrate the velocity baseline: weekly during project-update, after workflow changes, or when estimates diverge >30% from actuals
 - [Anti-Patterns](anti-patterns.md) — 6 anti-patterns to avoid: no type classification, ignoring discovery risk, equal Claude session assumption, no critical path, single number estimates, and CDD box-counting
 - [Personal Velocity Baseline](profiles/personal.md) — Personal velocity baseline with weekly calibration data: multipliers by work type, discovery risk multipliers, and velocity tiers from observed work
-<!-- END:PAGES -->
 
 ## Meta
+- [Operations Log](log.md) — Timestamped wiki operations log (ingest, lint, query filings)
 - [Schema](schema.md) — Wiki conventions and page-type definitions

@@ -64,26 +64,19 @@ Usage:
   ${CMD} --version, -v                     Show version
 
 Verb groups:
-  handoff          commit, path, validate, list — manage HANDOFF.md
-  pickup           Transfer a prior session's folder to the current session
-  register         Add, remove, status for scratch-memory MCP
-  cat-sessions     Assemble/inspect session log files newest-first with char budget
-  rewrite-pointer  Rewrite the thin HANDOFF.md pointer from the assembled session log
-  tasks            list, lint — workstream task backlog and issues-corpus frontmatter lint
-  epics            frontier — ready spikes of an epic in the scratch/issues/ corpus
+  handoff    commit, path, template, validate, list — manage HANDOFF.md
+  pickup     Transfer a prior session's folder to the current session
+  register   Add, remove, status for scratch-memory MCP
 
 Pickup subcommands:
-  pickup <from-session-id> --to-session-id <to-session-id> [--json]   Transfer prior session folder to current session
+  pickup <session> [--json]               Transfer prior session folder to current session
 
 Handoff subcommands:
-  handoff commit [ID] [--json]            No-op for v3 pointers; legacy folders redirect to rewrite-pointer
+  handoff commit [ID] [--json]            Validate strict + regenerate frontmatter
   handoff path [ID]                       Print absolute path to HANDOFF.md
-  handoff validate [ID] [--loose] [--json] Schema validation (v3 strict; --loose for hook use)
+  handoff template                        Print fresh 10-section template body
+  handoff validate [ID] [--loose] [--json] Schema validation (--loose for hook use)
   handoff list [--limit N] [--json]       List recent handoffs sorted by last_updated
-
-Tasks subcommands:
-  list <session-dir>   Print the '## Tasks' block for a workstream
-  lint <path>          Lint a file or directory (schema auto-detected from the path)
 
 Exit codes:
   0  success
@@ -140,26 +133,6 @@ async function main() {
     }
     case 'register': {
       const mod = await import('./register.mjs');
-      await mod.dispatch(remaining);
-      break;
-    }
-    case 'cat-sessions': {
-      const mod = await import('./cat-sessions.mjs');
-      await mod.dispatch(remaining);
-      break;
-    }
-    case 'rewrite-pointer': {
-      const mod = await import('./rewrite-pointer.mjs');
-      await mod.dispatch(remaining);
-      break;
-    }
-    case 'tasks': {
-      const mod = await import('./tasks.mjs');
-      await mod.dispatch(remaining);
-      break;
-    }
-    case 'epics': {
-      const mod = await import('./epics.mjs');
       await mod.dispatch(remaining);
       break;
     }

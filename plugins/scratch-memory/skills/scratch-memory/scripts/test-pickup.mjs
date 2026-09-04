@@ -9,7 +9,7 @@
 //     PID file as toSessionId before calling the pickup CLI — so the child's PID matches.
 //   - from_session_id is passed as the positional arg to `pickup`.
 
-import { existsSync, readFileSync, readdirSync, mkdirSync, writeFileSync, chmodSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { deepStrictEqual, strictEqual, ok } from 'node:assert';
 import process from 'node:process';
@@ -17,7 +17,6 @@ import process from 'node:process';
 import { runCli, runHandoffFlow, runPickup } from './test-driver.mjs';
 import { createFixture, writePidFile, parseFrontmatter, validBody } from './test-fixtures.mjs';
 import { parseMandatory, parseAvailable } from './pickup.mjs';
-import { rewritePointer } from './rewrite-pointer.mjs';
 
 const argv = process.argv.slice(2);
 if (argv.includes('--help') || argv.includes('-h')) {
@@ -65,47 +64,6 @@ process.on('unhandledRejection', (reason) => {
 function seedHandoff(sessionId, fx) {
   const env = { ...process.env, CLAUDE_SESSIONS_DIR: fx.sessionsDir };
   return runHandoffFlow({ sessionId, body: validBody(), env, cwd: fx.projectRoot });
-}
-
-// --- Helpers for FIX 1 tests: seed a genuine v3-pointer source via a real per-session file
-// + rewritePointer, rather than hand-typing a v3 pointer body that could drift from the real
-// renderer (see rewrite-pointer.mjs renderPointer()).
-function writeV3SessionFile(sessionsDir, isoTs, opts = {}) {
-  const tsName = isoTs.replace(/:/g, '-').replace(/\.(\d+)Z$/, '-$1Z');
-  const shortid = opts.shortid ?? 'deadbeef';
-  const filename = `${tsName}-${shortid}.md`;
-  const fmLines = [
-    '---',
-    `session_id: ${opts.sessionId ?? 'test'}`,
-    `started: ${isoTs}`,
-    `ended: ${isoTs}`,
-    'session_name: ',
-    `goal_at_time: ${opts.goal ?? 'Test goal'}`,
-    'parent_handoff_state: ',
-    '---',
-  ];
-  const bodyLines = [
-    '', '## Goal', '', opts.goal ?? 'Test goal', '',
-    '## Next best step', '', opts.nbs ?? 'Test NBS', '',
-    '## Done', '', opts.done ?? '- Did the thing', '',
-    '## Decisions made', '', '## What to avoid', '',
-    '## Open questions raised', '', '## Open questions resolved', '',
-    '## Key files & artifacts', '', '## Skills used', '', '## Projects', '',
-  ];
-  writeFileSync(join(sessionsDir, filename), fmLines.join('\n') + '\n' + bodyLines.join('\n'), 'utf-8');
-  return filename;
-}
-
-// Seed scratch/S-{sessionId}/ as a genuine v3 pointer: one real session file + rewritePointer.
-function seedV3Source(fx, sessionId) {
-  const folderPath = join(fx.projectRoot, 'scratch', `S-${sessionId}`);
-  const sessionsPath = join(folderPath, 'sessions');
-  mkdirSync(sessionsPath, { recursive: true });
-  writeV3SessionFile(sessionsPath, '2026-01-01T10:00:00.000Z', {
-    sessionId, shortid: 'v3seed01', goal: 'Seed v3 source.', nbs: 'Verify v3 regeneration.',
-  });
-  rewritePointer(resolve(folderPath));
-  return folderPath;
 }
 
 (async () => {
@@ -164,84 +122,6 @@ function seedV3Source(fx, sessionId) {
       deepStrictEqual(sessionChain, [idA], `frontmatter session_chain === [${idA}]`);
       strictEqual(fields.first_written, firstWritten, 'frontmatter first_written preserved');
     } finally {
-      fx.cleanup();
-    }
-  });
-
-  // F2: concurrent-pickup rename-failure rollback — if renameSync throws after fromFile has
-  // already been mutated to claim session_id: to_session_id, best-effort restore fromFile to its
-  // pre-pickup content rather than leaving a semantically inconsistent file (frontmatter claims
-  // the new owner while the folder is still physically named S-{from_session_id}).
-  await runTest('F2: rename failure — fromFile restored to priorContent on renameSync failure', async () => {
-    const isRoot = typeof process.getuid === 'function' && process.getuid() === 0;
-    if (isRoot) {
-      process.stdout.write('(skipped: running as root; chmod does not restrict root)\n');
-      return;
-    }
-    const fx = createFixture();
-    const scratchRoot = join(fx.projectRoot, 'scratch');
-    try {
-      const idA = 'f2-src-001';
-      const idB = 'f2-dst-001';
-
-      // V2-shaped source (skips legacy migration) so the captured priorContent is deterministic.
-      const sourceFolder = join(scratchRoot, `S-${idA}`);
-      mkdirSync(join(sourceFolder, 'sessions'), { recursive: true });
-      const v2Handoff = [
-        '---',
-        `session_id: ${idA}`,
-        'first_written: 2026-03-01T00:00:00.000Z',
-        'last_updated: 2026-03-01T00:00:00.000Z',
-        'git_branch: main',
-        'session_name: null',
-        'related_projects: []',
-        'goal: F2 rollback test.',
-        'schema_version: 2',
-        '---',
-        '## Goal', 'F2 rollback test.', '',
-        '## Current state', '', '',
-        '## Next best step', '', '',
-        '## Active decisions', '',
-        '## Active what-to-avoid', '',
-        '## Open questions (still open)', '',
-        '## Skills — Mandatory', '',
-        '## Skills — Available', '',
-        '## Projects', '',
-        '## Sessions', '',
-      ].join('\n');
-      writeFileSync(join(sourceFolder, 'HANDOFF.md'), v2Handoff, 'utf-8');
-      const priorContent = readFileSync(join(sourceFolder, 'HANDOFF.md'), 'utf-8');
-
-      // Remove write permission on scratchRoot so renameSync(fromFolder, toFolder) fails with
-      // EACCES — fromFile itself stays writable, so the frontmatter mutation write still
-      // succeeds first, reproducing the exact TOCTOU window F2 closes.
-      chmodSync(scratchRoot, 0o555);
-      const actualMode = statSync(scratchRoot).mode & 0o777;
-      if (actualMode !== 0o555) {
-        chmodSync(scratchRoot, 0o755);
-        process.stdout.write('(skipped: chmod did not take effect on this filesystem)\n');
-        return;
-      }
-
-      let result;
-      try {
-        result = runPickup(idA, idB, {
-          sessionsDir: fx.sessionsDir,
-          cwd: fx.projectRoot,
-          projectRootCwd: resolve(fx.projectRoot),
-        });
-      } finally {
-        chmodSync(scratchRoot, 0o755); // restore before assertions read the folder
-      }
-
-      strictEqual(result.exitCode, 2, `pickup exits 2 on rename failure (stderr: ${result.stderr})`);
-      ok(result.stderr.includes('PICKUP_RENAME_FAILED'), `stderr mentions PICKUP_RENAME_FAILED (stderr: ${result.stderr})`);
-
-      ok(existsSync(sourceFolder), 'source folder still exists (rename failed, no takeover)');
-      const afterContent = readFileSync(join(sourceFolder, 'HANDOFF.md'), 'utf-8');
-      strictEqual(afterContent, priorContent, 'fromFile restored to pre-pickup content after failed rename');
-    } finally {
-      try { chmodSync(scratchRoot, 0o755); } catch {}
       fx.cleanup();
     }
   });
@@ -642,93 +522,6 @@ function seedV3Source(fx, sessionId) {
       strictEqual(afterContent, originalContent, 'target content unchanged by idempotent pickup');
 
       ok(!existsSync(sourceFolder), 'source folder removed by idempotent pickup');
-    } finally {
-      fx.cleanup();
-    }
-  });
-
-  // F3: idempotent-pickup rmSync guard — refuses to delete a source folder that holds real,
-  // independent session data (a reused slug with a populated sessions/ log), instead of blindly
-  // wiping it because the TARGET's session_chain happens to contain from_session_id.
-  //
-  // NOTE: the target folder must be created at S-{idNew} exactly (not a separately-named
-  // session-name folder) — pickup resolves toFolder strictly from --to-session-id post-redesign
-  // (no PID-file name lookup), so existsSync(toFolder) only trips the collision/idempotent branch
-  // when the folder is literally named after to_session_id.
-  await runTest('F3: idempotent pickup refuses to delete source holding real session data', async () => {
-    const fx = createFixture();
-    try {
-      const idOld = 'f3-src-001';
-      const idNew = 'f3-dst-001';
-      const targetFolder = join(fx.projectRoot, 'scratch', `S-${idNew}`);
-      const sourceFolder = join(fx.projectRoot, 'scratch', `S-${idOld}`);
-
-      // Target already belongs to us (idempotent branch trigger).
-      mkdirSync(targetFolder, { recursive: true });
-      const ours = [
-        '---',
-        `session_id: ${idNew}`,
-        'first_written: 2026-01-01T00:00:00.000Z',
-        'last_updated: 2026-01-01T01:00:00.000Z',
-        'git_branch: main',
-        'session_name: null',
-        'related_projects: []',
-        'session_chain:',
-        `  - ${idOld}`,
-        'goal: Idempotent guard test.',
-        'schema_version: 1',
-        '---',
-        validBody(),
-      ].join('\n');
-      writeFileSync(join(targetFolder, 'HANDOFF.md'), ours, 'utf-8');
-      const originalContent = readFileSync(join(targetFolder, 'HANDOFF.md'), 'utf-8');
-
-      // Source folder is a V2 shape (skips migration) with a REAL session file in sessions/ —
-      // the reused-slug scenario: this is NOT the inert stale duplicate F3 must still delete.
-      mkdirSync(join(sourceFolder, 'sessions'), { recursive: true });
-      writeFileSync(join(sourceFolder, 'sessions', '2026-02-01T00-00-00-000Z-realdata.md'), '# real session data\n', 'utf-8');
-      const v2Source = [
-        '---',
-        `session_id: ${idOld}`,
-        'first_written: 2026-02-01T00:00:00.000Z',
-        'last_updated: 2026-02-01T00:00:00.000Z',
-        'git_branch: main',
-        'session_name: null',
-        'related_projects: []',
-        'goal: F3 guard test.',
-        'schema_version: 2',
-        '---',
-        '## Goal', 'F3 guard test.', '',
-        '## Current state', '', '',
-        '## Next best step', '', '',
-        '## Active decisions', '',
-        '## Active what-to-avoid', '',
-        '## Open questions (still open)', '',
-        '## Skills — Mandatory', '',
-        '## Skills — Available', '',
-        '## Projects', '',
-        '## Sessions', '',
-      ].join('\n');
-      writeFileSync(join(sourceFolder, 'HANDOFF.md'), v2Source, 'utf-8');
-
-      const result = runPickup(idOld, idNew, {
-        sessionsDir: fx.sessionsDir,
-        cwd: fx.projectRoot,
-        projectRootCwd: resolve(fx.projectRoot),
-      });
-      ok(result.exitCode !== 0, `idempotent pickup with real source data rejected (exit: ${result.exitCode})`);
-      ok(
-        result.stderr.includes('PICKUP_IDEMPOTENT_SOURCE_NOT_EMPTY'),
-        `stderr includes new error class (stderr: ${result.stderr})`
-      );
-
-      ok(existsSync(sourceFolder), 'source folder NOT deleted');
-      ok(
-        existsSync(join(sourceFolder, 'sessions', '2026-02-01T00-00-00-000Z-realdata.md')),
-        'real session data file survives'
-      );
-      const afterContent = readFileSync(join(targetFolder, 'HANDOFF.md'), 'utf-8');
-      strictEqual(afterContent, originalContent, 'target content unchanged by the refused pickup');
     } finally {
       fx.cleanup();
     }
@@ -1263,49 +1056,6 @@ function seedV3Source(fx, sessionId) {
     }
   });
 
-  // T22: retired from-id must not prefix-hijack a renamed workstream — pickup resolution
-  // is exact-match only (no prefix-glob fallback), unlike the read-only handoff verbs.
-  await runTest('T22: retired from-id after rename errors instead of prefix-hijacking the renamed folder', async () => {
-    const fx = createFixture();
-    try {
-      const idBase = 'eval-relay';
-      const idRenamed = 'eval-relay-2';
-      const idThirdAttempt = 'eval-relay-3';
-
-      const seedResult = seedHandoff(idBase, fx);
-      strictEqual(seedResult.commitExitCode, 0, 'seed eval-relay succeeded');
-
-      // First pickup: eval-relay -> eval-relay-2. Retires 'eval-relay' as a folder name,
-      // but the '-2' naming convention makes the retired id a live prefix of the survivor.
-      const r1 = runPickup(idBase, idRenamed, {
-        sessionsDir: fx.sessionsDir,
-        cwd: fx.projectRoot,
-        projectRootCwd: resolve(fx.projectRoot),
-      });
-      strictEqual(r1.exitCode, 0, `first pickup exited 0 (stderr: ${r1.stderr})`);
-      ok(!existsSync(join(fx.projectRoot, 'scratch', `S-${idBase}`)), 'retired source folder gone');
-      ok(existsSync(join(fx.projectRoot, 'scratch', `S-${idRenamed}`)), 'renamed folder exists');
-
-      // Second pickup attempt with the retired id: before the fix, 'eval-relay' uniquely
-      // prefix-matched S-eval-relay-2 and silently renamed it again. Must now error.
-      const r2 = runPickup(idBase, idThirdAttempt, {
-        sessionsDir: fx.sessionsDir,
-        cwd: fx.projectRoot,
-        projectRootCwd: resolve(fx.projectRoot),
-      });
-      strictEqual(r2.exitCode, 1, `retired-id pickup exits 1 (stderr: ${r2.stderr})`);
-      ok(r2.stderr.includes('no handoff found matching'), `stderr names the resolver miss (got: "${r2.stderr}")`);
-
-      // The renamed folder must be untouched — no hijacked third rename occurred.
-      ok(existsSync(join(fx.projectRoot, 'scratch', `S-${idRenamed}`)), 'renamed folder still exists, untouched');
-      ok(!existsSync(join(fx.projectRoot, 'scratch', `S-${idThirdAttempt}`)), 'no new folder created for the rejected attempt');
-      const { fields } = parseFrontmatter(readFileSync(join(fx.projectRoot, 'scratch', `S-${idRenamed}`, 'HANDOFF.md'), 'utf-8'));
-      strictEqual(fields.session_id, idRenamed, 'renamed folder session_id unchanged');
-    } finally {
-      fx.cleanup();
-    }
-  });
-
   // --- mechanical migration tests ---
 
   // TM1: Migration preserves session_chain verbatim + appends from_session_id; related_projects verbatim;
@@ -1395,8 +1145,7 @@ function seedV3Source(fx, sessionId) {
       ok(skeletonContent.includes('proj-alpha'), 'skeleton preserves related_projects: proj-alpha');
       ok(skeletonContent.includes('proj-beta'), 'skeleton preserves related_projects: proj-beta');
 
-      // legacy file body: content after frontmatter must be byte-equal to original body,
-      // except that ## Open questions is renamed to ## Open questions raised (B5 fix).
+      // legacy file body: content after frontmatter must be byte-equal to original body
       const legacyFiles = readdirSync(join(targetFolder, 'sessions')).filter(f => f.endsWith('-legacy.md'));
       strictEqual(legacyFiles.length, 1, 'exactly one *-legacy.md file created');
       const legacyContent = readFileSync(join(targetFolder, 'sessions', legacyFiles[0]), 'utf-8');
@@ -1404,9 +1153,7 @@ function seedV3Source(fx, sessionId) {
       // Legacy file frontmatter ends at the second '---\n' after _legacy: true injection
       const legacyFmEndIdx = legacyContent.indexOf('\n---\n');
       const legacyBodyActual = legacyFmEndIdx !== -1 ? legacyContent.slice(legacyFmEndIdx + 5) : '';
-      // B5: ## Open questions → ## Open questions raised in legacy file; all other content byte-equal
-      const expectedLegacyBody = originalBody.replace(/^## Open questions\s*$/m, '## Open questions raised');
-      strictEqual(legacyBodyActual, expectedLegacyBody, 'legacy file body matches original with ## Open questions renamed');
+      strictEqual(legacyBodyActual, originalBody, 'legacy file body is byte-equal to original body content');
       ok(legacyContent.includes('_legacy: true'), 'legacy frontmatter contains _legacy: true');
     } finally {
       fx.cleanup();
@@ -1725,293 +1472,6 @@ function seedV3Source(fx, sessionId) {
       ok('available_skills' in payload, 'available_skills field present in idempotent response');
       ok(Array.isArray(payload.available_skills), 'available_skills is an Array in idempotent response');
       ok(!('skills_loaded' in payload), 'skills_loaded not present in idempotent pickup response');
-    } finally {
-      fx.cleanup();
-    }
-  });
-
-  // B5: V1 legacy migration — ## Open questions bullets preserved as still-open via heading rename
-  await runTest('B5: V1 legacy migration — ## Open questions bullets preserved as still_open_questions', async () => {
-    const fx = createFixture();
-    try {
-      const idOld = 'b5-src';
-      const idNew = 'b5-dst';
-      const sourceFolder = join(fx.projectRoot, 'scratch', `S-${idOld}`);
-      mkdirSync(sourceFolder, { recursive: true });
-      const v1Handoff = [
-        '---',
-        `session_id: ${idOld}`,
-        'first_written: 2026-01-01T10:00:00.000Z',
-        'last_updated: 2026-01-01T10:00:00.000Z',
-        'git_branch: main',
-        'session_name: null',
-        'related_projects: []',
-        'goal: B5 test goal.',
-        'schema_version: 1',
-        '---',
-        '## Goal', 'B5 test goal.', '',
-        '## Current state', 'Pre-migration.', '',
-        '## Done this session', '- x', '',
-        '## In progress', '- y', '',
-        '## Decisions made', '- z', '',
-        '## What to avoid', '- none', '',
-        '## Open questions',
-        '- Will the first open question survive migration?',
-        '- Will the second open question survive migration?', '',
-        '## Key files & artifacts', '- scratch/b5/README.md', '',
-        '## Next best step', '- run tests', '',
-        '## Skills loaded', '- nodejs-expert', '',
-      ].join('\n');
-      writeFileSync(join(sourceFolder, 'HANDOFF.md'), v1Handoff, 'utf-8');
-
-      const result = runPickup(idOld, idNew, {
-        sessionsDir: fx.sessionsDir,
-        cwd: fx.projectRoot,
-        projectRootCwd: resolve(fx.projectRoot),
-      });
-      strictEqual(result.exitCode, 0, `pickup exited 0 (stderr: ${result.stderr})`);
-      strictEqual(result.json.migrated_from_legacy, true, 'migrated_from_legacy === true');
-
-      // Run rewrite-pointer so cat-sessions can read a valid v3 pointer (required by some environments)
-      const targetFolder = join(fx.projectRoot, 'scratch', `S-${idNew}`);
-      ok(existsSync(join(targetFolder, 'sessions')), 'sessions/ created by migration');
-
-      // cat-sessions should pick up the renamed ## Open questions raised section
-      const catResult = runCli(['cat-sessions', `scratch/S-${idNew}/`, '--format', 'json'], { cwd: fx.projectRoot });
-      strictEqual(catResult.exitCode, 0, `cat-sessions exit 0 (stderr: ${catResult.stderr})`);
-      const brief = JSON.parse(catResult.stdout);
-      const soqTexts = brief.still_open_questions.map(q => q.text);
-      ok(
-        soqTexts.some(t => t.includes('first open question')),
-        `first question preserved (got: ${JSON.stringify(soqTexts)})`
-      );
-      ok(
-        soqTexts.some(t => t.includes('second open question')),
-        `second question preserved (got: ${JSON.stringify(soqTexts)})`
-      );
-    } finally {
-      fx.cleanup();
-    }
-  });
-
-  // B6: Frontmatter-less HANDOFF.md body is preserved through pickup (not silently dropped)
-  await runTest('B6: frontmatter-less HANDOFF.md — body preserved after pickup', async () => {
-    const fx = createFixture();
-    try {
-      const idOld = 'b6-src';
-      const idNew = 'b6-dst';
-      const sourceFolder = join(fx.projectRoot, 'scratch', `S-${idOld}`);
-      const sessionsPath = join(sourceFolder, 'sessions');
-      mkdirSync(sessionsPath, { recursive: true });
-      // HANDOFF.md with NO closing frontmatter delimiter — fmEndIdx will be -1
-      // The file has ## Sessions so detectShape returns 'new' (with sessions/ present)
-      const frontmatterlessContent = [
-        '## Goal',
-        'Frontmatter-less body must survive pickup.',
-        '',
-        '## Next best step',
-        'Verify body is preserved.',
-        '',
-        '## Sessions',
-        '',
-      ].join('\n');
-      writeFileSync(join(sourceFolder, 'HANDOFF.md'), frontmatterlessContent, 'utf-8');
-
-      const result = runPickup(idOld, idNew, {
-        sessionsDir: fx.sessionsDir,
-        cwd: fx.projectRoot,
-        projectRootCwd: resolve(fx.projectRoot),
-      });
-      strictEqual(result.exitCode, 0, `pickup exited 0 (stderr: ${result.stderr})`);
-
-      const newHandoffPath = join(fx.projectRoot, 'scratch', `S-${idNew}`, 'HANDOFF.md');
-      ok(existsSync(newHandoffPath), 'HANDOFF.md exists in renamed folder');
-      const newContent = readFileSync(newHandoffPath, 'utf-8');
-      ok(
-        newContent.includes('Frontmatter-less body must survive pickup.'),
-        `goal text preserved in new HANDOFF.md (content: "${newContent.slice(0, 200)}")`
-      );
-    } finally {
-      fx.cleanup();
-    }
-  });
-
-  // ===========================================================================
-  // V3F — FIX 1: pickup of a v3-pointer source must regenerate a proper v3 pointer
-  // at the target after success, instead of leaving the V2-shaped ownership-claim
-  // frontmatter that the generic fallback write produces.
-  // ===========================================================================
-
-  // V3F1: Pickup of a v3 source → target HANDOFF.md is a valid v3 pointer (handoff validate exits 0)
-  await runTest('V3F1: Pickup of a v3 source — target is a valid v3 pointer (handoff validate exits 0)', async () => {
-    const fx = createFixture();
-    try {
-      const idA = 'v3fix-src-001';
-      const idB = 'v3fix-dst-001';
-      seedV3Source(fx, idA);
-
-      const result = runPickup(idA, idB, {
-        sessionsDir: fx.sessionsDir,
-        cwd: fx.projectRoot,
-        projectRootCwd: resolve(fx.projectRoot),
-      });
-      strictEqual(result.exitCode, 0, `pickup exited 0 (stderr: ${result.stderr})`);
-
-      const newFolder = join(fx.projectRoot, 'scratch', `S-${idB}`);
-      const newFile = join(newFolder, 'HANDOFF.md');
-      ok(existsSync(newFile), 'HANDOFF.md exists in renamed folder');
-
-      const content = readFileSync(newFile, 'utf-8');
-      const { fields } = parseFrontmatter(content);
-      strictEqual(fields.session_id, idB, `frontmatter session_id === ${idB}`);
-      strictEqual(fields.schema_version, '3', `frontmatter schema_version === '3' (got: ${fields.schema_version})`);
-      ok('last_pointer_rewrite' in fields, 'frontmatter has last_pointer_rewrite');
-      ok('session_count' in fields, 'frontmatter has session_count');
-
-      const validateResult = runCli(['handoff', 'validate', idB], { cwd: fx.projectRoot });
-      strictEqual(validateResult.exitCode, 0, `handoff validate exits 0 on regenerated v3 pointer (stderr: ${validateResult.stderr})`);
-    } finally {
-      fx.cleanup();
-    }
-  });
-
-  // V3F2: Same-slug re-pickup (from === to) on a v3 source → pointer still valid v3 afterward
-  await runTest('V3F2: Same-slug re-pickup (from === to) on a v3 source — pointer still valid v3 afterward', async () => {
-    const fx = createFixture();
-    try {
-      const sharedId = 'v3fix-same-002';
-      seedV3Source(fx, sharedId);
-
-      const result = runPickup(sharedId, sharedId, {
-        sessionsDir: fx.sessionsDir,
-        cwd: fx.projectRoot,
-        projectRootCwd: resolve(fx.projectRoot),
-      });
-      strictEqual(result.exitCode, 0, `same-slug pickup exited 0 (stderr: ${result.stderr})`);
-
-      const validateResult = runCli(['handoff', 'validate', sharedId], { cwd: fx.projectRoot });
-      strictEqual(validateResult.exitCode, 0, `handoff validate exits 0 after same-slug re-pickup (stderr: ${validateResult.stderr})`);
-
-      const folder = join(fx.projectRoot, 'scratch', `S-${sharedId}`);
-      const content = readFileSync(join(folder, 'HANDOFF.md'), 'utf-8');
-      const { fields } = parseFrontmatter(content);
-      strictEqual(fields.schema_version, '3', 'frontmatter schema_version === 3 after same-slug takeover');
-    } finally {
-      fx.cleanup();
-    }
-  });
-
-  // V3F3: Legacy V1 source pickup → target stays the V2 skeleton, NOT jumped to v3 (two-hop contract).
-  // Guards that the FIX 1 regeneration is scoped to shape === 'v3-pointer' only.
-  await runTest('V3F3: Legacy V1 source pickup — target stays V2 skeleton, not jumped to v3 (two-hop contract)', async () => {
-    const fx = createFixture();
-    try {
-      const idOld = 'v3fix-v1src-003';
-      const idNew = 'v3fix-v1dst-003';
-
-      const sourceFolder = join(fx.projectRoot, 'scratch', `S-${idOld}`);
-      mkdirSync(sourceFolder, { recursive: true });
-      const v1Handoff = [
-        '---',
-        `session_id: ${idOld}`,
-        'first_written: 2026-04-01T10:00:00.000Z',
-        'last_updated: 2026-04-01T10:00:00.000Z',
-        'git_branch: main',
-        'session_name: null',
-        'related_projects: []',
-        'goal: Two-hop contract guard.',
-        'schema_version: 1',
-        '---',
-        '## Goal',
-        'Verify legacy pickup does not jump straight to v3.',
-        '',
-        '## Current state',
-        'Pre-migration.',
-        '',
-        '## Done this session',
-        '- step1',
-        '',
-        '## In progress',
-        '- nothing',
-        '',
-        '## Decisions made',
-        '- Use Node',
-        '',
-        '## What to avoid',
-        '- nothing',
-        '',
-        '## Open questions',
-        '- none',
-        '',
-        '## Key files & artifacts',
-        '- scratch/test/README.md',
-        '',
-        '## Next best step',
-        '- run tests',
-        '',
-        '## Skills loaded',
-        '- nodejs-expert',
-        '',
-      ].join('\n');
-      writeFileSync(join(sourceFolder, 'HANDOFF.md'), v1Handoff, 'utf-8');
-
-      const result = runPickup(idOld, idNew, {
-        sessionsDir: fx.sessionsDir,
-        cwd: fx.projectRoot,
-        projectRootCwd: resolve(fx.projectRoot),
-      });
-      strictEqual(result.exitCode, 0, `pickup exited 0 (stderr: ${result.stderr})`);
-      strictEqual(result.json.migrated_from_legacy, true, 'migrated_from_legacy === true');
-
-      const newFile = join(fx.projectRoot, 'scratch', `S-${idNew}`, 'HANDOFF.md');
-      const content = readFileSync(newFile, 'utf-8');
-      const { fields } = parseFrontmatter(content);
-      strictEqual(fields.schema_version, '2', 'frontmatter schema_version === 2 (not jumped to v3)');
-      ok(!('last_pointer_rewrite' in fields), 'no last_pointer_rewrite key — v3 regeneration correctly NOT triggered for legacy source');
-      ok(!('session_count' in fields), 'no session_count key — v3 regeneration correctly NOT triggered for legacy source');
-    } finally {
-      fx.cleanup();
-    }
-  });
-
-  // ===========================================================================
-  // V4F — FIX 4: validateSessionId charset gap — reject shell-metacharacter ids.
-  // ===========================================================================
-
-  // V4F1: from-id "bad;id" → exit 1, PICKUP_INVALID_FROM_SESSION_ID
-  await runTest('V4F1: from-id "bad;id" → exit 1, stderr includes PICKUP_INVALID_FROM_SESSION_ID', async () => {
-    const fx = createFixture();
-    try {
-      const result = runPickup('bad;id', 'v4fix-valid-to', {
-        sessionsDir: fx.sessionsDir,
-        cwd: fx.projectRoot,
-        projectRootCwd: resolve(fx.projectRoot),
-      });
-      strictEqual(result.exitCode, 1, `exit 1 (stderr: ${result.stderr})`);
-      ok(
-        result.stderr.includes('PICKUP_INVALID_FROM_SESSION_ID'),
-        `stderr includes PICKUP_INVALID_FROM_SESSION_ID (got: "${result.stderr}")`
-      );
-    } finally {
-      fx.cleanup();
-    }
-  });
-
-  // V4F2: to-id "bad;id" → exit 1, PICKUP_INVALID_TO_SESSION_ID (checked before from-id resolution,
-  // so no seeded source folder is required — any from-id reaches the to-id validation first)
-  await runTest('V4F2: to-id "bad;id" → exit 1, stderr includes PICKUP_INVALID_TO_SESSION_ID', async () => {
-    const fx = createFixture();
-    try {
-      const result = runPickup('any-from-id', 'bad;id', {
-        sessionsDir: fx.sessionsDir,
-        cwd: fx.projectRoot,
-        projectRootCwd: resolve(fx.projectRoot),
-      });
-      strictEqual(result.exitCode, 1, `exit 1 (stderr: ${result.stderr})`);
-      ok(
-        result.stderr.includes('PICKUP_INVALID_TO_SESSION_ID'),
-        `stderr includes PICKUP_INVALID_TO_SESSION_ID (got: "${result.stderr}")`
-      );
     } finally {
       fx.cleanup();
     }

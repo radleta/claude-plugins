@@ -2,7 +2,6 @@
 description: Create a well-named feature branch from a description, enforcing naming conventions
 argument-hint: <description of what you'll work on>
 context: fork
-background: false
 ---
 
 <role>

@@ -1,6 +1,6 @@
 {
   "name": "test-verification",
-  "version": "1.0.3",
+  "version": "1.0.2",
   "description": "Test quality verification methodology with shallow test detection",
   "author": {
     "name": "Richard Adleta",

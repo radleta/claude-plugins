@@ -1,0 +1,187 @@
+{
+  "// NOTE": "Recommended ESLint configuration for React + TypeScript projects",
+  "// USAGE": "Copy relevant sections to your .eslintrc.json or adapt to .eslintrc.js format",
+
+  "env": {
+    "browser": true,
+    "es2021": true,
+    "node": true
+  },
+
+  "extends": [
+    "eslint:recommended",
+    "plugin:react/recommended",
+    "plugin:react-hooks/recommended",
+    "plugin:@typescript-eslint/recommended",
+    "plugin:jsx-a11y/recommended"
+  ],
+
+  "parser": "@typescript-eslint/parser",
+
+  "parserOptions": {
+    "ecmaVersion": "latest",
+    "sourceType": "module",
+    "ecmaFeatures": {
+      "jsx": true
+    }
+  },
+
+  "plugins": [
+    "react",
+    "react-hooks",
+    "@typescript-eslint",
+    "jsx-a11y"
+  ],
+
+  "settings": {
+    "react": {
+      "version": "detect"
+    }
+  },
+
+  "rules": {
+    "// CRITICAL REACT RULES (prevent Top 10 agent mistakes)": "",
+
+    "react-hooks/rules-of-hooks": "error",
+    "// EXPLANATION": "Enforces Rules of Hooks - prevents conditional hook calls, loops, nested functions",
+    "// PREVENTS": "Top 10 Mistake #3 - Violating Rules of Hooks",
+
+    "react-hooks/exhaustive-deps": "warn",
+    "// EXPLANATION": "Ensures all dependencies are included in useEffect/useMemo/useCallback arrays",
+    "// PREVENTS": "Top 10 Mistake #1 - Missing/incorrect dependencies (infinite loops, stale closures)",
+
+    "react/jsx-key": "error",
+    "// EXPLANATION": "Requires key prop when rendering lists with .map()",
+    "// PREVENTS": "Top 10 Mistake #2 - Missing keys (leads to using index as key)",
+
+    "react/no-array-index-key": "warn",
+    "// EXPLANATION": "Warns against using array index as key prop",
+    "// PREVENTS": "Top 10 Mistake #2 - Using array index as key (state corruption)",
+
+    "react/no-direct-mutation-state": "error",
+    "// EXPLANATION": "Prevents direct state mutation (for class components)",
+    "// PREVENTS": "Top 10 Mistake #4 - Direct state mutation",
+
+    "react/jsx-no-bind": [
+      "warn",
+      {
+        "allowArrowFunctions": true,
+        "allowBind": false,
+        "ignoreRefs": true
+      }
+    ],
+    "// EXPLANATION": "Warns about creating functions in render (performance issue)",
+    "// PREVENTS": "Unnecessary re-renders from new function references",
+
+    "// TYPESCRIPT + REACT INTEGRATION": "",
+
+    "@typescript-eslint/no-explicit-any": "error",
+    "// EXPLANATION": "Prevents use of 'any' type",
+    "// PREVENTS": "Top 10 Mistake #6 - Incorrect TypeScript event types (leads to using 'any')",
+
+    "@typescript-eslint/explicit-module-boundary-types": "off",
+    "// EXPLANATION": "Don't require return types on every function (inference works well)",
+    "// RATIONALE": "TypeScript can infer most return types, explicit types on props interfaces is sufficient",
+
+    "react/prop-types": "off",
+    "// EXPLANATION": "Disable PropTypes checking when using TypeScript",
+    "// RATIONALE": "TypeScript provides compile-time type checking, PropTypes are runtime",
+
+    "react/react-in-jsx-scope": "off",
+    "// EXPLANATION": "Don't require 'import React' in every file (React 17+ JSX transform)",
+    "// RATIONALE": "React 17+ has automatic JSX runtime, import not needed",
+
+    "// ACCESSIBILITY RULES": "",
+
+    "jsx-a11y/alt-text": "error",
+    "// EXPLANATION": "Requires alt text on images",
+    "// PREVENTS": "Accessibility violations",
+
+    "jsx-a11y/anchor-is-valid": "warn",
+    "// EXPLANATION": "Ensures <a> tags have valid href or use <button> instead",
+    "// PREVENTS": "Semantic HTML violations",
+
+    "// CODE QUALITY": "",
+
+    "no-console": [
+      "warn",
+      {
+        "allow": ["warn", "error"]
+      }
+    ],
+    "// EXPLANATION": "Warns about console.log (but allows console.warn and console.error)",
+    "// PREVENTS": "Leaving debug logs in production code",
+
+    "no-unused-vars": "off",
+    "@typescript-eslint/no-unused-vars": [
+      "error",
+      {
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_"
+      }
+    ],
+    "// EXPLANATION": "Error on unused variables (but allow _ prefix for intentionally unused)",
+    "// PREVENTS": "Dead code accumulation",
+
+    "prefer-const": "error",
+    "// EXPLANATION": "Prefer const over let when variable is never reassigned",
+    "// RATIONALE": "Immutability by default reduces bugs",
+
+    "no-var": "error",
+    "// EXPLANATION": "Disallow var, require let or const",
+    "// RATIONALE": "var has confusing scoping rules, deprecated in modern JavaScript"
+  },
+
+  "// OPTIONAL STRICTER RULES": "Uncomment these for more strict linting",
+  "// rules-strict": {
+    "react/function-component-definition": [
+      "warn",
+      {
+        "namedComponents": "function-declaration"
+      }
+    ],
+    "// EXPLANATION": "Enforces function declarations for named components (consistency)",
+
+    "react/self-closing-comp": "error",
+    "// EXPLANATION": "Require self-closing tags when no children (<Component /> not <Component></Component>)",
+
+    "@typescript-eslint/consistent-type-imports": "warn",
+    "// EXPLANATION": "Enforces 'import type' for type-only imports",
+
+    "react/jsx-pascal-case": "error",
+    "// EXPLANATION": "Enforces PascalCase for component names",
+
+    "react/jsx-boolean-value": [
+      "error",
+      "never"
+    ]
+    "// EXPLANATION": "Disallows explicit 'true' value for boolean props (use <Component required /> not <Component required={true} />)"
+  },
+
+  "// INSTALLATION": [
+    "npm install --save-dev eslint",
+    "npm install --save-dev @typescript-eslint/parser @typescript-eslint/eslint-plugin",
+    "npm install --save-dev eslint-plugin-react eslint-plugin-react-hooks",
+    "npm install --save-dev eslint-plugin-jsx-a11y"
+  ],
+
+  "// INTEGRATION": {
+    "vscode": "Install 'ESLint' extension by Microsoft",
+    "pre-commit": "Use husky + lint-staged to run ESLint before commits",
+    "ci-cd": "Add 'npm run lint' to CI pipeline (fails build on errors)"
+  },
+
+  "// PACKAGE.JSON SCRIPTS": {
+    "scripts": {
+      "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
+      "lint:fix": "eslint . --ext .js,.jsx,.ts,.tsx --fix"
+    }
+  },
+
+  "// TROUBLESHOOTING": {
+    "error-parsing-tsx-files": "Ensure @typescript-eslint/parser is set as parser",
+    "react-version-warning": "Add settings.react.version: 'detect' to auto-detect React version",
+    "hooks-rules-not-working": "Ensure eslint-plugin-react-hooks is installed and plugin is listed",
+    "slow-linting": "Add ignorePatterns: ['node_modules/', 'build/', 'dist/'] to .eslintrc"
+  }
+}

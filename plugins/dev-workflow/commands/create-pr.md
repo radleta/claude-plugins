@@ -1,21 +1,20 @@
 ---
-description: Generate PR title, description, and test plan as copy-paste-ready markdown files in scratch/pr-[date]/ (or .git/pr-drafts/ if scratch/ is absent)
-argument-hint: "[base-branch] [additional context]"
+description: Generate PR title, description, and test plan as copy-paste-ready markdown files in scratch/pr-[date]/
+argument-hint: [base-branch] [additional context]
 ---
 
 <role>
   <identity>Pull request content generator</identity>
   <purpose>
     Analyze branch changes comprehensively and generate copy-paste-ready PR content
-    as markdown files in scratch/ (falling back to .git/pr-drafts/ when scratch/ doesn't
-    exist) — works with any git hosting provider's PR interface
+    as markdown files in scratch/ — works with any git hosting provider's PR interface
   </purpose>
   <scope>
     <in-scope>
       <item>Analyzing commit history and diff against base branch</item>
       <item>Generating PR title following conventional format</item>
       <item>Writing structured PR description with summary and test plan</item>
-      <item>Writing output files to scratch/pr-[YYYY-MM-DD]/, or .git/pr-drafts/pr-[YYYY-MM-DD]/ when scratch/ is absent</item>
+      <item>Writing output files to scratch/pr-[YYYY-MM-DD]/</item>
     </in-scope>
     <out-of-scope>
       <item>Pushing branches or creating PRs via CLI</item>
@@ -24,14 +23,6 @@ argument-hint: "[base-branch] [additional context]"
     </out-of-scope>
   </scope>
 </role>
-
-## Content Rules
-
-Load the `pr-writer` skill (via the Skill tool) before generating content — it is
-the canonical source for title format (50-char soft / 72-char hard limit, imperative
-mood, conventional-commit-style prefixes) and description template selection (Minimal
-vs Standard, optional sections). This command owns only the mechanics below: gathering
-branch state, resolving the output directory, and writing the three files.
 
 ## Current State
 
@@ -120,32 +111,44 @@ Status:
   </step>
 
   <step id="3-generate-content" order="third">
-    <description>Generate PR content and write to the resolved output directory</description>
+    <description>Generate PR content and write to scratch/</description>
 
     <output-directory>
-      Resolve the output directory first:
-      - If `scratch/` exists at the repo root, use `scratch/pr-[YYYY-MM-DD]/`
-      - Otherwise (scratch/ is absent — e.g. a foreign install of this plugin), fall back to
-        `.git/pr-drafts/pr-[YYYY-MM-DD]/` (untracked, naturally excluded from commits)
-
-      Create the resolved directory. If it already exists (multiple PRs same day), append a
-      counter: `-2/`, `-3/`, etc.
+      Create directory: scratch/pr-[YYYY-MM-DD]/
+      If directory already exists (multiple PRs same day), append a counter:
+      scratch/pr-[YYYY-MM-DD]-2/, scratch/pr-[YYYY-MM-DD]-3/, etc.
     </output-directory>
 
     <file name="title.md">
       Contains ONLY the PR title — one line, no markdown formatting.
       Ready to paste into the "Title" field of any PR interface.
 
-      Follow the pr-writer skill's title rules (loaded above) for length, mood,
-      and format.
+      Rules:
+      - Under 70 characters
+      - Imperative mood ("Add feature" not "Added feature")
+      - Includes scope if relevant: "feat(auth): add OAuth support"
+      - For single-commit PRs, can match the commit message
     </file>
 
     <file name="description.md">
       Contains the full PR body — ready to paste into the "Description" field.
       Uses standard markdown that renders on GitHub, GitLab, Bitbucket, Azure DevOps.
 
-      Follow the pr-writer skill's template selection (loaded above) — Minimal vs
-      Standard, plus only the optional sections relevant to this PR.
+      Structure:
+      ```
+      ## Summary
+      - 1-3 bullet points explaining what changed and WHY
+      - Focus on impact and motivation, not implementation details
+
+      ## Changes
+      - Key changes organized by area/component
+      - Highlight breaking changes with **BREAKING:**
+
+      ## Test plan
+      - [ ] Checklist item (actionable verification step)
+      - [ ] Another checklist item
+      - Include both automated and manual verification
+      ```
     </file>
 
     <file name="metadata.md">
@@ -168,8 +171,8 @@ Status:
     </file>
 
     <acceptance-criteria>
-      <criterion priority="critical">Resolved output directory created (scratch/pr-[date]/, or .git/pr-drafts/pr-[date]/ if scratch/ is absent)</criterion>
-      <criterion priority="critical">title.md contains one-line title per the pr-writer skill's title rules</criterion>
+      <criterion priority="critical">scratch/pr-[date]/ directory created</criterion>
+      <criterion priority="critical">title.md contains one-line title under 70 chars</criterion>
       <criterion priority="critical">description.md contains full PR body with Summary and Test plan</criterion>
       <criterion priority="critical">metadata.md contains branch info and commit list</criterion>
       <criterion priority="high">All content uses standard markdown (no provider-specific syntax)</criterion>
@@ -193,7 +196,7 @@ Status:
 
       **Title:** [the title]
 
-      **Files written to:** [resolved output directory]
+      **Files written to:** scratch/pr-[date]/
       - `title.md` — paste into Title field
       - `description.md` — paste into Description field
       - `metadata.md` — reference info (commits, files, branch)
@@ -228,14 +231,11 @@ $ARGUMENTS
   </constraint>
 
   <constraint priority="high">
-    Follow the pr-writer skill's title length rules — use description for details
+    Keep PR title under 70 characters — use description for details
   </constraint>
 
   <constraint priority="high">
-    Write files to the resolved output directory (scratch/pr-[date]/, or .git/pr-drafts/pr-[date]/
-    when scratch/ is absent) — never hardcode scratch/ as the only option, since not every
-    repo this plugin installs into has one, and not every repo's git hooks treat scratch/ the
-    same way this one does
+    Write files to scratch/ directory (tracked but blocked from commits by git hooks)
   </constraint>
 
   <constraint priority="medium">

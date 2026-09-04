@@ -1,11 +1,13 @@
 ---
 name: human-voice
 description: >-
-  Rewrite text to read as human and strip AI tells — puffery, hollow symmetry, filler
-  transitions, em-dash overuse, fake warmth, robotic structure. Use WHENEVER text is
-  attributed to a person or meant to persuade: emails, replies, social/LinkedIn posts,
-  cover letters, bios, blog/marketing copy. Reach for it even when not asked to "humanize"
-  and the draft looks fine — AI-ness breaks trust in anything a person signs.
+  Rewrite text to read as human and strip AI tells — puffery, hollow symmetry ("not
+  just X, but Y"), filler transitions, em-dash overuse, fake warmth, robotic structure.
+  Use WHENEVER text is attributed to a person or meant to persuade or connect: emails
+  sent on someone's behalf, replies, messages, social/LinkedIn posts, cover letters,
+  bios, blog/marketing/fundraising copy. Reach for it even when not asked to "humanize"
+  and even when the draft looks fine — detected AI-ness destroys credibility in anything
+  a person signs.
 cowork: true
 ---
 
@@ -76,10 +78,6 @@ skill works fully without it.** Pick whichever fits your environment:
 Each tool prints the tell with a line/column and a concrete fix, and exits `1` when
 anything is found (so it can gate a workflow). However you scan, fix what it surfaces.
 
-One calibration before you fix: no single tell proves AI — humans use every one of
-these. What's diagnostic is density: clusters in one passage. Scrub the clusters, and
-keep a flagged word when it's genuinely the precise choice.
-
 **A clean scan is necessary, not sufficient.** It only catches the obvious mechanical
 tells, never the judgment-level ones in Step 3. Don't stop here.
 
@@ -118,10 +116,6 @@ These are what actually make text feel human. Read the draft as the recipient an
 - **Fronted participials.** "Leveraging X, the team…", "Having done X, we…" stacked
   through the text (AI uses these 2–5× as often as people). Recast as plain
   subject-verb sentences.
-- **Colon-fronted clauses.** "The useful bit for us: consultants bill the same median."
-  One is fine; several in one piece is a template. Recast most as a period or a comma.
-- **Sheer length.** The meta-tell: AI over-writes; humans under-write. After fixing
-  everything else, cut 20–30%. Ask: would a busy person send something this long?
 
 **Structural audit — the reshuffle test.** Could you swap two body paragraphs without
 breaking the logic? If yes, the piece is a pile of co-equal points, not an argument —
@@ -130,8 +124,7 @@ AI's default shape. Give it a spine: each paragraph should depend on the one bef
 Then apply the **read-aloud test**: would a person actually *say* this out loud to the
 recipient? If a phrase only survives on paper, it's an AI tell. Rewrite it the way you'd
 say it. AI also *avoids* semicolons and parentheses — a well-placed one of either reads
-distinctly human, so add them where they fit. Same goes for contractions, a sentence
-starting with And or But, and the occasional one-sentence paragraph.
+distinctly human, so add them where they fit.
 
 **Then self-critique — don't skip this.** Reread the result and ask plainly: *what here
 still reads as AI?* Name the two or three worst offenders specifically, then fix exactly
@@ -159,9 +152,6 @@ a specific person, go further:
   the signature, occasional fillers like "well" or "you know," sign off as "Richard."
 - When you have no samples, default to plain, direct, and slightly informal — that reads
   as human far more reliably than polished-and-balanced does.
-- Match the channel's register, not just the person's. In Slack, texts, and DMs, real
-  people write fragments, lowercase openers, and minimal punctuation — formally perfect
-  prose is itself a tell there.
 
 ## What "done" looks like
 
@@ -182,8 +172,4 @@ an install, or skipping it entirely.
 - **No install (Claude Cowork or any packaged copy of this skill):** the `scripts/` files
   ship inside the skill folder, so `node "<skill-dir>/scripts/ai-lint.mjs"` works wherever
   node is available — nothing to install.
-- **POSIX wrapper:** `scripts/ai-lint.sh` is the thin bash wrapper the installer points
-  `~/.local/bin/ai-lint` at; it just forwards arguments to `ai-lint.mjs`.
 - **Tests:** `node --test '.claude/skills/human-voice/scripts/*.test.mjs'`
-- **Evals:** `evals/evals.json` holds this skill's eval scenarios, runnable via the
-  `skill-creator` skill.

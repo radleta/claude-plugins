@@ -1,41 +1,10 @@
----
-summary: "consume wiki-health verdict and produce a remediation plan"
----
-
 # Audit Workflow
 
-`/wiki-memory audit <skill> [--fix]` · `/wiki-memory audit --all [--fix]`
+`/wiki-memory audit <skill>`
 
-Audit is the wiki maintenance command: it **reports by default and applies with `--fix`** (D12).
-Either way it consumes the `wiki-health --json` verdict and produces a remediation plan at
+Consumes the `wiki-health --json` verdict and produces a remediation plan at
 `${LOCALAPPDATA:-$HOME/AppData/Local}/Temp/wiki-audit/{skill}.md`.
-
-**Detection is mechanical; fixing is an agent (D13).** Every finding in the report comes from
-`wiki-health`, which is pure-read and scripted. Repair is `wiki-groomer`'s work — dispatched per
-affected domain by `--fix`, and expressed as the prose catalog in `## The conformance catalog`
-below rather than as fixer code. There is deliberately no mechanical fixer and no test suite for
-one: the thing that repairs a wiki is an agent reading a catalog.
-
----
-
-## Modes
-
-| Mode | Invocation | What happens | What is written |
-|------|------------|--------------|-----------------|
-| Report (default) | `audit <skill>` | Run the detector, build the plan, print the summary | The plan file under `%TEMP%`, nothing else |
-| Apply | `audit <skill> --fix` | Report, then dispatch `wiki-groomer` per affected domain, then **re-run the detector** and report what actually closed | The plan file, plus whatever the agent repairs in the skill folder |
-| Fleet | `audit --all [--fix]` | The same, once per declared domain — see `## Fleet mode` | One plan file per domain with findings |
-
-**Two properties this protocol must keep, and how it keeps them:**
-
-- **Report mode writes nothing inside the repository.** The plan lands under
-  `${LOCALAPPDATA:-$HOME/AppData/Local}/Temp/wiki-audit/`, outside the working tree, so
-  `git status --short` is unchanged by a report run. That is the whole reason for the `%TEMP%`
-  destination, and why it does not contradict the pure-read contract (D2), whose subject is
-  working-tree churn.
-- **Two report runs over an unchanged tree produce identical reports.** Every finding is a
-  `wiki-health` reason code read out of `--json`; no step asks an agent what it thinks before the
-  report is printed. Anything that moves detection into judgment breaks this, so nothing may.
+**Audit is strictly read-only — no skill-folder writes occur during this protocol.**
 
 ---
 
@@ -43,22 +12,17 @@ one: the thing that repairs a wiki is an agent reading a catalog.
 
 The audit protocol consumes two inputs:
 
-**Input A — `wiki-health <skill> --json` verdict** (Data Model §1). **Read `--json`, not the
-verbose text** — the verbose form is for a person, the JSON is the contract, and only the JSON
-carries the per-signal detail the adoption report needs:
+**Input A — `wiki-health <skill> --json` verdict** (Data Model §1):
 
 | Field | How used |
 |-------|----------|
-| `state` | drives which rules apply — see `## Per-state behavior summary` |
+| `state` | drives which section-decomposition rules apply |
 | `reasons[].code` | determines which action codes appear in the plan |
-| `files.wiki_declared` | whether this folder has declared itself a wiki (D15) |
-| `files.legacy_log_present` | a retired operations log is still on disk |
 | `files.body_line_count` | promote-vs-keep threshold |
 | `files.body_section_count` | hierarchy-bias trigger |
 | `files.pages_placement` | D34 placement violation detection |
 | `files.staging_dir_present` | abort guard |
 | `pages.missing_summary` | PATCH candidates |
-| `pages.duplicate_last_verified` | PATCH candidates — a page with an ambiguous verification date |
 | `pages.tag_prefix_mismatches` | PATCH candidates |
 | `pages.listed_but_missing` | PATCH/REMOVE candidates |
 | `pages.orphan_index_md` | top-level index.md cleanup flag |
@@ -74,16 +38,9 @@ This is the second required input. Lint violations of `severity: "error"` produc
 action code on the offending file (added to the `## Files` table, Detail column includes the
 rule name and message).
 
-Three early exits, checked in this order:
-
-- If `state = not-a-wiki`: **say nothing about this skill at all.** It has not declared itself and
-  carries no structural signal, so it is not a wiki that is broken — it is not a wiki. Emit
-  `State: not-a-wiki — nothing to audit.` for a single-skill invocation, and under `--all` omit
-  the row entirely. This is the outcome that retires the false "unmigrated wiki" classifications;
-  never report an undeclared, unsignalled skill as a finding of any kind.
-- If `state = healthy`: emit one-line "State: healthy — no remediation needed." and exit.
-- If `files.staging_dir_present = true`: emit error "Staging dir present for {skill} — resolve
-  the pending staging conflict before running audit." and exit with non-zero.
+If `state = healthy`: emit one-line "State: healthy — no remediation needed." and exit.
+If `files.staging_dir_present = true`: emit error "Staging dir present for {skill} — resolve
+the pending staging conflict before running audit." and exit with non-zero.
 
 ---
 
@@ -97,15 +54,9 @@ wiki-health <skill> --json
 
 Capture stdout as the JSON verdict. The exit code maps directly to state:
 - `0` → healthy (exit audit — no-op)
-- `2` → not-a-wiki (exit audit — say nothing; this is the shared "not a wiki" code, not a new one)
-- `3` → new — **an adoption candidate**, see Step 1c
+- `3` → new
 - `4` → partial-migration
 - `5` → unhealthy
-
-**`new` no longer means "a bare skill awaiting a scaffold".** Since identity became the `wiki: true`
-declaration (D15), `new` has exactly one cause: `ADOPTION_CANDIDATE` — a skill that has not declared
-itself but is structurally shaped like a wiki. A skill with no scaffold and no signal is
-`not-a-wiki` and is silent. Read the state through that meaning everywhere below.
 
 Parse all fields from Data Model §1. If `files.staging_dir_present` is `true`, abort
 with an error message (staging dir conflict — cannot safely audit while a push is pending).
@@ -121,10 +72,6 @@ MUST check for the `State: healthy` prefix before attempting to read the `Plan:`
 unconditionally reading line 6 of stdout will fail for healthy-state skills. See migrate.md
 Step 2 for the caller-side guard.
 
-**`not-a-wiki` has the same shape.** It is the second state that emits one line and no
-`Plan:` — `State: not-a-wiki — nothing to audit.` A caller that guards only on `State: healthy`
-will read line 6 and fail here. Guard on the absence of the `Plan:` line, or on both prefixes.
-
 ### Step 1b — Run mdite lint and capture violations
 
 ```bash
@@ -137,43 +84,27 @@ Filter to `severity: "error"` entries — these become additional `PATCH` candid
 no additional PATCH rows are added from this step. A cached lint result from a prior
 `wiki-health` invocation in the same session may be reused in place of a fresh run.
 
-### Step 1c — Report the adoption candidate and its conformance gap (`state = new`)
+### Step 1c — Enumerate required scaffold files for `state = new` (CREATE action)
 
-This step applies **only when `state = new`**, which now means exactly one thing: the verdict
-carries `ADOPTION_CANDIDATE`. Skip entirely for `partial-migration`, `unhealthy`, and `healthy`.
+This step applies **only when `state = new`**. Skip entirely for `partial-migration`,
+`unhealthy`, and `healthy`.
 
-**Report it as adoptable, never as broken.** The candidate is a skill folder that looks like a
-wiki and has not said it is one. That is a question for a person, not a defect: the report names
-the signals that made it a candidate and stops there. Adoption happens only under `--fix`.
+When `state = new`, the wiki scaffold files do not yet exist on disk. The `**/*` glob
+in Step 2 cannot find them, so they must be declared explicitly here. For each of the
+following files that is **absent** from the skill folder, add a `CREATE` row to the plan:
 
-`reasons[]` carries `ADOPTION_CANDIDATE` first, then one line per signal that fired. Reproduce
-each in the plan verbatim — the signals are the evidence a reader confirms the candidacy on:
+| Missing file | Target path | Content template |
+|--------------|-------------|-----------------|
+| `.mditerc` | `.claude/skills/{skill}/.mditerc` | `protocols/init.md` — `.mditerc` template block |
+| `log.md` | `.claude/skills/{skill}/log.md` | `protocols/init.md` — `log.md` template block |
+| `schema.md` | `.claude/skills/{skill}/schema.md` | `protocols/init.md` — `schema.md` template block |
 
-| Signal code | What it means |
-|-------------|---------------|
-| `PAGES_HEADING` | `SKILL.md` carries a `## Pages` heading |
-| `LEGACY_LOG` | a retired operations log from a previous wiki generation is present |
-| `MDITERC_PRESENT` | a `.mditerc` file is present |
-| `SIBLING_PAGES` | three or more sibling pages carry both `tags:` and `summary:` frontmatter |
+Additionally record two structural additions required in SKILL.md itself (not separate files):
 
-**Adoption is all-or-nothing (D17).** A confirmed candidate is brought *fully* into conformance,
-never merely declared: declaring a folder a wiki while leaving it without the artifacts a wiki
-needs converts a silent non-wiki into a loud broken one. For each of the following that is
-**absent**, add a row to the plan:
-
-| Missing element | Action | Target |
+| Missing element | Action | Detail |
 |-----------------|--------|--------|
-| `wiki: true` in `SKILL.md` frontmatter | `PATCH` | the declaration, bare and lowercase, top-level inside the frontmatter block |
-| `.mditerc` | `CREATE` | `.claude/skills/{skill}/.mditerc` — `protocols/init.md`'s `.mditerc` template block |
-| `schema.md` | `CREATE` | `.claude/skills/{skill}/schema.md` — `protocols/init.md`'s `schema.md` template block |
-| `## Pages` heading | `CREATE` | scaffold the nav section per `protocols/init.md`'s template |
-| `## Meta` heading | `CREATE` | scaffold the nav section per `protocols/init.md`'s template |
-
-A `LEGACY_LOG` signal additionally contributes its own row — see the catalog's
-`LEGACY_LOG_PRESENT` entry, which applies to a candidate and a declared wiki alike.
-
-**Order matters within adoption:** the declaration is the row that changes what every other
-check means, so it is applied *with* the rest, never before them. See `## Applying with --fix`.
+| `## Pages` heading | `CREATE` | Scaffold `## Pages` nav section per `protocols/init.md` template |
+| `## Meta` heading | `CREATE` | Scaffold `## Meta` nav section per `protocols/init.md` template |
 
 **Content-template resolution rule:** Template references point to named blocks in
 `protocols/init.md`. Each block is delimited by a `### Template: {name}` heading and
@@ -220,10 +151,10 @@ subset where `orphan = true` — these are disk-resident files not reachable fro
 
 If any condition fails, assign `ORPHAN-LINK` instead of `DELETE`.
 
-**Critical:** conditions 1–3 alone are not sufficient — condition 4's age AND never-linked
-sub-parts must BOTH hold before assigning `DELETE`. A recently-touched-but-unlinked file is
-likely in-flight work; a never-linked-but-recent file is a new page awaiting cross-references.
-Either alone fails condition 4.
+**Critical:** conditions 1–3 alone are not sufficient. A file recently mtime-touched but
+unlinked is likely in-flight work (condition 4 fails). A file linked nowhere but created
+recently is a new page awaiting cross-references — not a stale draft (condition 4 fails).
+Both conditions (age AND never-linked) must hold before assigning `DELETE`.
 
 **When `mdite` is unavailable:** log a warning in the plan Detail column
 (`mdite not found — orphan detection skipped`), assign default `KEEP` action to all
@@ -244,7 +175,7 @@ scaffold creation appears at the top of the plan and is included in `files-accou
 file (table below), check whether the file appears in the `orphans_json` from Step 1d. If it
 does (i.e., it is graph-unreachable), override the action code to `ORPHAN-LINK` or `DELETE`
 per the stale-draft heuristic defined in Step 1d. The orphan override takes precedence over
-the initial action codes below, except for `SKILL.md`, `.mditerc`, and `schema.md` — these are structural/infrastructure files that are never orphanable by definition.
+the initial action codes below, except for `SKILL.md`, `log.md`, `.mditerc`, and `schema.md` — these are structural/infrastructure files that are never orphanable by definition.
 
 For each disk file, determine its initial action code:
 
@@ -252,7 +183,7 @@ For each disk file, determine its initial action code:
 |------|----------------|
 | `SKILL.md` | `KEEP` or `DECOMPOSE` (see Step 3) |
 | `schema.md` | `KEEP` or `PATCH` (check tag prefix vs `pages.tag_prefix_mismatches`) |
-| `log.md` | `DELETE` — a retired operations log (D3); see the catalog's `LEGACY_LOG_PRESENT` entry |
+| `log.md` | `APPEND` (migration log entry always appended on apply) |
 | `.mditerc` | `KEEP` (entrypoint already correct means no change needed) |
 | `*.md` sibling pages | one of: `KEEP`, `MERGE-INTO`, `CROSS-REFERENCE`, `PATCH` (see Step 5); override to `ORPHAN-LINK`/`DELETE` if in orphans_json |
 | `{group}/index.md` | `KEEP` unless the group index is malformed (missing canonical `## Pages` hub structure), in which case assign `PATCH` |
@@ -279,7 +210,7 @@ This mismatch silently undermines lint/query — the schema lies. Every page mus
    codified a prefix convention), **skip this step** — the prefix check requires an explicit
    declaration in schema.md.
 
-2. For each `.md` page in the skill folder (excluding `SKILL.md`, `schema.md`, group
+2. For each `.md` page in the skill folder (excluding `SKILL.md`, `log.md`, `schema.md`, group
    `index.md` files), read the page's YAML frontmatter `tags:` field. Extract the prefix of each
    tag value (text before the first `/`).
 
@@ -289,7 +220,13 @@ This mismatch silently undermines lint/query — the schema lies. Every page mus
    - Action: `PATCH`
    - Detail: `tag prefix {actual-prefix} → {expected-prefix}`
 
-   Worked example: see [`audit-examples.md#step-2a-tag-prefix-patch-example`](audit-examples.md#step-2a-tag-prefix-patch-example).
+   Concrete example from winforms-expert migration:
+
+   | Path | Action | Detail |
+   |------|--------|--------|
+   | `dual-context-form-mode-flag.md` | PATCH | tag prefix winforms → winforms-expert |
+   | `form-anchor-bottom-edge-on-resize.md` | PATCH | tag prefix winforms → winforms-expert |
+   | `layered-window-bounds-cache-staleness.md` | PATCH | tag prefix winforms → winforms-expert |
 
 4. Subdir-grouped pages (e.g. `notifyicon-lifecycle/disposal.md`) follow the same rule: extract
    the prefix of each tag (text before first `/`). A tag like `winforms-expert/notifyicon-lifecycle`
@@ -312,15 +249,42 @@ by this step — they stay in SKILL.md regardless of any heuristic result.
 For each `## ` section, classify by **what the content IS** rather than by keyword matching.
 Four content classes, each with a default action:
 
-| Class | Action | Definition |
-|-------|--------|------------|
-| **Procedural** | KEEP | Content the agent reads at skill-load time to begin work — setup steps, investigation protocol, configuration instructions, prerequisites. Must be present when the agent opens SKILL.md, so it stays inline. |
-| **Lookup-time reference** | PROMOTE | Content the agent retrieves when a specific question arises — pitfalls, gotchas, troubleshooting guides, FAQ, tips, notes. Agents look these up by name; not needed at load time. |
-| **Conditional / niche** | PROMOTE | Content that applies only under specific circumstances — platform constraints, version-specific caveats, compatibility notes, "when to use" decision guidance. Bloats SKILL.md for the majority of use cases where the condition doesn't apply. |
-| **End-of-work QA** | PROMOTE | Checklists, acceptance criteria, validation steps, verification guides — content used AFTER implementation, not during. Inflates load-time footprint for no active-coding benefit. |
+**Procedural (KEEP):** Content the agent reads at skill-load time to begin work — setup steps,
+investigation protocol, configuration instructions, prerequisites. This content must be present
+when the agent opens SKILL.md, so it stays inline.
 
-Worked examples (one winforms-expert/react-expert/csharp-expert illustration per class): see
-[`audit-examples.md#step-3a-content-class-examples`](audit-examples.md#step-3a-content-class-examples).
+- *winforms-expert example:* `## Investigation Protocol` — the agent consults this before
+  writing any WinForms code. Keeping it inline means it is immediately available. Action: KEEP.
+- *csharp-expert example:* `## Project Detection` — environment detection steps the agent
+  needs before deciding which patterns apply. Action: KEEP.
+
+**Lookup-time reference (PROMOTE):** Content the agent retrieves when a specific question arises —
+pitfalls, gotchas, troubleshooting guides, FAQ, tips, notes. Agents look these up by name; they
+do not need them at load time.
+
+- *winforms-expert example:* `## Common Pitfalls` — consulted when something goes wrong, not
+  proactively. Thin SKILL.md + dedicated page is better. Action: PROMOTE.
+- *react-expert example:* `## Common Hooks Mistakes` — reference content, not procedural.
+  Action: PROMOTE.
+
+**Conditional / niche (PROMOTE):** Content that applies only under specific circumstances —
+platform constraints, version-specific caveats, compatibility notes, "when to use" decision
+guidance. Conditional content bloats SKILL.md for the majority of use cases where the condition
+does not apply.
+
+- *winforms-expert example:* `## .NET 10 and AOT Considerations` — only relevant when targeting
+  AOT. Agents working on standard WinForms apps never need it. Action: PROMOTE.
+- *csharp-expert example:* `## Nullable Reference Type Migration` — niche topic for projects
+  enabling NRTs. Action: PROMOTE.
+
+**End-of-work QA (PROMOTE):** Checklists, acceptance criteria, validation steps, verification
+guides — content used AFTER implementation, not during. Keeping QA checklists in SKILL.md
+inflates the load-time footprint for no benefit during active coding.
+
+- *winforms-expert example:* `## Success Indicators` — reviewed after implementation is done.
+  Action: PROMOTE.
+- *react-expert example:* `## Quality Checklist` — post-implementation QA; not needed at
+  skill-load time. Action: PROMOTE.
 
 **When PROMOTE fires from the content-class classifier:** apply the same Step 5 page-merge
 intelligence used for other promotion candidates — compare against existing pages before
@@ -381,11 +345,14 @@ If `files.pages_placement` from the verdict is `top` but body weight exceeds thr
 ### Step 5 — Page-merge intelligence for promotion candidates (WMF-D8)
 
 For each section that will be promoted (action = `PROMOTE` or `SPLIT`), compare the
-candidate against existing sibling pages using the same three overlap signals Step 5b
-defines below (tag overlap, code-block fingerprint, semantic relatedness — see Step 5b's
-"Signals to check" for the full definitions, including the ≥80% token-overlap threshold
-for code-block fingerprint). Applied here to candidate-vs-existing-page, rather than
-Step 5b's existing-page-vs-existing-page.
+candidate against existing sibling pages using three overlap signals:
+
+1. **Tag overlap** (mechanical): does the candidate's likely tag prefix match an existing page's tags?
+2. **Code-block fingerprint** (mechanical): does the candidate share identical or near-identical code
+   samples with an existing page? (Same ≥80% non-trivial token overlap rule as Step 5b.)
+3. **Semantic relatedness** (judgment): would a reader of the candidate page benefit from the existing
+   page, or vice versa? Use heading text, body concepts, and domain terminology as evidence. Heading
+   similarity is input to this judgment — not a standalone signal.
 
 Three outcomes:
 
@@ -421,13 +388,18 @@ there are no pre-existing pages; skip. For `state = healthy`, audit already exit
    snippet. Requires ≥80% lexical overlap of non-trivial tokens — shared import lines, common DSL
    boilerplate, or framework scaffolding do not count.
 
+   *Anti-example:* Two pages each containing a `csproj` snippet with `<TargetFramework>` are NOT
+   near-identical — one may be a NuGet packaging guide and the other a multi-target build setup.
+   Code-block fingerprint fires only when the surrounding code logic (not just framework boilerplate)
+   overlaps substantially.
+
 3. **Semantic relatedness** (judgment): would a reader of page A benefit from page B's content?
    Use heading text and page body as evidence. Heading-text similarity (same domain term, same
    pattern name, same concept) is one input to this judgment — but it is not a standalone signal.
    Fold heading similarity into this holistic assessment.
 
-Edge cases for signals 2 and 3 (what does NOT count as a match): see
-[`audit-examples.md#step-5b-signal-edge-cases`](audit-examples.md#step-5b-signal-edge-cases).
+   *Not a separate signal:* heading-text similarity alone should not emit `CROSS-REFERENCE`.
+   It must combine with substantive content overlap to clear the "reader benefit" bar.
 
 **Action-code assignment (any of the three signals above counts):**
 
@@ -448,7 +420,17 @@ Emit a `CROSS-REFERENCE` row in `## Files` for **both** pages in the pair with:
 **Deduplication:** If a page pair already has `[text](link)` in either page's body pointing to the
 other, skip — the cross-link already exists.
 
-Worked example: see [`audit-examples.md#step-5b-cross-link-example`](audit-examples.md#step-5b-cross-link-example).
+**Concrete example (winforms-expert):** `core-principles/gdi-handles.md` describes the
+clone-and-destroy pattern. `notifyicon-lifecycle/icon-updates.md` and
+`gdi-icon-rendering/circle-icon.md` both use the pattern (code-block fingerprint match).
+None of the three currently link to each other. Step 5b should emit:
+
+| Path | Action | Detail |
+|------|--------|--------|
+| `core-principles/gdi-handles.md` | CROSS-REFERENCE | bidirectional link to notifyicon-lifecycle/icon-updates.md |
+| `notifyicon-lifecycle/icon-updates.md` | CROSS-REFERENCE | bidirectional link to core-principles/gdi-handles.md |
+| `core-principles/gdi-handles.md` | CROSS-REFERENCE | bidirectional link to gdi-icon-rendering/circle-icon.md |
+| `gdi-icon-rendering/circle-icon.md` | CROSS-REFERENCE | bidirectional link to core-principles/gdi-handles.md |
 
 #### Saturation cap — top-5 per page
 
@@ -475,8 +457,22 @@ in `CROSS-REFERENCE` rows for pages B, C, D, E, F (5 outbound), while page F's o
 not include A because F has stronger pairings elsewhere. This is by design — saturation is
 judged independently per page.
 
-Worked example (12-candidate ranking walkthrough): see
-[`audit-examples.md#step-5b-saturation-cap-example`](audit-examples.md#step-5b-saturation-cap-example).
+**Concrete example — GDI-rendering pages:**
+
+Suppose `gdi-icon-rendering/circle-icon.md` (A) has 12 candidate cross-references after the
+pairwise pass. Ranked by tier:
+
+| Candidate | Tier | Keep? |
+|---|---|---|
+| A → `core-principles/gdi-handles.md` | Strongest (tag + code) | yes |
+| A → `gdi-icon-rendering/square-icon.md` | Strong (code only) | yes |
+| A → `notifyicon-lifecycle/icon-updates.md` | Strong (code only) | yes |
+| A → `rendering-patterns/clip-region.md` | Medium (semantic) | yes |
+| A → `rendering-patterns/double-buffer.md` | Medium (semantic) | yes (5th) |
+| A → 7 remaining pages | Weak | no |
+
+Result: page A emits exactly 5 `CROSS-REFERENCE` rows. Each referenced page independently
+applies its own top-5 cap.
 
 **Integration with Step 2 action codes:** `CROSS-REFERENCE` from Step 5b overrides `KEEP` for
 the affected pages. If a page already has a `CROSS-REFERENCE` from Step 5 promotion candidates,
@@ -500,19 +496,32 @@ cohesive domain concept that a reader would navigate **as a group** — the cand
 inside that group because it covers the same sub-domain, not merely because it shares a tag
 prefix or slug prefix.
 
-**Do NOT propose group membership solely because of:**
-- **Slug-prefix coincidence** — the candidate's slug happens to share a directory-name token
-  with the group (e.g. "decision-tree") without the candidate actually covering that group's
-  sub-domain.
-- **Same tag, orthogonal concerns** — the candidate shares a tag prefix with the group while
-  addressing an unrelated aspect of that domain.
+**Anti-examples — do NOT propose group membership for these patterns:**
 
-Worked anti-pattern illustrations + a full group-affinity walkthrough: see
-[`audit-examples.md#step-6-group-affinity-examples`](audit-examples.md#step-6-group-affinity-examples).
+[a] **Slug-prefix coincidence**: pages under `decision-trees/` (csharp-expert) share the
+directory name token "decision-tree" in their slugs. A new candidate tagged
+`csharp-expert/null-handling` should NOT be filed into `decision-trees/` solely because
+its slug contains "null-handling" and `decision-trees/null-handling.md` exists. The slug
+prefix is a filing convention — `null-handling` under `decision-trees/` and a new
+`null-handling-advanced.md` at top level address different navigation needs.
+
+[b] **Same tag, orthogonal concerns**: pages tagged `react/hooks` may cover `useState` rules
+(state management) and `useEffect` dependency arrays (side-effect management). A new
+candidate also tagged `react/hooks` about `useReducer` patterns does NOT automatically
+belong in an existing `hooks/` group — the shared tag reflects domain category, not
+navigational grouping. Assess whether a reader navigating the group would expect to find
+all three pages there together.
 
 **When a candidate fits an existing group:** change the action from `PROMOTE` to `PROMOTE`
 with `Target: {group}/{slug}.md` in the Section Decomposition table. Emit a note in the
 Detail column explaining the group-affinity rationale.
+
+Concrete example — `contextmenu-patterns.md` (about ContextMenuStrip for NotifyIcon):
+- `notifyicon-lifecycle/` group contains pages about NotifyIcon creation, lifecycle, disposal.
+- The candidate covers ContextMenuStrip *for* NotifyIcon — same component, same lifecycle context.
+  A reader navigating `notifyicon-lifecycle/` would expect to find it there.
+- Action: `PROMOTE`, Target: `notifyicon-lifecycle/contextmenu-patterns.md`
+- Detail: `group-affinity: candidate covers NotifyIcon sub-domain, fits notifyicon-lifecycle/`
 
 ### Step 7 — Build plan header (5-line summary)
 
@@ -522,7 +531,7 @@ Emit five fields verbatim (no extra prose):
 state: {state from verdict}
 triggers: {comma-separated reason codes from verdict}
 files-accounted: {count of all files enumerated in Step 2}
-pages-current: {count of existing *.md sibling pages excluding SKILL.md and schema.md}
+pages-current: {count of existing *.md sibling pages excluding SKILL.md, log.md, schema.md}
 pages-proposed: {pages-current +/- net change from decomposition actions}
 ```
 
@@ -543,8 +552,9 @@ Use the full set of action codes:
 | `MERGE-INTO` | Content integrated into an existing sibling page |
 | `CROSS-REFERENCE` | New page created + bidirectional link added to related page |
 | `ORPHAN-LINK` | Orphan file linked from `## Pages` for operator visibility (Step 1d) |
-| `DELETE` | File removed — an orphan matching the stale-draft heuristic (Step 1d), or a retired operations log |
-| `PATCH` | In-place fix: tag prefix, frontmatter (including the `wiki: true` declaration), dangling entry removal |
+| `DELETE` | Orphan file removed — stale-draft heuristic matched (Step 1d) |
+| `PATCH` | In-place fix: tag prefix, frontmatter, dangling entry removal |
+| `APPEND` | Append-only write: migration log entry in log.md |
 
 ### Step 9 — Build `## Section Decomposition` table (only when SKILL.md action = DECOMPOSE)
 
@@ -575,10 +585,14 @@ mv "$TMP_PLAN" "${AUDIT_DIR}/${skill}.md"
 
 Same-volume rename is atomic on POSIX and on Windows/MSYS when source and destination
 share a volume. **Cross-volume caveat:** When `LOCALAPPDATA` is on a different volume than
-the skill folder (e.g., `LOCALAPPDATA=C:\Users\...` and the project on `D:\`), a system-temp-dir
-placement for `$TMP_PLAN` could land on a different volume than `${AUDIT_DIR}`, making `mv`
-non-atomic — this is exactly why the write pattern above already creates `TMP_PLAN` inside
-`${AUDIT_DIR}` (same volume as the destination) instead of using the system temp dir.
+the skill folder (e.g., `LOCALAPPDATA=C:\Users\...` and the project on `D:\`), the system
+temp dir for `$TMP_PLAN` may be on a different volume than `${AUDIT_DIR}`, making the
+`mv` non-atomic. In cross-volume scenarios, create `TMP_PLAN` inside `${AUDIT_DIR}`
+(same volume as the destination) rather than in the system temp dir:
+
+```bash
+TMP_PLAN="${AUDIT_DIR}/.${skill}.md.tmp"   # same dir = same volume = atomic mv
+```
 
 The plan is **overwritten on each run** — no cruft accumulation (WMF-D5).
 
@@ -598,169 +612,25 @@ Plan: ${LOCALAPPDATA:-$HOME/AppData/Local}/Temp/wiki-audit/{skill}.md
 The 6th line `Plan:` gives the stable path for callers (migrate protocol, CI tooling) to
 locate the plan without re-parsing.
 
-**This six-line block is a caller contract and does not move.** It is emitted first, in this
-order, in every mode. `--fix` appends its dispatch and re-run output *after* it (Steps 12–13),
-and `--all` emits one such block per domain with findings — so a caller reading the sixth line of
-a single-skill invocation reads the same thing it always did. Anything added to audit's stdout is
-added below these six lines, never above or between them.
-
----
-
-## The conformance catalog
-
-This is the normative statement of what a conforming wiki looks like, keyed on the exact reason
-codes `wiki-health` emits. It is prose on purpose (D13): `--fix` hands it to `wiki-groomer`
-verbatim, and there is no mechanical fixer that implements it. **Code strings below match
-`wiki-health`'s output exactly — do not paraphrase a code.**
-
-### Identity and adoption
-
-| Finding | What conformance is | Repair |
-|---------|--------------------|--------|
-| `ADOPTION_CANDIDATE` | The folder declares itself: `wiki: true` in `SKILL.md` frontmatter | Add the declaration **together with** every artifact below that is missing. The key is bare, lowercase and unquoted, a top-level key inside the frontmatter block whose first line is exactly `---`; `wiki: True`, `wiki: "true"`, `wiki: yes`, `wiki:true`, an indented copy and a trailing comment are all rejected by the reader |
-| `MDITERC_MISSING` | A `.mditerc` exists | Create it from `protocols/init.md`'s template. The declaration replaced `.mditerc` as the *identity* test; `.mditerc` remains a required conformance artifact |
-| `ENTRYPOINT_WRONG` | `.mditerc` carries `entrypoint: SKILL.md` | Correct the entrypoint line |
-| `NO_PAGES_HEADING` | `SKILL.md` has a `## Pages` nav section | Scaffold it per `protocols/init.md` and file every knowledge page into it |
-| `NO_META_HEADING` | `SKILL.md` has a non-empty `## Meta` section | Scaffold it. **A `## Meta` emptied by removing its last entry is a finding, not a fix** — a domain whose only Meta entry is removed needs the `- [Schema](schema.md) — Wiki conventions and page-type definitions` line, not a deleted heading |
-
-**Adoption is all-or-nothing.** Applying only the declaration to a candidate is the one repair
-that leaves the domain worse than it started: an undeclared folder is silently ignored, while a
-declared folder missing its artifacts is reported `unhealthy`. Apply the whole set in one pass.
-
-### Retired mechanisms
-
-| Finding | What conformance is | Repair |
-|---------|--------------------|--------|
-| `LEGACY_LOG_PRESENT` | No operations log on disk. It was retired outright (D3) — `git log` reconstructs everything it held | Delete the file. Then remove its `## Meta` link in the same pass: a deleted target with a surviving relative link fails `mdite lint` and lands the domain back on `MDITE_LINT_FAILURE`. The two edits are one repair, never two |
-| `FORBIDDEN_UPDATED_FIELD` | No `updated:` key in page frontmatter — page age is git-derived | Remove the key |
-| `DUPLICATE_LAST_VERIFIED` | At most one `last-verified:` key per frontmatter block | Keep the later date, remove the rest. Never guess: if the two dates disagree about what was verified, escalate rather than pick |
-
-### Pages and navigation
-
-| Finding | What conformance is | Repair |
-|---------|--------------------|--------|
-| `MISSING_SUMMARY` | Every page carries `tags:` and `summary:` | Add the missing field on the page, then re-run `wiki-write --update` on it so the nav entry regenerates and the two agree |
-| `TAG_PREFIX_MISMATCH` | Every page's tag prefix matches the one `schema.md`'s fenced `tags:` example declares | Correct the page's tag. If the schema's example is the wrong one, correct the schema instead — and know that removing or unfencing that example does not fix the finding, it disables the check |
-| `LISTED_PAGE_MISSING` | Every `## Pages` entry resolves to a file | Restore the page, or drop the entry by regenerating the nav — see the fence rule |
-| `ORPHAN_PAGE` | Every page on disk is reachable from `SKILL.md` | File it via `wiki-write` so the nav regenerates, or link it from its group hub's `index.md` (a page body, not a fenced region) |
-| `ORPHAN_INDEX_MD` | No top-level `index.md` beside a `## Pages` section | Fold its content into `SKILL.md` and remove it |
-| `NAV_SUMMARY_MISMATCH` | A nav entry's text after the ` — ` separator equals the target page's `summary:` | See the fence rule below — this one is never repaired by hand |
-| `ARCHIVED_STATUS_MISMATCH` | `status: archived` in frontmatter and a listing under `### Archived` always agree | Add whichever half is missing, or remove both |
-| `MISSING_PAGES_FENCE`, `UNBALANCED_PAGES_FENCE` | Every `## Pages` bullet run sits inside `<!-- BEGIN:PAGES -->` / `<!-- END:PAGES -->` | See the fence rule below |
-
-**The fence rule, and it overrides every repair above it.** `SKILL.md`'s `## Pages` bullet run is
-a machine-owned region regenerated wholesale by `wiki-write` and delimited by
-`<!-- BEGIN:PAGES -->` / `<!-- END:PAGES -->`. **Never hand-edit inside that fence**, including to
-repair a finding this catalog names. So: **any repair that changes a `## Pages` bullet is made by
-re-running `wiki-write` on the page, never by editing the bullet** — that covers
-`MISSING_SUMMARY`, `LISTED_PAGE_MISSING`, `ORPHAN_PAGE` and `NAV_SUMMARY_MISMATCH` alike.
-
-Two of them have no other route at all:
-
-- `NAV_SUMMARY_MISMATCH` — the nav text and the page's `summary:` must agree, and each is written
-  by a different hand. Change the page's `summary:` and re-run `wiki-write --update` on it so the
-  nav regenerates from the new value. Editing either side alone manufactures the mismatch it was
-  meant to clear.
-- `MISSING_PAGES_FENCE` / `UNBALANCED_PAGES_FENCE` — the fence itself is malformed; regenerate the
-  region with its owning tool.
-
-What is **not** fenced, and may be edited directly: `## Meta`, the `### Topic Areas` /
-`### Standalone Pages` / `### Archived` sub-headings, and everything outside the bullet runs. That
-is why `ARCHIVED_STATUS_MISMATCH` is repairable by hand and `NAV_SUMMARY_MISMATCH` is not.
-
-If a repair cannot be made without opening a fence, **stop and report it**. An unrepaired finding
-that is honestly reported is a good outcome; a hand-edited fence is not.
-
-### Structure
-
-| Finding | What conformance is | Repair |
-|---------|--------------------|--------|
-| `MDITE_LINT_FAILURE` | `mdite lint` exits 0 for the domain | Fix the reported violations — most often a link whose target moved or was deleted |
-| `BODY_WEIGHT_EXCEEDED`, `EXCESSIVE_BODY_SECTIONS` | `SKILL.md` is a navigation hub, not the content | Decompose per Steps 3–6 above. This is the heaviest repair in the catalog and the one most worth confirming with the user first |
-| `STAGING_DIR_PRESENT` | No staging directory pending | **Not a repair.** Audit aborts on this (Step 1); a human resolves the pending push |
-
----
-
-## Applying with `--fix`
-
-`--fix` does not change how anything is detected. It adds three things after the report: a
-dispatch, a bounded one, and a second mechanical pass that decides what actually closed.
-
-### Step 12 — Dispatch `wiki-groomer` per affected domain
-
-1. **Print the report first, always.** `--fix` never suppresses the report mode's output; a user
-   who sees nothing before the writes begin cannot stop them.
-2. **One dispatch per domain with findings, and none for a domain without.** A domain whose state
-   is `healthy` or `not-a-wiki` is never dispatched for. Two domains are never merged into one
-   dispatch — the agent's context is per domain, and so is the repair.
-3. **The dispatch prompt carries context and the catalog, never a paraphrase of either:** the
-   domain name, its `wiki-health --json` findings for this run, the plan path, and
-   `## The conformance catalog` verbatim. Do not restate the catalog's rules in your own words in
-   the prompt — a loose paraphrase competes with the protocol for authority, and the looser
-   authority wins.
-4. **The dispatch ceiling is 10 domains per run.** Order the affected domains alphabetically and
-   dispatch the first 10. This is deterministic, so the same tree defers the same domains.
-5. **Report every deferred domain by name — never truncate silently.** Under the ceiling, print:
-
-   ```
-   Deferred: {N} domain(s) over the 10-per-run dispatch ceiling — {comma-separated names}
-   Re-run `/wiki-memory audit --all --fix` to continue.
-   ```
-
-   A run that repaired 10 of 30 domains and said so is a good run. A run that repaired 10 of 30
-   and reported success is a broken one.
-
-### Step 13 — Re-run the detector; the second report closes the finding
-
-After every dispatch returns, re-run `wiki-health <skill> --json` for each domain dispatched and
-diff the reason codes against the first run.
-
-**The agent's report is not evidence a finding closed.** An agent can return success over an
-unchanged file, and only the mechanical detector can tell the difference. A finding is closed when
-and only when it is absent from the second verdict.
-
-Emit, per domain:
-
-```
-{skill}: {N} finding(s) → {M} remaining   [closed: CODE, CODE | still open: CODE]
-```
-
-A finding still open after a dispatch is reported, not retried in a loop. Re-dispatching the same
-agent against the same unchanged finding is how a fix loop spins; a human reads the second report
-and decides.
-
----
-
-## Fleet mode (`--all`)
-
-`audit --all` runs the whole protocol once per **declared** domain — every skill folder whose
-`SKILL.md` carries `wiki: true`. Three properties, all of which follow from the detector:
-
-- **Undeclared skills are absent, not passed.** A `not-a-wiki` state produces no row, no finding,
-  and no mention. A fleet of declared domains plus a hundred deliberately monolithic skills
-  reports on the declared domains alone.
-- **Adoption candidates appear as candidates.** An undeclared folder with a structural signal is
-  listed under `ADOPTION_CANDIDATE` with its signals, in its own section of the report, separate
-  from the domains that are broken. Being adoptable is not being unhealthy.
-- **One plan file per domain with findings**, at the same per-skill `%TEMP%` path. Domains with no
-  findings write no plan.
-
-Emit a fleet summary after the per-domain rows:
-
-```
-Fleet audit: {N} declared domains — {N} healthy, {N} with findings, {N} adoption candidates.
-```
-
 ---
 
 ## Action code reference summary
 
-The full action-code list with meanings is defined once, in Step 8's `## Files` table
-action-code list above (`KEEP`, `CREATE`, `DECOMPOSE`, `PROMOTE`, `SPLIT`, `MERGE-INTO`,
-`CROSS-REFERENCE`, `ORPHAN-LINK`, `DELETE`, `PATCH`) — not repeated here.
-All codes are planning-time only in report mode — audit itself writes no skill-folder file in
-either mode. Under `--fix` they are the instructions `wiki-groomer` applies, and the agent is
-what writes.
+| Code | Read-only? | Meaning |
+|------|-----------|---------|
+| `KEEP` | yes | File or section unchanged |
+| `CREATE` | yes | File does not yet exist; migrate creates it from the referenced template (scaffold files for `state=new` only) |
+| `DECOMPOSE` | yes | SKILL.md will be broken into pages (see Section Decomposition table) |
+| `PROMOTE` | yes | Body section → standalone page; Target column carries destination (top-level `{slug}.md` or group path `{group}/{slug}.md`) |
+| `SPLIT` | yes | Body section with ≥3 `### ` → `{group}/` subdirectory |
+| `MERGE-INTO` | yes | Candidate content absorbed into named existing page |
+| `CROSS-REFERENCE` | yes | New page + bidirectional link to named related page (also: existing-page pair emitted by Step 5b) |
+| `ORPHAN-LINK` | yes | File is graph-unreachable (orphan); migrate adds a `## Pages` link so operator can decide to keep or remove |
+| `DELETE` | yes | Orphan file matches stale-draft heuristic; migrate removes the file (see Step 1d conditions) |
+| `PATCH` | yes | In-place correction (tag prefix, missing frontmatter, dangling entry) |
+| `APPEND` | yes | Append-only addition (log entry) |
+
+All codes are planning-time only — the audit protocol writes NO skill-folder files.
 
 ---
 
@@ -768,16 +638,40 @@ what writes.
 
 | State | What audit focuses on |
 |-------|----------------------|
-| `not-a-wiki` | **Nothing.** Undeclared and no structural signal — audit says nothing about it, and `--all` omits the row |
-| `new` | An **adoption candidate** (`ADOPTION_CANDIDATE`): reported with its signals as adoptable, never as broken. Step 1c lists the full conformance gap — declaration plus any missing artifact — because adoption is all-or-nothing (D17). Promotion candidates receive `PROMOTE` where there are no pages to merge against; orphan detection is skipped |
+| `new` | Full decomposition of SKILL.md body + **CREATE-driven scaffold** (.mditerc, log.md, schema.md, `## Pages`, `## Meta`) emitted by Step 1c; all promotion candidates receive `PROMOTE` (no existing pages to merge against); orphan detection skipped (no pre-existing pages) |
 | `partial-migration` | Enumerates existing sibling pages AND trapped SKILL.md body; applies merge intelligence; fixes D34 placement violation if present; Step 1d orphan detection runs |
-| `unhealthy` | Targets lint failures, schema violations, dangling entries, tag-prefix mismatches, a retired operations log still on disk, and duplicate `last-verified` keys; **Step 1d orphan detection runs** and overrides `KEEP` with `ORPHAN-LINK`/`DELETE` for graph-unreachable files; body decomposition only if body weight also exceeds threshold |
+| `unhealthy` | Targets lint failures, schema violations, dangling entries, tag-prefix mismatches; **Step 1d orphan detection runs** and overrides `KEEP` with `ORPHAN-LINK`/`DELETE` for graph-unreachable files; body decomposition only if body weight also exceeds threshold |
 | `healthy` | Exit immediately — no plan generated |
 
 ---
 
 ## Example plan output
 
-A full worked example of the plan file shape (5-line header + `## Files` table + `## Section
-Decomposition` table) is available on demand: see
-[`audit-examples.md#example-plan-output`](audit-examples.md#example-plan-output).
+```markdown
+state: partial-migration
+triggers: BODY_WEIGHT_EXCEEDED, D34_PLACEMENT_VIOLATION
+files-accounted: 12
+pages-current: 6
+pages-proposed: 14
+
+## Files
+
+| Path | Action | Detail |
+|------|--------|--------|
+| SKILL.md | DECOMPOSE | 512 lines / 11 sections after ## Meta → per section-decomposition table |
+| schema.md | PATCH | fix tag prefix winforms → winforms-expert |
+| log.md | APPEND | migration log entry |
+| .mditerc | KEEP | entrypoint already correct |
+| bounds-cache.md | MERGE-INTO | substantial overlap with new bounds-cache section |
+| form-anchor-bottom-edge-on-resize.md | KEEP | standalone page, no overlap |
+
+## Section Decomposition
+
+| Section | Lines | Action | Target |
+|---------|-------|--------|--------|
+| ## Overview | 8 | KEEP | SKILL.md landing prose |
+| ## Architecture | 45 | PROMOTE | architecture.md |
+| ## Configuration | 62 | PROMOTE | configuration.md |
+| ## Event Handling | 38 | PROMOTE | event-handling.md |
+| ## Layered Windows | 120 | SPLIT | layered-windows/ (group index + 3 pages) |
+```
