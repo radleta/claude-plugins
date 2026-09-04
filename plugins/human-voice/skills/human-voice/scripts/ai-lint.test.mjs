@@ -173,3 +173,119 @@ test("detection tables are non-empty and well-formed", () => {
     assert.ok(typeof t.fix === "string" && t.fix.length > 0);
   }
 });
+
+test("here's a / let me know if you have report distinct severities", () => {
+  const here = analyze("Here's a quick update.");
+  const hereFinding = here.findings.find((f) => f.match.toLowerCase() === "here's a");
+  assert.ok(hereFinding, JSON.stringify(here.findings));
+  assert.equal(hereFinding.severity, "low");
+
+  const letKnow = analyze("Let me know if you have any concerns.");
+  const letFinding = letKnow.findings.find((f) => f.match.toLowerCase() === "let me know if you have");
+  assert.ok(letFinding, JSON.stringify(letKnow.findings));
+  assert.equal(letFinding.severity, "med");
+});
+
+test("narrowed 'commitment to' skips literal commitments, flags puffery", () => {
+  const clean = analyze("Our commitment to close by Friday stands.");
+  assert.ok(!matched(clean).some((m) => m.startsWith("commitment to")));
+
+  const flagged = analyze("We're proud of their commitment to excellence.");
+  assert.ok(matched(flagged).includes("commitment to excellence"));
+});
+
+test("narrowed 'navigate the' skips literal UI navigation, flags the cliche", () => {
+  const clean = analyze("navigate the settings panel");
+  assert.ok(!matched(clean).some((m) => m.startsWith("navigate the") || m.startsWith("navigating the")));
+
+  const flagged = analyze("navigating the complexities of tax law");
+  assert.ok(matched(flagged).includes("navigating the complexities"));
+});
+
+test("flags cross-sentence negative parallelism (isn't just X. It's Y.)", () => {
+  const r = analyze("It isn't just a dashboard. It's a philosophy.");
+  assert.ok(cats(r).includes("structure:isnt-just"), JSON.stringify(r.findings));
+});
+
+test("catches era throat-clearing, manufactured warmth, and game-changer", () => {
+  assert.ok(matched(analyze("in an era of rapid change")).includes("in an era of"));
+  assert.ok(matched(analyze("We're thrilled to announce the update.")).includes("thrilled to"));
+  assert.ok(matched(analyze("a real game-changer")).includes("game-changer"));
+});
+
+test("flags colon-headline formula but not a literal step heading", () => {
+  const formula = analyze("## Serverless: Why It Matters\n\nbody");
+  assert.ok(cats(formula).includes("formatting:colon-headline"));
+
+  const step = analyze("## Step 1: configure the webhook\n\nbody");
+  assert.ok(!cats(step).includes("formatting:colon-headline"));
+});
+
+test("masks fenced and inline code so tells inside code don't fire", () => {
+  const doc = [
+    "We should not delve into filler words here.",
+    "",
+    "```js",
+    "// delve is fine inside code",
+    "const message = \"delve\";",
+    "```",
+    "",
+    "Also skip `delve` when it's inline code.",
+  ].join("\n");
+  const r = analyze(doc);
+  const delveHits = r.findings.filter((f) => f.match.toLowerCase() === "delve");
+  assert.equal(delveHits.length, 1, JSON.stringify(r.findings));
+  assert.equal(delveHits[0].line, 1);
+});
+
+test("end-to-end: human sample yields no high-severity findings", () => {
+  const r = analyze(
+    "Here's a quick note: I reviewed the contract and the indemnification clause looks fine. Let me know if you have any concerns about section 4. Our commitment to close by Friday stands."
+  );
+  assert.equal(r.summary.high, 0, JSON.stringify(r.findings));
+});
+
+test("flags colon-fronted clause density but not a single instance", () => {
+  const dense = [
+    "The one finding I'd actually hand somebody: part-time consultants bill the same median.",
+    "",
+    "On us being related: bring it up yourself before anyone else does.",
+    "",
+    "One thing to flag now so it doesn't surprise anyone later: I'm set up to contract.",
+  ].join("\n");
+  const r = analyze(dense);
+  const f = r.findings.find((x) => x.category === "structure:colon-clause-density");
+  assert.ok(f, JSON.stringify(r.findings));
+  assert.equal(f.severity, "low");
+  assert.ok(f.match.startsWith("3 colon-fronted clauses"));
+
+  const single = analyze("On us being related: bring it up yourself before anyone else does.");
+  assert.ok(!cats(single).includes("structure:colon-clause-density"));
+});
+
+test("colon-clause density ignores code, URLs, times, headings, lists, and frontmatter", () => {
+  const doc = [
+    "---",
+    "title: the plan",
+    "author: someone",
+    "---",
+    "",
+    "## Serverless costs: what we measured",
+    "",
+    "We met at 14:30 and again at 09:15 to walk the numbers with the team.",
+    "",
+    "The reference is at https://example.com/a and the mirror at https://example.org/b now.",
+    "",
+    "- The first thing we checked: the invoices matched what the vendor quoted.",
+    "- The second thing we checked: the hours matched the invoices exactly.",
+    "",
+    "Run the helper with `node scripts/thing.mjs: run` to see the totals printed.",
+    "",
+    "```yaml",
+    "one thing we checked here: the invoices",
+    "another thing we checked: the hours",
+    "```",
+  ].join("\n");
+  const r = analyze(doc);
+  assert.ok(!cats(r).includes("structure:colon-clause-density"), JSON.stringify(r.findings));
+});

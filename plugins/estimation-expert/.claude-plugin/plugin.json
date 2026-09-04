@@ -1,6 +1,6 @@
 {
   "name": "estimation-expert",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Calibrated effort estimation for AI-augmented development workflows",
   "author": {
     "name": "Richard Adleta",

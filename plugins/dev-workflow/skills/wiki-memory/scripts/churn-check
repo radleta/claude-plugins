@@ -1,0 +1,529 @@
+#!/usr/bin/env bash
+# churn-check — git-only churn detector for a wiki-backed skill's auditable
+# reference set (md-link targets + code-cites: frontmatter values)
+#
+# Usage: churn-check <skill> [--json]
+#
+# Detects dead-or-changed source references. A reference is auditable ONLY
+# if it is a code-cites: frontmatter value or a literal markdown link
+# [text](target) — bare prose/inline-code path mentions are never extracted
+# (D13: auditable-reference convention; prose is unaudited by design).
+#
+# Exit codes:
+#   0 — clean (no churn found)
+#   1 — churn found (one or more dead or changed references)
+#   2 — bad input (usage error, invalid skill arg, skill not resolvable as wiki)
+#
+# No EX_UNAVAILABLE — this tool is git-only, no external fetch. Unix
+# predicate-command idiom (grep/diff-style: 0=clean, non-zero=condition-met,
+# distinct code=error) — a stated deviation from the skill's USER_ERROR=1
+# convention.
+
+set -euo pipefail
+
+_usage() {
+  cat <<'USAGE'
+Usage: churn-check <skill> [--json]
+
+Detects dead-or-changed source references for a wiki-backed skill's
+auditable reference set: markdown-link targets (literal ](...) syntax)
+and code-cites: frontmatter values. Prose/inline-code mentions are never
+extracted (auditable-reference convention — md links or code-cites only).
+
+Arguments:
+  <skill>     Skill folder name under .claude/skills/ (e.g. wiki-memory)
+
+Options:
+  --json      Emit the per-target churn list as JSON on stdout
+              (populated or empty, regardless of exit code)
+  -h, --help  Show this help and exit
+
+Exit codes:
+  0   clean — no churn found
+  1   churn found — one or more dead or changed references
+  2   bad input — usage error or skill not resolvable as a wiki
+USAGE
+}
+
+# --- Resolve script directory through symlinks (MSYS-safe) ---
+_resolve_script() {
+  local src="${BASH_SOURCE[0]}"
+  while [[ -L "$src" ]]; do
+    local dir
+    dir="$(cd "$(dirname "$src")" && pwd)"
+    src="$(readlink "$src")"
+    [[ "$src" != /* ]] && src="$dir/$src"
+  done
+  cd "$(dirname "$src")" && pwd
+}
+SCRIPT_DIR="$(_resolve_script)"
+
+# --- JSON string escaping ---
+_json_str() {
+  printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\n/\\n/g; s/\t/\\t/g; s/\r/\\r/g'
+}
+
+# --- Argument parsing ---
+CHURN_SKILL=""
+CHURN_JSON=false
+
+end_of_opts=false
+while [[ $# -gt 0 ]]; do
+  if [[ "$end_of_opts" == false && "$1" == "--" ]]; then
+    end_of_opts=true
+    shift
+    continue
+  fi
+  if [[ "$end_of_opts" == false && "$1" == -* ]]; then
+    case "$1" in
+      -h|--help) _usage; exit 0 ;;
+      --json) CHURN_JSON=true; shift ;;
+      *)
+        echo "ERROR: unknown option: $1" >&2
+        echo "Run 'churn-check --help' for usage." >&2
+        exit 2
+        ;;
+    esac
+  else
+    if [[ -z "$CHURN_SKILL" ]]; then
+      CHURN_SKILL="$1"
+      shift
+    else
+      echo "ERROR: unexpected argument: $1" >&2
+      echo "Run 'churn-check --help' for usage." >&2
+      exit 2
+    fi
+  fi
+done
+
+if [[ -z "$CHURN_SKILL" ]]; then
+  echo "ERROR: churn-check requires <skill> positional argument" >&2
+  echo "Run 'churn-check --help' for usage." >&2
+  exit 2
+fi
+
+# Allowlist: skill folder names are always [A-Za-z0-9_-]+ (see .claude/skills/
+# naming convention) — an allowlist is tighter than a hand-maintained denylist
+# and can't miss an unanticipated separator/metacharacter. (security-verifier
+# iter1 low finding: denylist-vs-allowlist for defense in depth.)
+if [[ ! "$CHURN_SKILL" =~ ^[A-Za-z0-9_-]+$ ]]; then
+  echo "ERROR: invalid skill path: $CHURN_SKILL" >&2
+  exit 2
+fi
+
+# --- Resolve skill directory using the skill-as-wiki triple-gate resolver ---
+# churn-check is a new standalone file (not wiki-health.sh) — it implements
+# its own copy of the resolver rather than sourcing wiki-health.sh, per this
+# step's explicit instruction (claude-code-ref-expert
+# wiki-health-subcommand-and-check-scope, referenced as shape only).
+# Walk up from $PWD looking for .claude/skills/<skill>/ with:
+#   1. SKILL.md present
+#   2. '## Pages' heading in SKILL.md
+#   3. .mditerc present with entrypoint: SKILL.md
+# Sets CHURN_SKILL_DIR (absolute) and CHURN_PROJECT_ROOT (absolute, the
+# ancestor directory containing .claude/) on success; returns 0 on hit, 1 on miss.
+CHURN_SKILL_DIR=""
+CHURN_PROJECT_ROOT=""
+_resolve_skill_as_wiki() {
+  local skill="$1"
+  local dir="${PWD%/}"
+  while [[ "$dir" != "/" && "$dir" != "." ]]; do
+    local candidate="$dir/.claude/skills/$skill"
+    if [[ -d "$candidate" && -f "$candidate/SKILL.md" ]]; then
+      if grep -q '^## Pages' "$candidate/SKILL.md" 2>/dev/null; then
+        if [[ -f "$candidate/.mditerc" ]] && grep -q '^entrypoint:[[:space:]]*SKILL\.md' "$candidate/.mditerc" 2>/dev/null; then
+          CHURN_SKILL_DIR="$candidate"
+          CHURN_PROJECT_ROOT="$dir"
+          return 0
+        fi
+      fi
+    fi
+    dir="$(dirname "$dir")"
+  done
+  # Fallback: try SCRIPT_DIR walk (parity with wiki-health.sh's resolvers)
+  local sdir="$SCRIPT_DIR"
+  while [[ "$sdir" != "/" && "$sdir" != "." ]]; do
+    local candidate="$sdir/.claude/skills/$skill"
+    if [[ -d "$candidate" && -f "$candidate/SKILL.md" ]]; then
+      if grep -q '^## Pages' "$candidate/SKILL.md" 2>/dev/null; then
+        if [[ -f "$candidate/.mditerc" ]] && grep -q '^entrypoint:[[:space:]]*SKILL\.md' "$candidate/.mditerc" 2>/dev/null; then
+          CHURN_SKILL_DIR="$candidate"
+          CHURN_PROJECT_ROOT="$sdir"
+          return 0
+        fi
+      fi
+    fi
+    sdir="$(dirname "$sdir")"
+  done
+  return 1
+}
+
+if ! _resolve_skill_as_wiki "$CHURN_SKILL"; then
+  echo "ERROR: skill '$CHURN_SKILL' not resolvable as wiki (SKILL.md + ## Pages + .mditerc required)" >&2
+  exit 2
+fi
+
+# --- Read exclude: patterns from a skill's .mditerc (gitignore-style subset,
+# see _wiki_path_excluded below for match semantics) ---
+# Own copy of wiki-health.sh's `_wiki_mditerc_exclude_patterns` — churn-check
+# sources nothing. Handles flow-style (exclude: [a, b]), block-style
+# (exclude:\n  - a\n  - b), a bare single-scalar value (exclude: a), CRLF
+# line endings, and single/double-quoted items. Absent .mditerc or absent
+# exclude: field -> empty output (no behavior change). Security-relevant
+# parse of repo content: awk/sed only, no eval, and every parsed pattern is
+# later used only inside a bash [[ ]] string/glob comparison — never
+# expanded into a command.
+_wiki_mditerc_exclude_patterns() {
+  local mditerc="$1"
+  [[ -f "$mditerc" ]] || return 0
+  tr -d '\r' < "$mditerc" | awk '
+    /^exclude:[[:space:]]*\[/ {
+      line = $0
+      sub(/^exclude:[[:space:]]*/, "", line)
+      gsub(/^\[|\][[:space:]]*$/, "", line)
+      n = split(line, items, /,[[:space:]]*/)
+      for (i = 1; i <= n; i++) {
+        item = items[i]
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", item)
+        gsub(/^"|"$/, "", item)
+        gsub(/^'"'"'|'"'"'$/, "", item)
+        if (item != "") print item
+      }
+      in_list = 0
+      next
+    }
+    /^exclude:[[:space:]]*$/ { in_list = 1; next }
+    /^exclude:/ {
+      line = $0
+      sub(/^exclude:[[:space:]]*/, "", line)
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", line)
+      gsub(/^"|"$/, "", line)
+      gsub(/^'"'"'|'"'"'$/, "", line)
+      if (line != "") print line
+      in_list = 0
+      next
+    }
+    in_list && /^[[:space:]]*-[[:space:]]/ {
+      item = $0
+      sub(/^[[:space:]]*-[[:space:]]*/, "", item)
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", item)
+      gsub(/^"|"$/, "", item)
+      gsub(/^'"'"'|'"'"'$/, "", item)
+      if (item != "") print item
+      next
+    }
+    in_list && /^[^[:space:]-]/ { in_list = 0 }
+  ' 2>/dev/null
+}
+
+# --- Test whether a wiki-root-relative path matches ANY of a
+# newline-delimited exclude-pattern list (documented gitignore-compatible
+# subset) ---
+# (a) no wildcard char -> exact relative-path match; (b) trailing "/**" ->
+# directory-prefix match (dir/** matches dir/ itself and everything below);
+# (c) otherwise a bash [[ == ]] glob match — bash's `*`/`?` cross "/"
+# (divergence from gitignore's own semantics), accepted for this subset.
+# Own copy of wiki-health.sh's `_wiki_path_excluded` — churn-check sources
+# nothing.
+_wiki_path_excluded() {
+  local rel="$1" patterns="$2"
+  local pattern
+  while IFS= read -r pattern; do
+    [[ -z "$pattern" ]] && continue
+    if [[ "$pattern" == */\*\* ]]; then
+      local prefix="${pattern%/\*\*}"
+      [[ "$rel" == "$prefix" || "$rel" == "$prefix"/* ]] && return 0
+    else
+      [[ "$rel" == $pattern ]] && return 0
+    fi
+  done <<< "$patterns"
+  return 1
+}
+
+# --- Extract code-cites list from a page's YAML frontmatter ---
+# Own copy of wiki-health.sh's _extract_code_cites — churn-check sources
+# nothing. Outputs one raw cite value per line (may carry an optional
+# ":line" suffix, stripped by the caller before path resolution).
+_extract_code_cites() {
+  local page_path="$1"
+  awk '
+    NR == 1 && !/^---[[:space:]]*$/ { exit }
+    /^---/ { count++; if (count == 2) exit; next }
+    count == 1 && /^code-cites:/ {
+      line = $0
+      gsub(/^code-cites:[[:space:]]*/, "", line)
+      if (line ~ /^\[/) {
+        gsub(/[\[\]]/, "", line)
+        n = split(line, items, /,[[:space:]]*/)
+        for (i = 1; i <= n; i++) {
+          gsub(/^[[:space:]]+|[[:space:]]+$/, "", items[i])
+          if (items[i] != "") print items[i]
+        }
+        found = 1
+      } else if (line == "" || line ~ /^[[:space:]]*$/) {
+        in_list = 1
+      } else {
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", line)
+        if (line != "") print line
+        found = 1
+      }
+      next
+    }
+    count == 1 && in_list && /^[[:space:]]*-[[:space:]]/ {
+      item = $0
+      gsub(/^[[:space:]]*-[[:space:]]*/, "", item)
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", item)
+      if (item != "") print item
+      next
+    }
+    count == 1 && in_list && /^[^[:space:]-]/ { in_list = 0 }
+  ' "$page_path" 2>/dev/null
+}
+
+# --- Extract md-link targets from a page's body (post-frontmatter content) ---
+# Guarded regex: requires literal ](...) markdown-link syntax — the ]
+# immediately preceding ( — NEVER the loose \([^)]*\.md\) pattern (three
+# prior false-positive regression sites in wiki-health.sh; see
+# claude-code-ref-expert wiki-health-parsing-contracts). Filters out
+# non-repo-path schemes (http(s)://, mailto:, obsidian://, file://) and
+# pure-anchor targets (#heading) — these carry no git existence/churn
+# signal and are not auditable source references (D13). Strips a trailing
+# #fragment from an otherwise-real path target. Fence-aware (AD5): a line
+# matching ^``` flips an in-fence flag; while in-fence, link extraction is
+# skipped, so illustrative links inside fenced code blocks are never
+# flagged. Inline-code spans (`` `[x](y)` `` on a prose line) remain a
+# documented limitation — not fence-toggled, extracted as usual. Outputs
+# one target per line.
+_extract_md_link_targets() {
+  local page_path="$1"
+  awk '
+    NR == 1 && /^---[[:space:]]*$/ { count++; next }
+    NR == 1 { count = 2 }
+    count == 1 && /^---/ { count++; next }
+    count < 2 { next }
+    /^```/ { in_fence = !in_fence; next }
+    in_fence { next }
+    {
+      line = $0
+      while (match(line, /\]\([^)]*\)/)) {
+        raw = substr(line, RSTART + 2, RLENGTH - 3)
+        line = substr(line, RSTART + RLENGTH)
+        if (raw == "") continue
+        if (raw ~ /^https?:\/\//) continue
+        if (raw ~ /^mailto:/) continue
+        if (raw ~ /^obsidian:\/\//) continue
+        if (raw ~ /^file:\/\//) continue
+        if (raw ~ /^#/) continue
+        sub(/#.*$/, "", raw)
+        if (raw == "") continue
+        print raw
+      }
+    }
+  ' "$page_path" 2>/dev/null
+}
+
+# --- Normalize a path string's ./ and ../ segments (pure bash, no realpath
+# dependency) --- MSYS-safe fallback for _resolve_abs below: `realpath -m`
+# fails silently on MSYS, a first-class platform for this repo, and its old
+# fallback (`|| echo "$base_dir/$raw"`) returned the raw un-normalized
+# concatenation, which would make containment classification silently
+# mis-resolve .. segments. Operates purely on the string (no filesystem
+# access, no symlink resolution) — parity with realpath -m's "does not
+# require the path to exist" contract, minus symlink resolution. Input MUST
+# be an absolute path (all call sites pass an absolute base_dir).
+_normalize_path() {
+  local input="$1"
+  local IFS='/'
+  local -a parts
+  # Disable pathname expansion for the split below — an unquoted array
+  # assignment is subject to globbing, and a raw target segment containing
+  # *, ?, or [ must split as a literal string, not glob-expand against cwd
+  # entries. Restore the prior glob setting immediately after the split.
+  local restore_glob=""
+  case $- in *f*) ;; *) set -f; restore_glob=1 ;; esac
+  parts=($input)
+  [[ -n "$restore_glob" ]] && set +f
+  local -a stack=()
+  local part
+  for part in "${parts[@]}"; do
+    case "$part" in
+      "" | ".") continue ;;
+      "..")
+        if [[ "${#stack[@]}" -gt 0 ]]; then
+          stack=("${stack[@]:0:$((${#stack[@]} - 1))}")
+        fi
+        ;;
+      *) stack+=("$part") ;;
+    esac
+  done
+  local result="" seg
+  for seg in "${stack[@]}"; do
+    result+="/$seg"
+  done
+  [[ -z "$result" ]] && result="/"
+  printf '%s' "$result"
+}
+
+# --- Resolve a raw target string to an absolute path ---
+# code-cites values are repo-root-relative (existing wiki-memory convention);
+# md-link targets are relative to the referencing page's own directory.
+# Caller contract: reject absolute (leading "/") targets BEFORE calling this
+# — an absolute target is never resolved or probed. Relative targets
+# (including ..-containing ones) are resolved HERE first; the caller then
+# containment-checks the resolved path (against CHURN_PROJECT_ROOT for the
+# md-link loop) BEFORE any filesystem/git probe runs — this function
+# performs no containment check itself. (The code-cites loop additionally
+# pre-rejects any *..* target before calling this, unchanged, since
+# code-cites values are always repo-root-relative with no legitimate need
+# for .. segments; the md-link loop cannot pre-reject *..* the same way
+# because a page-relative external link requires .. by construction — see
+# the resolve-then-contain rework at the md-link guard below.) Falls back to
+# pure-bash ./.. normalization (_normalize_path) when `realpath -m` fails or
+# produces empty output.
+_resolve_abs() {
+  local base_dir="$1" raw="$2"
+  local resolved
+  resolved="$(realpath -m "$base_dir/$raw" 2>/dev/null)" || resolved=""
+  if [[ -n "$resolved" ]]; then
+    printf '%s' "$resolved"
+  else
+    _normalize_path "$base_dir/$raw"
+  fi
+}
+
+# --- Walk pages, extract targets, run the git churn/existence test ---
+HIT_TARGETS=()
+HIT_KINDS=()
+HIT_SHAS=()
+HIT_SCOPES=()
+HIT_LINES=()
+
+# Two-tier enumeration (BUG 1 fix) mirroring wiki-health.sh's
+# _wiki_collect_pages freshness page walk exactly: maxdepth-2 (group/page
+# two-tier, D12), excluding scripts/, assets/, protocols/, fixtures/ subdirs
+# and the same special-file set (SKILL.md, log.md, schema.md, index.md), plus
+# per-wiki .mditerc exclude: filtering (gitignore-style subset — see
+# _wiki_path_excluded above). fixtures/ holds test-fixture .md files, not
+# knowledge pages (see wiki-health-fixtures-census-exclusion). Own copy —
+# churn-check sources nothing (no-sourcing convention).
+pages=()
+CHURN_EXCLUDE_PATTERNS="$(_wiki_mditerc_exclude_patterns "$CHURN_SKILL_DIR/.mditerc")"
+while IFS= read -r -d '' f; do
+  rel="${f#"$CHURN_SKILL_DIR"/}"
+  [[ "$rel" == scripts/* || "$rel" == assets/* || "$rel" == protocols/* || "$rel" == fixtures/* ]] && continue
+  base="$(basename "$f")"
+  [[ "$base" == "SKILL.md" || "$base" == "log.md" || "$base" == "schema.md" || "$base" == "index.md" ]] && continue
+  [[ -n "$CHURN_EXCLUDE_PATTERNS" ]] && _wiki_path_excluded "$rel" "$CHURN_EXCLUDE_PATTERNS" && continue
+  pages+=("$f")
+done < <(find "$CHURN_SKILL_DIR" -maxdepth 2 -name "*.md" \
+          -not -path "*/scripts/*" -not -path "*/assets/*" -not -path "*/protocols/*" -not -path "*/fixtures/*" \
+          -print0 2>/dev/null | sort -z)
+
+for page in "${pages[@]}"; do
+  page_dir="$(dirname "$page")"
+
+  # Page's own last-touched commit time — the churn baseline for this page's
+  # targets (same git-log mechanism as wiki-health.sh's freshness Tier-1).
+  t_page="$(git log -1 --format=%at -- "$page" 2>/dev/null || true)"
+
+  # code-cites: targets (repo-root-relative). Always external-semantic
+  # (AD2/AD3) — a code-cites value points at a source file, never at an
+  # internal wiki page — so MISSING and CHANGED both apply, same as before
+  # the split (churn matrix row: code-cites → external → MISSING+CHANGED).
+  while IFS= read -r cite; do
+    [[ -z "$cite" ]] && continue
+    cite_path="${cite%%:*}"
+    # Reject absolute paths and .. traversal segments BEFORE resolution —
+    # mirrors wiki-health.sh's containment guard (page_path == /* || *..*,
+    # wiki-health.sh:241) so a crafted code-cites value can't escape
+    # CHURN_PROJECT_ROOT and turn this tool into a filesystem existence
+    # oracle. (security-verifier iter1 high finding.) UNCHANGED — code-cites
+    # values are always repo-root-relative with no legitimate need for ..
+    # segments, so this pre-resolution reject is not the resolve-then-contain
+    # rework applied to the md-link loop below.
+    [[ "$cite_path" == /* || "$cite_path" == *..* ]] && continue
+    abs="$(_resolve_abs "$CHURN_PROJECT_ROOT" "$cite_path")"
+
+    if [[ ! -e "$abs" ]]; then
+      sha="$(git log -1 --format=%H -- "$abs" 2>/dev/null || true)"
+      HIT_TARGETS+=("$cite"); HIT_KINDS+=("code-cite"); HIT_SHAS+=("$sha"); HIT_SCOPES+=("external")
+      HIT_LINES+=("$(basename "$page")	code-cite	$cite	MISSING	${sha:-unknown}")
+      continue
+    fi
+
+    if [[ -n "$t_page" ]]; then
+      sha="$(git log --since="$t_page" -1 --format=%H -- "$abs" 2>/dev/null || true)"
+      if [[ -n "$sha" ]]; then
+        HIT_TARGETS+=("$cite"); HIT_KINDS+=("code-cite"); HIT_SHAS+=("$sha"); HIT_SCOPES+=("external")
+        HIT_LINES+=("$(basename "$page")	code-cite	$cite	CHANGED	$sha")
+      fi
+    fi
+  done <<< "$(_extract_code_cites "$page")"
+
+  # md-link targets (page-relative). Resolve-then-contain (reworked from the
+  # old pre-resolution *..* reject): a page-relative external link
+  # legitimately requires .. segments to escape the skill dir by
+  # construction (e.g. ../../wiki-memory/scripts/wiki-write.sh), so
+  # pre-rejecting every ..-containing target would make the external class
+  # structurally empty (AD2/AD3). Only a leading "/" (absolute) is rejected
+  # pre-resolution — never resolved, never probed. Relative targets are
+  # resolved FIRST via _resolve_abs, then containment-checked against
+  # CHURN_PROJECT_ROOT; a target that resolves outside the project root is
+  # rejected with NO filesystem or git probe on it (preserves the
+  # existence-oracle security property the guard was added for — see the
+  # comment at the code-cites guard above). Once containment passes,
+  # classify internal (resolves under CHURN_SKILL_DIR) vs external
+  # (resolves under CHURN_PROJECT_ROOT but outside CHURN_SKILL_DIR) per AD2,
+  # then apply the churn matrix (AD3): MISSING applies to both scopes;
+  # CHANGED-since-page-commit applies to external only (internal wiki pages
+  # change constantly — not a churn signal).
+  while IFS= read -r target; do
+    [[ -z "$target" ]] && continue
+    [[ "$target" == /* ]] && continue
+    abs="$(_resolve_abs "$page_dir" "$target")"
+
+    case "$abs" in
+      "$CHURN_PROJECT_ROOT"/*) ;;
+      *) continue ;;
+    esac
+
+    case "$abs" in
+      "$CHURN_SKILL_DIR"/*) scope="internal" ;;
+      *) scope="external" ;;
+    esac
+
+    if [[ ! -e "$abs" ]]; then
+      sha="$(git log -1 --format=%H -- "$abs" 2>/dev/null || true)"
+      HIT_TARGETS+=("$target"); HIT_KINDS+=("md-link"); HIT_SHAS+=("$sha"); HIT_SCOPES+=("$scope")
+      HIT_LINES+=("$(basename "$page")	md-link	$target	MISSING	${sha:-unknown}")
+      continue
+    fi
+
+    if [[ "$scope" == "external" && -n "$t_page" ]]; then
+      sha="$(git log --since="$t_page" -1 --format=%H -- "$abs" 2>/dev/null || true)"
+      if [[ -n "$sha" ]]; then
+        HIT_TARGETS+=("$target"); HIT_KINDS+=("md-link"); HIT_SHAS+=("$sha"); HIT_SCOPES+=("$scope")
+        HIT_LINES+=("$(basename "$page")	md-link	$target	CHANGED	$sha")
+      fi
+    fi
+  done <<< "$(_extract_md_link_targets "$page")"
+done
+
+# --- Emit output ---
+if [[ "$CHURN_JSON" == true ]]; then
+  targets_json=""
+  for i in "${!HIT_TARGETS[@]}"; do
+    [[ -n "$targets_json" ]] && targets_json+=","
+    targets_json+="{\"target\":\"$(_json_str "${HIT_TARGETS[$i]}")\",\"kind\":\"$(_json_str "${HIT_KINDS[$i]}")\",\"scope\":\"$(_json_str "${HIT_SCOPES[$i]}")\",\"contradicting-sha\":\"$(_json_str "${HIT_SHAS[$i]}")\"}"
+  done
+  printf '{"skill":"%s","targets":[%s]}\n' "$(_json_str "$CHURN_SKILL")" "$targets_json"
+elif [[ "${#HIT_LINES[@]}" -gt 0 ]]; then
+  for line in "${HIT_LINES[@]}"; do
+    printf '%s\n' "$line"
+  done
+fi
+
+if [[ "${#HIT_TARGETS[@]}" -gt 0 ]]; then
+  exit 1
+fi
+exit 0

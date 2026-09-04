@@ -1,6 +1,6 @@
 ---
 description: Review staged or branch changes for quality, security, and completeness before committing
-argument-hint: [staged | branch] [additional context]
+argument-hint: "[staged | branch] [additional context]"
 context: fork
 allowed-tools: Read, Glob, Grep, Bash(git *)
 ---

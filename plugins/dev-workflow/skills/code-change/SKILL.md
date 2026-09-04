@@ -29,123 +29,6 @@ Use this skill whenever you need to:
 - Initial project scaffolding
 - Documentation-only updates (minor)
 
-## Your Expertise Level as Code-Change
-
-<expertise-contract>
-  <your-identity>Expert code change specialist with investigation-driven quality assurance</your-identity>
-
-  <what-you-promised>
-    Your skill description claims you "Guide high-quality code changes with project investigation, quality checklists, testing, and documentation."
-    Users invoke this skill expecting expert-level guidance for production-quality code changes.
-    You MUST deliver at this level, or you are misrepresenting your capabilities.
-  </what-you-promised>
-
-  <available-knowledge>
-    <currently-loaded>
-      <file>SKILL.md</file>
-      <contains>
-        - Overview and philosophy
-        - When to use this skill
-        - Core workflow summary (6 steps)
-        - High-level guidance navigation
-      </contains>
-      <limitation>This is 14.2% of your total knowledge base (234 of 1,651 lines)</limitation>
-    </currently-loaded>
-
-    <available-to-read>
-      <file name="INVESTIGATION.md" size="386 lines">
-        Complete investigation protocols: technology stack detection, pattern discovery methods, documentation standards analysis, testing conventions, code style rules, tool-specific investigation commands
-      </file>
-
-      <file name="CHECKLISTS.md" size="402 lines">
-        Comprehensive quality checklists: Code Quality Checklist (25+ items), Testing Checklist (15+ items), Documentation Checklist (10+ items), CHANGELOG Checklist, validation protocols
-      </file>
-
-      <file name="EXAMPLES.md" size="629 lines">
-        Real-world examples: feature implementation walkthrough, bug fix workflow, refactoring patterns, investigation reports, test coverage examples, documentation updates
-      </file>
-    </available-to-read>
-  </available-knowledge>
-
-  <self-assessment-required>
-    **BEFORE responding to any code change request, you MUST assess:**
-
-    <question-1>What code change is the user requesting?</question-1>
-    <question-2>What knowledge do I need to guide this change with quality assurance?</question-2>
-    <question-3>Do I currently have that knowledge from SKILL.md alone?</question-3>
-    <question-4>Which files should I read to fill knowledge gaps?</question-4>
-
-    <decision-criteria>
-      <ask-yourself>
-        - Am I about to guide investigation without reading INVESTIGATION.md protocols?
-        - Am I about to validate code quality without reading CHECKLISTS.md?
-        - Am I about to recommend patterns without checking EXAMPLES.md?
-        - Am I about to skip testing or documentation guidance?
-        - Would reading X file make my guidance measurably more thorough?
-      </ask-yourself>
-
-      <if-answer-yes>Read those files FIRST, then guide code change</if-answer-yes>
-      <if-answer-no>SKILL.md alone is sufficient (very rare)</if-answer-no>
-      <if-uncertain>Err on side of reading more - incomplete guidance causes quality issues</if-uncertain>
-    </decision-criteria>
-  </self-assessment-required>
-
-  <knowledge-inventory>
-    **Before responding, check what you know vs. what you need:**
-
-    <check item="Workflow Overview">
-      <have>✓ Available in SKILL.md</have>
-    </check>
-
-    <check item="Investigation Protocols">
-      <have>✗ Need to read INVESTIGATION.md</have>
-    </check>
-
-    <check item="Code Quality Standards">
-      <have>✗ Need to read CHECKLISTS.md</have>
-    </check>
-
-    <check item="Testing Requirements">
-      <have>✗ Need to read CHECKLISTS.md</have>
-    </check>
-
-    <check item="Documentation Standards">
-      <have>✗ Need to read CHECKLISTS.md</have>
-    </check>
-
-    <check item="Real-World Patterns">
-      <have>✗ Need to read EXAMPLES.md</have>
-    </check>
-
-    **Match your knowledge needs to the code change type.**
-  </knowledge-inventory>
-
-  <accountability>
-    <failure-mode>
-      If you guide code changes without reading necessary quality protocols:
-      - You delivered incomplete guidance while claiming expert quality assurance
-      - You violated the contract your skill description made
-      - You had comprehensive checklists available but chose not to access them
-      - The user trusted your expertise and got low-quality code changes
-      - Missing tests, documentation, or quality checks create technical debt
-      - The user's team inherits poorly validated changes
-    </failure-mode>
-
-    <integrity-check>
-      After guiding a code change, ask yourself:
-      "Did I use all available quality protocols to ensure comprehensive guidance?"
-      If no, you failed the expertise contract.
-    </integrity-check>
-  </accountability>
-
-  <guiding-principle>
-    **For all code changes, always read INVESTIGATION.md first to understand project context.**
-    Always read CHECKLISTS.md to ensure quality, testing, and documentation completeness.
-    For patterns and examples, always check EXAMPLES.md.
-    Token cost is irrelevant compared to guiding high-quality, production-ready code changes.
-  </guiding-principle>
-</expertise-contract>
-
 ---
 
 ## Core Workflow (6 Steps)
@@ -176,7 +59,7 @@ Design your solution following discovered patterns:
 - Identify documentation to update
 - Consider backwards compatibility
 - Plan migration guide (if breaking changes)
-- Get user confirmation (if needed)
+- Get user confirmation (if needed) — skip when an orchestrator owns confirmation (e.g. an autonomous pipeline like `/implement-code` that proceeds through its verify-fix loop without per-step sign-off)
 
 **Follow project patterns discovered in investigation**
 
@@ -211,7 +94,7 @@ Keep all documentation current:
 - Update inline documentation (docstrings, comments)
 - Update README (if public API or setup changed)
 - Update API documentation (if applicable)
-- Create CHANGELOG entry (required for all changes)
+- Create CHANGELOG entry (required for all changes) — skip when an orchestrator owns doc updates (e.g. `/implement-code` defers doc and changelog rollups to `doc-updater` at its boundary-2 sweep)
 - Update architectural docs (if applicable)
 - Add migration guide (if breaking changes)
 
@@ -238,7 +121,7 @@ Final checks before completion:
 - ✅ **Investigate first** - Never skip Step 1
 - ✅ **Run all applicable checklists** - Use them as guides
 - ✅ **Update documentation** - Every change needs docs
-- ✅ **Create CHANGELOG entry** - Document user-facing changes
+- ✅ **Create CHANGELOG entry** - Document user-facing changes (per Step 5 — skip when an orchestrator owns doc updates)
 - ✅ **Validate before completion** - All checks must pass
 - ✅ **Follow project conventions** - Adapt to discovered patterns
 
@@ -250,7 +133,7 @@ Final checks before completion:
 - ❌ Skip investigation phase
 - ❌ Forget to write tests
 - ❌ Leave documentation outdated
-- ❌ Ignore CHANGELOG updates
+- ❌ Ignore CHANGELOG updates (unless Step 5's orchestrator-owns exception applies)
 - ❌ Skip validation checks
 - ❌ Introduce breaking changes without migration guides
 
@@ -331,7 +214,7 @@ You've successfully used this skill when:
 - ✅ Code follows discovered conventions
 - ✅ Tests are comprehensive and pass
 - ✅ Documentation is up to date
-- ✅ CHANGELOG entry created
+- ✅ CHANGELOG entry created (or explicitly deferred to an orchestrator per Step 5)
 - ✅ All validation checks pass
 - ✅ Code is ready for review
 

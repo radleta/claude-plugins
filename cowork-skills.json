@@ -2,11 +2,60 @@
   "release_tag": "cowork-latest",
   "skills": [
     {
+      "skill": "agent-voice",
+      "source_dir": "plugins/agent-voice/skills/agent-voice",
+      "asset": "agent-voice.zip",
+      "url": "https://github.com/radleta/claude-plugins/releases/download/cowork-latest/agent-voice.zip",
+      "displayName": "Agent Voice"
+    },
+    {
+      "skill": "completeness-expert",
+      "source_dir": "plugins/completeness-expert/skills/completeness-expert",
+      "asset": "completeness-expert.zip",
+      "url": "https://github.com/radleta/claude-plugins/releases/download/cowork-latest/completeness-expert.zip",
+      "displayName": "Completeness Expert"
+    },
+    {
+      "skill": "discuss-methodology",
+      "source_dir": "plugins/discuss-methodology/skills/discuss-methodology",
+      "asset": "discuss-methodology.zip",
+      "url": "https://github.com/radleta/claude-plugins/releases/download/cowork-latest/discuss-methodology.zip",
+      "displayName": "Discuss Methodology"
+    },
+    {
+      "skill": "estimation-expert",
+      "source_dir": "plugins/estimation-expert/skills/estimation-expert",
+      "asset": "estimation-expert.zip",
+      "url": "https://github.com/radleta/claude-plugins/releases/download/cowork-latest/estimation-expert.zip",
+      "displayName": "Estimation Expert"
+    },
+    {
       "skill": "human-voice",
       "source_dir": "plugins/human-voice/skills/human-voice",
       "asset": "human-voice.zip",
       "url": "https://github.com/radleta/claude-plugins/releases/download/cowork-latest/human-voice.zip",
       "displayName": "Human Voice"
+    },
+    {
+      "skill": "interview-methodology",
+      "source_dir": "plugins/interview-methodology/skills/interview-methodology",
+      "asset": "interview-methodology.zip",
+      "url": "https://github.com/radleta/claude-plugins/releases/download/cowork-latest/interview-methodology.zip",
+      "displayName": "Interview Methodology"
+    },
+    {
+      "skill": "knowledge-distillation",
+      "source_dir": "plugins/research-and-capture/skills/knowledge-distillation",
+      "asset": "knowledge-distillation.zip",
+      "url": "https://github.com/radleta/claude-plugins/releases/download/cowork-latest/knowledge-distillation.zip",
+      "displayName": "Knowledge Distillation"
+    },
+    {
+      "skill": "writing-expert",
+      "source_dir": "plugins/writing-expert/skills/writing-expert",
+      "asset": "writing-expert.zip",
+      "url": "https://github.com/radleta/claude-plugins/releases/download/cowork-latest/writing-expert.zip",
+      "displayName": "Writing Expert"
     }
   ]
 }

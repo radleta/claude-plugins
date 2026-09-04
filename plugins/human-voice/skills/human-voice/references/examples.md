@@ -38,7 +38,9 @@ A real recipient instantly senses a machine — and the warmth reads as fake.
 > Richard
 
 (Honors the user's stated style: no "Dear", no "I hope this finds you well", no closing
-phrase before the signature, signs off as "Richard".)
+phrase before the signature, signs off as "Richard". Also note the deliberate "…not just
+who opened": the negative-parallelism shape used once, anchored to a concrete contrast,
+reads human. A stack of them is the tell — density, not presence.)
 
 ## Tier 1 — Blog post intro (still scrub hard — it persuades)
 
@@ -59,7 +61,10 @@ detected AI-ness kills it. It belongs in Tier 1, not Tier 2.
 > what I'd do differently.
 
 (Replaced throat-clearing and filler with a specific claim, a number, and a promise of
-concrete payoff. That's what earns the next paragraph.)
+concrete payoff. That's what earns the next paragraph. The closing triple — "how we set
+it up, what broke, and what I'd do differently" — is a rule of three used once with three
+concrete, load-bearing items; that reads human. Three vague adjectives repeated across
+paragraphs is the tell.)
 
 ## Tier 2 — How-to guide (light scrub)
 

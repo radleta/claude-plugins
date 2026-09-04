@@ -1,0 +1,19 @@
+{
+  "name": "research-and-capture",
+  "version": "1.0.1",
+  "description": "Wiki-first codebase investigation plus the capture and ingestion layer that turns what a session learned into durable wiki knowledge",
+  "author": {
+    "name": "Richard Adleta",
+    "email": "radleta@gmail.com",
+    "url": "https://github.com/radleta"
+  },
+  "repository": "https://github.com/radleta/claude-plugins",
+  "license": "MIT",
+  "keywords": [
+    "research",
+    "investigation",
+    "knowledge",
+    "wiki",
+    "capture"
+  ]
+}

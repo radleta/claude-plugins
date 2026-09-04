@@ -7,6 +7,8 @@ description: "Structured option-batch protocol for soliciting user decisions —
 
 This skill defines a structured option-batch protocol for soliciting user decisions: 3 options per question with an explicit recommendation, batched (cap 5), with a convergence declaration closing the session.
 
+**No install, no tooling.** The protocol is prose and runs anywhere Claude runs — Claude Cowork or any packaged copy included. The `.claude/skills/` paths further down appear only in this skill's recorded design history, as the worked example of the protocol; nothing in the protocol itself reads them.
+
 ## When to Use This Skill
 
 Load this skill when any of the following callsites is active:
@@ -176,7 +178,7 @@ A run that produces any Unlocked entries is NOT converged. Re-batch and re-evalu
 
 ### Example 2 — Convergence declaration
 
-**Scenario:** All open questions answered; convergence check after brainstorming step 9.
+**Scenario:** All open questions answered; convergence check as the exit artifact of brainstorming step 8 (Open Questions Gate).
 
 ```
 ## Convergence Declaration

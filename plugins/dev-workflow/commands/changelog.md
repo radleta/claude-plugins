@@ -1,6 +1,6 @@
 ---
 description: Generate changelog entries from git history between two refs, organized by change type
-argument-hint: [from-ref] [to-ref]
+argument-hint: "[from-ref] [to-ref]"
 context: fork
 allowed-tools: Read, Glob, Grep, Bash(git *)
 ---

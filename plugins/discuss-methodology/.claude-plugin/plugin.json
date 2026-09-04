@@ -1,0 +1,17 @@
+{
+  "name": "discuss-methodology",
+  "version": "1.0.1",
+  "description": "Interview a plan, decision, or design relentlessly until nothing is left unasked",
+  "author": {
+    "name": "Richard Adleta",
+    "email": "radleta@gmail.com",
+    "url": "https://github.com/radleta"
+  },
+  "repository": "https://github.com/radleta/claude-plugins",
+  "license": "MIT",
+  "keywords": [
+    "discussion",
+    "elicitation",
+    "design-tree"
+  ]
+}

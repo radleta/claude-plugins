@@ -310,6 +310,7 @@ context: fork
           <check>.claude/commands/*.md files have valid YAML frontmatter</check>
           <check>.claude/skills/*/SKILL.md files have valid YAML frontmatter</check>
           <check>No secrets or sensitive paths in Claude configuration</check>
+          <check>No published-primitive scratch/ artifact citations: run `scripts/check-scratch-refs.sh` — any `[published]` hit is a BLOCKER (the primitive is staged by a plugin manifest and the citation will not resolve in an installed copy); `[local]` hits are WARNING</check>
         </checks>
         <skip-if>No .claude/ directory or CLAUDE.md detected</skip-if>
       </domain>

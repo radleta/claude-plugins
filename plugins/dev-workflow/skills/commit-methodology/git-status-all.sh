@@ -66,6 +66,8 @@ while IFS= read -r line || [ -n "$line" ]; do
   # Trim leading/trailing whitespace
   line="$(echo "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
   [ -z "$line" ] && continue
+  # Expand a leading ~ so .subrepos can name repos outside the parent tree
+  line="${line/#\~/$HOME}"
   # Strip trailing slash for consistency
   line="${line%/}"
   REPOS+=("$line")
@@ -101,10 +103,19 @@ CLEAN_COUNT=0
 SKIP_COUNT=0
 INLINE_SUMMARY=""
 
+# A repo path is not usable as a filename: an external path carries slashes and may
+# carry spaces. Keep the path verbatim for `git -C` and slugify it for the diff file.
+slugify() {
+  local s="${1#"$HOME"/}"
+  s=$(printf '%s' "$s" | tr -c 'A-Za-z0-9._-' '-')
+  printf '%s' "$s" | sed 's/-\{2,\}/-/g; s/^-//; s/-$//'
+}
+
 gather_repo_state() {
   local repo_path="$1"
   local repo_name="$2"
-  local diff_file="$DIFF_DIR/$repo_name.diff"
+  local repo_slug="$3"
+  local diff_file="$DIFF_DIR/$repo_slug.diff"
 
   # Check if repo exists
   if [ ! -d "$repo_path" ]; then
@@ -163,6 +174,15 @@ gather_repo_state() {
   # Write per-repo diff file (only if dirty)
   if [ "$is_dirty" = true ]; then
     {
+      echo "=== SNAPSHOT ==="
+      echo "Repo: $repo_path"
+      echo "Captured: $(date -u '+%Y-%m-%dT%H:%M:%SZ') — BEFORE /commit-all stages anything."
+      echo "ADVISORY ONLY. Everything below reports the pre-staging tree, so STAGED_* is"
+      echo "normally empty and the DIFF section omits untracked files entirely. A repo whose"
+      echo "changes are all new files shows an empty DIFF. Never write a commit message from"
+      echo "this file — run 'git-state -C <repo>' after staging to get the real changeset."
+
+      echo ""
       echo "=== STATUS ==="
       git -C "$repo_path" status
 
@@ -208,9 +228,9 @@ gather_repo_state() {
 
 for repo in "${ORDERED_REPOS[@]}"; do
   if [ "$repo" = "." ]; then
-    gather_repo_state "." "main"
+    gather_repo_state "." "main" "main"
   else
-    gather_repo_state "$repo" "$repo"
+    gather_repo_state "$repo" "$repo" "$(slugify "$repo")"
   fi
 done
 

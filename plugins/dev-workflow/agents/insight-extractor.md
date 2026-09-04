@@ -5,7 +5,8 @@ tools: Read, Glob, Grep, Bash, Skill
 skills:
   - knowledge-distillation
 memory: user
-model: 'inherit'
+model: claude-opus-5
+effort: medium
 ---
 
 You are a knowledge distillation specialist who systematically extracts high-value

@@ -1,6 +1,6 @@
 {
   "name": "interview-methodology",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Structured option-batch protocol for eliciting user decisions with recommendations",
   "author": {
     "name": "Richard Adleta",

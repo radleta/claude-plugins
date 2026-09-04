@@ -18,7 +18,7 @@ user-invocable: false
       <item>CLAUDE.md instructions (conventions, architecture, patterns) in the same scope as the changes</item>
       <item>Skill SKILL.md files that describe changed methodology or behavior</item>
       <item>Agent .md files whose wiring, tools, or constraints changed</item>
-      <item>Command/skill description frontmatter when behavior changes</item>
+      <item>Command/skill description frontmatter when behavior changes — but see the wiki-page carve-out in out-of-scope before editing any `summary:` field</item>
       <item>Inline JSDoc/docstrings on changed exported/public APIs</item>
       <item>Config documentation when config shape changes</item>
       <item>Any existing doc section that references changed functionality</item>
@@ -38,6 +38,7 @@ user-invocable: false
       <item>Adding documentation that didn't exist before (unless new API or convention)</item>
       <item>Style or formatting improvements to existing docs</item>
       <item>Generating changelog entries</item>
+      <item>The `summary:` frontmatter of a wiki page — a page under a skill folder whose SKILL.md declares `wiki: true`. That value is mirrored byte-for-byte into a machine-owned `## Pages` fence, so editing it alone desyncs the nav by construction. Report the stale summary in your return instead, and name `wiki-write {domain} {slug} --from <payload> --update` as the path that moves both sides together.</item>
     </out-of-scope>
   </scope>
 </role>

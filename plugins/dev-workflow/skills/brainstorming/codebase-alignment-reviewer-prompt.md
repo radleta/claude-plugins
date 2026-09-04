@@ -4,10 +4,16 @@ Dispatched via the `codebase-alignment-reviewer` agent. Read-only; persists its 
 
 **Parameters:**
 - `{PROJECT_NAME}` — scratch subdir slug
-- `{PHASE}` — `idea` | `spec`
-- `{ITER}` — 1-based iteration number within the review loop
-- `{ARTIFACT_PATH}` — absolute path to the idea or spec doc
-- `{DEPTH}` — `light` (idea, advisory) | `thorough` (spec, blocking)
+- `{PHASE}` — `idea`
+- `{ITER}` — `1`; there is one pass
+- `{ARTIFACT_PATH}` — absolute path to `idea.md`
+- `{DEPTH}` — `thorough`
+
+`idea.md` is the binding artifact the build derives from directly, so an alignment
+conflict left advisory here reaches the coder unchallenged: findings land in
+`## Issues` and block approval. A non-blocking note the reviewer emits under
+`## Implementation Notes` is moved by main into `idea.md`'s own
+`## Implementation Notes`.
 
 ```
 Agent({
@@ -23,9 +29,7 @@ Agent({
     - depth: {DEPTH}
     - iteration: {ITER}
 
-    ## Your Prior Verdicts (iteration 2+ only — read these first)
-    {one bullet per path in PRIOR_CODEBASE_PATHS, in iteration order}
-    (Omit this block entirely on iter 1 — no prior verdicts exist.)
+    ## Your Prior Verdicts (omit — there is one pass and no prior verdict)
 })
 ```
 

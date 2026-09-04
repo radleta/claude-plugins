@@ -1,7 +1,7 @@
 {
   "name": "scratch-memory",
-  "version": "1.3.2",
-  "description": "Project-scoped scratch-memory: MCP tools (write_report, write_review, write_issue) for sub-agent verdicts plus scratch-memory CLI (handoff, pickup, register with opt-in PostToolUse hook) for session state persistence and ownership transfer across Claude Code sessions, plus the commit-session verb for per-session file validation and the handoff-manager agent for HANDOFF.md synthesis and resume briefs",
+  "version": "1.3.3",
+  "description": "Project-scoped scratch-memory: MCP tools (write_report, write_review, write_issue, write_session, write_task) for sub-agent verdicts, session handoffs, and task capture plus scratch-memory CLI (handoff, pickup, register with two opt-in PostToolUse hooks, tasks, epics) for session state persistence and ownership transfer across Claude Code sessions, plus the commit-session verb for per-session file validation and rewrite-pointer/cat-sessions (with --with-tasks) verbs for v3 HANDOFF.md pointer regeneration and resume briefs; plus the capture-issue command and the scratch/issues/ corpus conventions (schema including the optional epic/spike keys, open|resolved lifecycle, triage, resolution) documented in scratch-issues-methodology, with the epics verb group deriving an epic's workable spike frontier from those files",
   "author": {
     "name": "Richard Adleta",
     "email": "radleta@gmail.com",
@@ -19,6 +19,11 @@
     "session",
     "rename",
     "validate",
-    "hook"
+    "hook",
+    "issues",
+    "triage",
+    "tasks",
+    "epics",
+    "spikes"
   ]
 }

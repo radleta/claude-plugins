@@ -1,6 +1,6 @@
 {
   "name": "completeness-expert",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Enforces complete output and verification before declaring tasks done",
   "author": {
     "name": "Richard Adleta",

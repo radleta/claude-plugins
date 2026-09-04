@@ -41,15 +41,15 @@ JUST_ONE_NAME="visual-companion"
 
 check_deps() {
   local missing=()
-  for dep in node curl just-one; do
+  for dep in node npx curl; do
     if ! command -v "$dep" &>/dev/null; then
       missing+=("$dep")
     fi
   done
   if [[ ${#missing[@]} -gt 0 ]]; then
     echo "ERROR: missing required dependencies: ${missing[*]}" >&2
-    echo "Install: npm install -g @radleta/just-one  (for just-one)" >&2
-    echo "         node and curl must be on PATH" >&2
+    echo "node, npx, and curl must be on PATH" >&2
+    echo "just-one itself is fetched on demand via npx @radleta/just-one" >&2
     exit 2
   fi
 }
@@ -233,16 +233,16 @@ server_info_field() {
 # --- just-one helpers ---
 
 just_one_cmd() {
-  just-one -n "$JUST_ONE_NAME" -d "$CONFIG_DIR" "$@"
+  npx @radleta/just-one -n "$JUST_ONE_NAME" -d "$CONFIG_DIR" "$@"
 }
 
 # Status/kill helpers — these commands take name as their own argument, not via -n
 just_one_is_running() {
-  just-one -s "$JUST_ONE_NAME" -d "$CONFIG_DIR" -q 2>/dev/null
+  npx @radleta/just-one -s "$JUST_ONE_NAME" -d "$CONFIG_DIR" -q 2>/dev/null
 }
 
 just_one_kill() {
-  just-one -k "$JUST_ONE_NAME" -d "$CONFIG_DIR" "$@" 2>/dev/null
+  npx @radleta/just-one -k "$JUST_ONE_NAME" -d "$CONFIG_DIR" "$@" 2>/dev/null
 }
 
 # --- Poll helpers ---
@@ -285,14 +285,14 @@ ensure_server() {
   # Try -e (ensure) mode: starts only if not already running
   if ! just_one_cmd -e -D -- node "$SCRIPT_DIR/server.cjs" 2>/dev/null; then
     echo "ERROR: just-one failed to start server" >&2
-    echo "Check logs: just-one -L $JUST_ONE_NAME -d $CONFIG_DIR" >&2
+    echo "Check logs: npx @radleta/just-one -L $JUST_ONE_NAME -d $CONFIG_DIR" >&2
     exit 2
   fi
 
   # Wait for .server-info
   if ! poll_server_info; then
     echo "ERROR: server failed to write server-info within 5 seconds" >&2
-    echo "Check logs: just-one -L $JUST_ONE_NAME -d $CONFIG_DIR" >&2
+    echo "Check logs: npx @radleta/just-one -L $JUST_ONE_NAME -d $CONFIG_DIR" >&2
     exit 2
   fi
 
@@ -302,7 +302,7 @@ ensure_server() {
   # Poll /_ready
   if ! poll_ready "$RESOLVED_PORT"; then
     echo "ERROR: server started but /_ready not responding within 3 seconds" >&2
-    echo "Check logs: just-one -L $JUST_ONE_NAME -d $CONFIG_DIR" >&2
+    echo "Check logs: npx @radleta/just-one -L $JUST_ONE_NAME -d $CONFIG_DIR" >&2
     exit 2
   fi
 }
@@ -415,13 +415,13 @@ cmd_start() {
 
   if ! just_one_cmd -e -D -- node "$SCRIPT_DIR/server.cjs" 2>/dev/null; then
     echo "ERROR: just-one failed to start server" >&2
-    echo "Check logs: just-one -L $JUST_ONE_NAME -d $CONFIG_DIR" >&2
+    echo "Check logs: npx @radleta/just-one -L $JUST_ONE_NAME -d $CONFIG_DIR" >&2
     exit 2
   fi
 
   if ! poll_server_info; then
     echo "ERROR: server failed to write server-info within 5 seconds" >&2
-    echo "Check logs: just-one -L $JUST_ONE_NAME -d $CONFIG_DIR" >&2
+    echo "Check logs: npx @radleta/just-one -L $JUST_ONE_NAME -d $CONFIG_DIR" >&2
     exit 2
   fi
 
@@ -432,7 +432,7 @@ cmd_start() {
 
   if ! poll_ready "$port"; then
     echo "ERROR: server started but /_ready not responding within 3 seconds" >&2
-    echo "Check logs: just-one -L $JUST_ONE_NAME -d $CONFIG_DIR" >&2
+    echo "Check logs: npx @radleta/just-one -L $JUST_ONE_NAME -d $CONFIG_DIR" >&2
     exit 2
   fi
 
@@ -632,7 +632,7 @@ Config directory:
   Default: ~/.claude/visual-companion/
   Override: VISUAL_COMPANION_CONFIG_DIR=<path>
 
-Requires: node, curl, just-one (npm install -g @radleta/just-one)
+Requires: node, npx, curl (just-one is fetched on demand via npx @radleta/just-one)
 
 Examples:
   visual-companion add scratch/my-feature/   Register dir, start server, get URL

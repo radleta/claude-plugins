@@ -40,8 +40,13 @@ argument-hint: [plan name or path — auto-detected if omitted]
   NOT a suggestion requiring user acknowledgment.
 
   Only stop when:
-  - Same issue fails 3+ fix attempts (escalate)
-  - Iteration count >= 4 (require acknowledgment)
+  - The same verifier hits the canonical fix-loop cap — **3 attempts per
+    verifier** (see Fix Protocol below) — with the issue still failing.
+    Escalate to the user; do not keep retrying past the cap.
+  - The thorough-mode skill coverage gate fires (see Plan Detection below).
+    This is the ONE documented exception to "do NOT stop" above — present
+    every coverage gap to the user, who must build or waive each before
+    the pipeline proceeds.
 </autonomous-execution>
 
 ## Plan Detection
@@ -76,11 +81,11 @@ Step 3: security-verifier agent         (security — FINAL gate, reviews approv
 <workflow type="sequential">
   <step id="1-completeness" order="first">
     <description>Completeness gate (plan-aware)</description>
-    <action>Launch the **completeness-verifier** agent via the Agent tool. Build the dispatch prompt with: plan path, step file paths, decisions path, changed file list (git diff --name-only), implementation summary, and documented deviations. Same dispatch template as implement-code step 3b.</action>
+    <action>Launch the **completeness-verifier** agent via the Agent tool and wait for its completion notification — step 2 cannot start until its verdict returns. Build the dispatch prompt with: plan path, step file paths, decisions path, changed file list (git diff --name-only), implementation summary, and documented deviations.</action>
     <gate-logic>
       <if>**Verdict:** COMPLETE</if>
       <then>Proceed to step 2</then>
-      <else>Fix incomplete items, re-run completeness-verifier (max 10 cycles)</else>
+      <else>Fix incomplete items, re-run completeness-verifier (per the canonical 3-attempt cap — see Fix Protocol below)</else>
     </gate-logic>
     <blocks>2-code-review</blocks>
   </step>
@@ -89,10 +94,11 @@ Step 3: security-verifier agent         (security — FINAL gate, reviews approv
     <description>Parallel code review with structural + domain reviewers</description>
     <actions>
       <action>Launch the **code-verifier** agent via the Agent tool (quality focus: naming, style, DRY, codebase-alignment)</action>
-      <action>Launch a **codebase-alignment** reviewer via the Agent tool using the prompt template at `~/.claude/skills/brainstorming/codebase-alignment-reviewer-prompt.md` (artifact_type=diff, depth=REVIEW_DEPTH)</action>
+      <action>Launch the **codebase-alignment-reviewer** agent via the Agent tool directly — matching the direct-dispatch pattern used by the other Step-2 reviewers (no prompt-template file; the agent already knows its own protocol). Dispatch is a thin parameter block: `Agent(subagent_type="codebase-alignment-reviewer", description="Codebase alignment review", prompt="Artifact: <changed files>\nDepth: REVIEW_DEPTH\nType: diff")`. The agent persists its verdict via `mcp__scratch-memory__write_review` and returns the standard two-line contract (`Wrote:` / `Status: APPROVED | ISSUES_FOUND`).</action>
       <action condition="plan exists (REVIEW_DEPTH=light)">Launch a **requirements-coverage** reviewer via the Agent tool — traces code to plan steps using code-verifier with requirements categories only</action>
       <!-- Canonical affinity groups
-           Keep in sync with implement-code.md, brainstorming SKILL.md, and plan-expert SKILL.md affinity maps
+           Keep in sync with brainstorming SKILL.md affinity maps
+           (implement-code.md carries no domain-reviewer dispatch; brainstorming passes every relevant skill in one dispatch)
            AFFINITY_GROUPS:
              frontend:     [react-expert, typescript-expert]
              backend-net:  [csharp-expert, dynamodb-expert, google-sheets-expert]  # shared .NET/C# integration context
@@ -106,16 +112,23 @@ Step 3: security-verifier agent         (security — FINAL gate, reviews approv
     <note>Launch all applicable agents in parallel (multiple Agent calls in one message).
     Each agent runs in its own isolated context with its methodology skill preloaded.
 
-    **Model selection:** All reviewer agents default to Sonnet (set in their agent
-    definitions). At dispatch time, you may override to `model: opus` for any
-    reviewer when the change involves cross-cutting architectural concerns, complex
-    state management, or subtle correctness reasoning that checklist-driven review
-    would miss. Default to Sonnet — the burden of proof is on escalation.
+    **Model selection: pass no `model` at all.** Every reviewer agent pins its own
+    model version and effort in its frontmatter — `claude-opus-5` at `low` for
+    verdict work. The Agent tool's `model` parameter takes bare aliases only, so an
+    override here would replace a pinned version with whatever `opus` points at
+    today and silently discard the agent's effort pin. Change the agent file
+    instead.
 
     **Verdict evaluation:** After reading each reviewer's verdict, check for shallow
     output (rubber-stamp with no file:line refs, missed known issues, inapplicable
     flags, vague findings). If a verdict appears shallow, re-dispatch ONLY that
-    reviewer with `model: opus` for higher-fidelity review.
+    reviewer — with the same dispatch, unchanged — and say in the report that it was
+    re-run. A shallow verdict that survives a re-run is evidence to raise that
+    agent's `effort:` pin one step, which is a file edit the user reviews, not a
+    dispatch-time decision.
+
+    Normative copy of these escalation rules: the `dispatch-tier-rubric` skill —
+    edit there first, then sync this condensed copy.
 
     When REVIEW_DEPTH = "light" (plan exists):
     - code-verifier runs with quality focus
@@ -136,18 +149,18 @@ Step 3: security-verifier agent         (security — FINAL gate, reviews approv
     <gate-logic>
       <if>ALL APPROVED (unanimous)</if>
       <then>Proceed to step 3</then>
-      <else>Fix issues, re-run failed agents (max 10 cycles)</else>
+      <else>Fix issues, re-run failed agents (per the canonical 3-attempt cap — see Fix Protocol below)</else>
     </gate-logic>
     <blocks>3-security</blocks>
   </step>
 
   <step id="3-security" order="third">
     <description>Security gate (final review)</description>
-    <action>Launch the **security-verifier** agent via the Agent tool, passing session context summary as the prompt</action>
+    <action>Launch the **security-verifier** agent via the Agent tool and wait for its completion notification — step 4 (report) needs its verdict first, passing session context summary as the prompt</action>
     <gate-logic>
       <if>APPROVED</if>
       <then>All gates passed — report results</then>
-      <else>Fix security issues, re-run security-verifier agent (max 10 cycles)</else>
+      <else>Fix security issues, re-run security-verifier agent (per the canonical 3-attempt cap — see Fix Protocol below)</else>
     </gate-logic>
   </step>
 
@@ -175,12 +188,16 @@ Step 3: security-verifier agent         (security — FINAL gate, reviews approv
 
 ## Fix Protocol
 
+**Canonical cap: 3 attempts per verifier.** This is the single fix-loop cap for
+the entire pipeline — every "re-run" reference above points here; no other
+cap value (10 cycles, 4 iterations, etc.) applies anywhere in this command.
+
 When a verification returns issues:
 1. Read the findings (file:line references)
 2. IMMEDIATELY fix the issues
 3. IMMEDIATELY re-run the verification
-4. Repeat until APPROVED or max cycles (3) reached
-5. If max cycles reached: stop and report to user
+4. Repeat until APPROVED or the same verifier has failed 3 attempts
+5. If the 3-attempt cap is reached: stop and report to user (escalate — see Autonomous Execution above)
 
 ## Context
 

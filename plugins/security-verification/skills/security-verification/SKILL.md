@@ -91,6 +91,24 @@ AI-generated code frequently introduces security vulnerabilities:
 - Conditional: runs only when `## Invariants` is present, non-empty, and contains security-relevant keywords
 - Anti-pattern: security invariants documented in spec but no code path enforces them
 
+## OWASP Top 10 Coverage
+
+Ensure analysis addresses all ten categories, even where this skill's named Detection
+Categories above don't use OWASP numbering directly:
+
+| # | OWASP Category | Mapped Detection Category |
+|---|-----------------|---------------------------|
+| A01 | Broken Access Control | authentication |
+| A02 | Cryptographic Failures | cryptography |
+| A03 | Injection | injection |
+| A04 | Insecure Design | assess against the attack surface mapped in Step 1 |
+| A05 | Security Misconfiguration | configuration |
+| A06 | Vulnerable Components | dependencies |
+| A07 | Auth Failures | authentication |
+| A08 | Data Integrity Failures | verify deserialization / CI-CD integrity where applicable |
+| A09 | Logging Failures | logging-failures |
+| A10 | SSRF | verify outbound request validation where applicable |
+
 ## Out of Scope
 
 - Completeness verification (use /verify-todo)
@@ -124,144 +142,8 @@ Determine APPROVED or ISSUES_FOUND with detailed findings.
 
 ## Output Format
 
-```
-## Security Verification Report
-
-**VERDICT: [APPROVED|ISSUES_FOUND]**
-
----
-
-### Attack Surface Summary
-
-**Entry Points Identified:**
-[List of API endpoints, user inputs, file uploads, etc.]
-
-**Sensitive Data Flows:**
-[List of sensitive data and how it flows through the system]
-
-**Authentication Boundaries:**
-[List of protected vs unprotected endpoints]
-
----
-
-### Security Analysis
-
-**✅ Good Security Practices Found:**
-- [Practice]: [Where observed and why it's good]
-
-**❌ Vulnerabilities Found:**
-- [Vulnerability]: [file:line] - [Severity: CRITICAL/HIGH/MEDIUM/LOW]
-
----
-
-### Detailed Findings (if ISSUES_FOUND)
-
-**Injection Vulnerabilities:**
-| File | Line | Type | Vulnerable Code | Remediation |
-|------|------|------|-----------------|-------------|
-
-**Authentication Issues:**
-| File | Line | Issue | Risk | Remediation |
-|------|------|-------|------|-------------|
-
-**Data Exposure Risks:**
-| File | Line | Data Type | Exposure | Remediation |
-|------|------|-----------|----------|-------------|
-
-**Input Validation Issues:**
-| File | Line | Input | Missing Validation | Risk |
-|------|------|-------|-------------------|------|
-
-**Cryptography Issues:**
-| File | Line | Issue | Risk | Remediation |
-|------|------|-------|------|-------------|
-
-**Configuration Issues:**
-| File | Line | Misconfiguration | Risk | Remediation |
-|------|------|------------------|------|-------------|
-
----
-
-### OWASP Top 10 Checklist
-
-| # | Category | Status | Notes |
-|---|----------|--------|-------|
-| A01 | Broken Access Control | ✅/❌ | [Details] |
-| A02 | Cryptographic Failures | ✅/❌ | [Details] |
-| A03 | Injection | ✅/❌ | [Details] |
-| A04 | Insecure Design | ✅/❌ | [Details] |
-| A05 | Security Misconfiguration | ✅/❌ | [Details] |
-| A06 | Vulnerable Components | ✅/❌ | [Details] |
-| A07 | Auth Failures | ✅/❌ | [Details] |
-| A08 | Data Integrity Failures | ✅/❌ | [Details] |
-| A09 | Logging Failures | ✅/❌ | [Details] |
-| A10 | SSRF | ✅/❌ | [Details] |
-
----
-
-### Recommendations
-
-**Critical (must fix before merge):**
-1. [Specific fix with file:line and exact remediation]
-
-**High Priority (should fix before merge):**
-1. [Specific fix with file:line]
-
-**Medium Priority (fix soon):**
-1. [Improvement suggestion]
-
----
-
-### Summary
-
-**Overall Assessment:**
-[Detailed paragraph explaining security status]
-
-**Security Risk Score:** [X/10] (10 = critical risk, 0 = minimal risk)
-**Vulnerabilities Found:** [count] critical, [count] high, [count] medium, [count] low
-**Recommendation:** [APPROVED for merge / FIX security issues first]
-```
-
-## Examples
-
-### ISSUES_FOUND Example
-
-```
-## Security Verification Report
-
-**VERDICT: ISSUES_FOUND**
-
-### Detailed Findings
-
-**Injection Vulnerabilities:**
-| File | Line | Type | Vulnerable Code | Remediation |
-|------|------|------|-----------------|-------------|
-| api/users.ts | 45 | SQL | `WHERE name LIKE '%${query}%'` | Use parameterized query |
-
-**Authentication Issues:**
-| File | Line | Issue | Risk | Remediation |
-|------|------|-------|------|-------------|
-| api/admin.ts | 12 | No auth check | Unauthorized data access | Add requireAdmin middleware |
-
-**Security Risk Score:** 9/10
-**Recommendation:** FIX security issues first
-```
-
-### APPROVED Example
-
-```
-## Security Verification Report
-
-**VERDICT: APPROVED**
-
-### Security Analysis
-
-**✅ Good Security Practices Found:**
-- Parameterized queries: All SQL uses prepared statements
-- Input validation: All user inputs validated and sanitized
-- Authentication: JWT with proper validation on all protected routes
-- Secure headers: CSP, X-Frame-Options, X-Content-Type-Options set
-
-**Security Risk Score:** 1/10
-**Recommendation:** APPROVED for merge
-```
+Output format is owned by the dispatching agent's contract. Findings are grouped
+by detection category (injection, authentication, data-exposure, input-validation,
+cryptography, configuration, dependencies, logging-failures, security-invariants-honored)
+with `file:line` citations and a severity (CRITICAL/HIGH/MEDIUM/LOW) — the dispatching
+agent's contract determines the literal report structure.

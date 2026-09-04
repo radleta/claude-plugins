@@ -10,6 +10,9 @@ scope here).
 any of these. What's diagnostic is **density** — clusters of these in one passage. Scrub
 the clusters first.
 
+Tells drift as models are retuned — "delve" is already fading from newer models. Last
+audited: 2026-07. Re-audit this catalog against current-model output when models change.
+
 The `ai-lint` tool catches the items marked 🔧 automatically — but it's optional. If it
 isn't available (e.g. in Claude Cowork), scan for the 🔧 items yourself against this
 catalog; they're all plain lexical/structural patterns you can spot by reading. The
@@ -51,6 +54,8 @@ Words that show up far more in AI text than human text. They're not banned — t
 | myriad, plethora, diverse array | "many", or give a number |
 | elevate, enhance, enduring, groundbreaking, renowned | plain verb; cut hype |
 | utilize, embark, commence, synergy, holistic, actionable, impactful, learnings | use, start, start, benefit, whole, usable, the impact, lessons |
+| deep dive | "close look", or just cover it |
+| game-changer / unlock (the full, the power, your potential, new) | say what changed / name the concrete benefit |
 
 **Prefer the plain (Anglo-Saxon) word over the Latinate one** — AI leans formal/Latinate:
 utilize→use, commence→start, subsequently→then, prior to→before, sufficient→enough,
@@ -74,6 +79,7 @@ The "travel brochure" and "press release" registers. The text *sells* instead of
 | "rich cultural heritage", "rich history" | Name the specific events/people |
 | "commitment to excellence / sustainability / quality" | Show the action, not the slogan |
 | "seamlessly connecting…", "dependable, value-driven…" | Describe what it does concretely |
+| "In an era where… / In a world where…" | Cut the throat-clearing; start at the point |
 
 Rule of thumb: if a sentence would fit unchanged in an advertisement, it's puffery.
 
@@ -110,6 +116,7 @@ The most recognizable AI fingerprints. Several are 🔧 caught by `ai-lint`.
 | "it's not just X, it's Y" | State what it *is* |
 | "not a mirror but a portal", "not X, but rather Y" | Lead with the positive; drop the setup |
 | "X rather than Y" (as faux-insight) | Say the point directly |
+| "isn't just X. It's Y." / "doesn't just X — it's Y" | State what it is (🔧 now caught) |
 
 **Rule of three** (needs judgment) — three parallel items, compulsively:
 
@@ -149,6 +156,16 @@ The most recognizable AI fingerprints. Several are 🔧 caught by `ai-lint`.
 |-----|-----|
 | "X is the Y of Z", "not a tool but a mirror", "the currency/architecture/language of…" | Delete, or make a concrete claim |
 
+**Colon-fronted clauses** 🔧 (density, not any single instance) — a colon inside body
+prose introducing the explanation, distinct from the "X: Why Y Matters" *heading*
+formula in §7:
+
+| Cue | Fix |
+|-----|-----|
+| "The useful bit for us: part-time consultants bill the same median." | Make it two sentences, or one with a comma |
+| "On us being related: bring it up yourself." | Recast — "On us being related, bring it up yourself" |
+| Several paragraphs in one document all fronting a clause this way | One is fine; a repeat is a template — vary the punctuation |
+
 **Staccato drama** (the inverse of even rhythm):
 
 | Cue | Fix |
@@ -179,6 +196,7 @@ by `ai-lint`.
 | Infomercial hooks | "The catch?", "The kicker?", "Sound familiar?" (as standalone teasers) | Cut the teaser; state it |
 | Faux-candor openers | "Here's the thing", "Let's be honest", "Real talk", "Honestly?" (as standalone hooks) | Just be direct |
 | Treadmill restatement | "In other words", "Put simply", "To put it another way", "Essentially," then the same point | Say it once, well |
+| Rhetorical-question transitions | "So what does this mean?", "Why does this matter?" | Cut; state the point |
 
 ## 6. Paragraph and section structure
 
@@ -198,6 +216,8 @@ Larger patterns — judgment-level, not regex-catchable.
 The **reshuffle test** is the single most useful structural check: human prose has a
 dependency chain; AI produces a bag of co-equal points.
 
+## 7. Formatting tells
+
 🔧 Mostly caught by `ai-lint`. Especially damaging in attributed prose (Tier 1), where
 heavy markdown screams "generated."
 
@@ -210,6 +230,7 @@ heavy markdown screams "generated."
 | **Emoji** in professional or attributed prose | Remove |
 | **Title Case Headings** ("Impact Of Technology And Growth") | Sentence case, unless house style is Title Case |
 | Lists where flowing prose is expected (e.g. an email body) | Write it as sentences |
+| Colon headline formula: "X: Why Y Matters" | Say the point as the title (🔧 caught) |
 
 ## 8. Chatbot and assistant artifacts
 
@@ -227,3 +248,4 @@ that's supposed to be the user's. Never ship these in attributed text.
 | Placeholder text: "[insert name here]", "This section would discuss…" | Fill it in or remove |
 | Sycophancy: "You're absolutely right", "Of course!" | Delete |
 | Servile offers: "Would you like me to…", "Happy to help" | Delete, or make a specific ask |
+| "Thrilled to announce…", "Excited to share…", "Delighted to…" | Manufactured warmth — match the real register (🔧 caught) |

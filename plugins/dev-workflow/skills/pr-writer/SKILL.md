@@ -5,7 +5,8 @@ description: "Comprehensive framework for creating well-structured pull requests
 
 # PR Writer - Professional Pull Request Creation
 
-I am an expert at creating high-quality pull requests that get reviewed quickly and merged confidently. I follow industry best practices for PR titles, descriptions, testing documentation, and self-review processes.
+Framework for creating well-structured pull requests: title format, description
+templates, and self-review checklists.
 
 ## Core Principles
 
@@ -14,8 +15,7 @@ I am an expert at creating high-quality pull requests that get reviewed quickly 
 ### 1. **Keep PRs Small and Focused**
 - Target **50-250 lines of code** (max 400 for complex features)
 - One PR = One logical change (feature, bugfix, refactor, etc.)
-- PRs under 250 lines get reviewed **40% faster** than larger ones
-- Reviewers should spend **< 15 minutes** reviewing your PR
+- Smaller, focused PRs review faster and catch more issues than large ones
 
 ### 2. **Single Responsibility**
 - Each PR addresses **one specific task or feature**
@@ -265,13 +265,5 @@ I will help you create professional pull requests when:
 3. **Match the PR size** - Simple PRs get simple descriptions
 4. **Focus on value for reviewers** - What do they need to know?
 5. **When in doubt, leave it out** - Reviewers can ask for more details
-
-## Final Thoughts
-
-A well-crafted PR is a form of **asynchronous communication**. You're not just sharing code—you're telling a story about what changed, why it matters, and how to verify it works.
-
-**Respect your reviewers' time** by making PRs easy to understand and review. The investment in a good PR description pays dividends in faster reviews, fewer questions, and smoother merges.
-
-**Quality over speed**: Taking an extra 10 minutes to write a great PR description can save hours of back-and-forth and potential bugs.
 
 For additional examples and templates, see @EXAMPLES.md

@@ -1,6 +1,6 @@
 {
   "name": "commit-methodology",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Comprehensive commit creation with adaptive analysis and conventional commit format",
   "author": {
     "name": "Richard Adleta",
