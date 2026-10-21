@@ -1,6 +1,7 @@
 ---
 description: Reread all recently modified files in full and verify edits are consistent with surrounding code — catches what isolated edits miss
-argument-hint: [specific files or areas to focus on]
+disable-model-invocation: true
+argument-hint: "[specific files or areas to focus on]"
 ---
 
 # Verify Changes

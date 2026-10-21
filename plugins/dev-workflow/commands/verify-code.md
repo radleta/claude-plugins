@@ -1,9 +1,9 @@
 ---
 description: Code verification - unified quality and requirements review in a single pass before security review
-argument-hint: [plan name or path — auto-detected if omitted]
+argument-hint: "[plan name or path — auto-detected if omitted]"
 ---
 
-Launch the **code-verifier** agent via the Agent tool. Provide a concise paragraph as the prompt summarizing:
+Launch the **code-verifier** agent via the Agent tool and wait for its completion notification — this command's entire output is the agent's verdict. Provide a concise paragraph as the prompt summarizing:
 
 - What files were changed and why
 - What was implemented, fixed, or refactored

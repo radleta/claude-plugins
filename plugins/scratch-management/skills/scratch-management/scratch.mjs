@@ -3,9 +3,9 @@
  * scratch.mjs - Cross-platform scratch folder lifecycle manager
  *
  * Handles scratch folder lifecycle:
- * - save: Commit folder to main branch (keep working)
+ * - save: Commit folder to the checked-out branch (keep working); on a lane, also catch up and push
  * - archive: Move folder to archive branch (hide from agents)
- * - list: Show active folders on main
+ * - list: Show active folders on the checked-out branch
  * - archived: Show archived folders
  * - config: Show or update configuration
  *
@@ -17,13 +17,11 @@
  *   scratch config
  */
 
-import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readdirSync, statSync, rmSync, cpSync, writeFileSync, readFileSync } from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
+import { existsSync, mkdirSync, readdirSync, statSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
 import { join, resolve, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createInterface } from 'node:readline';
-import { tmpdir } from 'node:os';
-import { randomUUID } from 'node:crypto';
 
 // Get script directory (ESM equivalent of __dirname)
 const __filename = fileURLToPath(import.meta.url);
@@ -119,6 +117,7 @@ function git(args, options = {}) {
     cwd,
     encoding: 'utf-8',
     shell: false,
+    input: options.input,
   });
 
   if (result.error) {
@@ -143,6 +142,7 @@ function gitSilent(args, options = {}) {
     cwd,
     encoding: 'utf-8',
     shell: false,
+    input: options.input,
   });
 
   // Handle spawn errors (e.g., git not found)
@@ -161,6 +161,70 @@ function gitSilent(args, options = {}) {
     stderr: (result.stderr || '').trim(),
     error: null,
   };
+}
+
+/**
+ * Seconds a network git call may run: SCRATCH_NET_TIMEOUT, default 60. Exits on a value that is
+ * not a positive integer.
+ */
+function netTimeoutSeconds() {
+  const raw = process.env.SCRATCH_NET_TIMEOUT;
+  if (raw === undefined) return 60;
+  // setTimeout fires at once past 2^31-1 ms, so a larger value would time out every call.
+  if (!/^[1-9][0-9]*$/.test(raw) || Number(raw) > 2147483) {
+    console.error(`Usage: SCRATCH_NET_TIMEOUT must be a whole number of seconds from 1 to 2147483, not '${raw}'`);
+    process.exit(1);
+  }
+  return Number(raw);
+}
+
+/**
+ * Run a network git call (ls-remote, fetch, push) with a timeout and a non-interactive SSH, in
+ * gitSilent's result shape. On expiry it kills the whole process tree, since an ssh grandchild
+ * holding the pipes keeps the call open past a kill of git alone, then exits non-zero.
+ */
+function netGit(args) {
+  const seconds = netTimeoutSeconds();
+  const env = { ...process.env };
+  if (!env.GIT_SSH_COMMAND && !gitSilent(['config', '--get', 'core.sshCommand']).stdout) {
+    env.GIT_SSH_COMMAND = 'ssh -o ConnectTimeout=15 -o ServerAliveInterval=15 -o BatchMode=yes';
+  }
+  const isWindows = process.platform === 'win32';
+  return new Promise((resolvePromise) => {
+    const child = spawn('git', args, {
+      cwd: SCRATCH_DIR, env, shell: false, detached: !isWindows, stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (chunk) => { stdout += chunk; });
+    child.stderr.on('data', (chunk) => { stderr += chunk; });
+    const killTree = () => {
+      try {
+        if (isWindows) spawnSync(`${process.env.SystemRoot || 'C:\\Windows'}\\System32\\taskkill.exe`, ['/T', '/F', '/PID', String(child.pid)]);
+        else process.kill(-child.pid, 'SIGKILL');
+      } catch { /* the tree already exited */ }
+    };
+    // The detached group misses a terminal Ctrl+C, so pass an interrupt on to it before exiting.
+    const onSignal = (signal) => {
+      killTree();
+      process.exit(signal === 'SIGINT' ? 130 : 143);
+    };
+    process.once('SIGINT', onSignal);
+    process.once('SIGTERM', onSignal);
+    const settle = (result) => {
+      clearTimeout(timer);
+      process.off('SIGINT', onSignal);
+      process.off('SIGTERM', onSignal);
+      resolvePromise(result);
+    };
+    const timer = setTimeout(() => {
+      killTree();
+      console.error(`ERROR: git ${args[0]} timed out after ${seconds}s`);
+      process.exit(1);
+    }, seconds * 1000);
+    child.on('error', (error) => settle({ success: false, stdout: '', stderr: error.message, error }));
+    child.on('close', (code) => settle({ success: code === 0, stdout: stdout.trim(), stderr: stderr.trim(), error: null }));
+  });
 }
 
 /**
@@ -455,146 +519,7 @@ function getFolderState(name) {
 }
 
 /**
- * Initialize archive branch if it doesn't exist
- */
-async function initializeArchiveBranch(config) {
-  const branchExists = gitSilent(['branch', '--list', config.archiveBranch]);
-  if (branchExists.stdout) {
-    return;
-  }
-
-  // Preflight: without a reachable origin, the orphan path below creates a
-  // phantom init commit locally and then fails on push — leaving a divergent
-  // branch that can't be merged with the real remote if/when it comes back.
-  // Distinguish three states: origin missing, origin unreachable, origin ok.
-  const originUrl = gitSilent(['remote', 'get-url', 'origin']);
-  if (!originUrl.success) {
-    throw new Error(
-      'No git remote named "origin" is configured on the scratch repo. ' +
-      'Add one with: git -C scratch remote add origin <url>',
-    );
-  }
-  const remoteHasArchive = gitSilent([
-    'ls-remote', '--heads', 'origin', config.archiveBranch,
-  ]);
-  if (!remoteHasArchive.success) {
-    throw new Error(
-      `Cannot reach origin (${originUrl.stdout.trim()}): ${remoteHasArchive.stderr.trim() || 'network error'}. ` +
-      'Refusing to create archive branch locally — would diverge from remote.',
-    );
-  }
-  if (remoteHasArchive.stdout) {
-    // Remote already has archive — track it rather than create a divergent orphan.
-    writeStatus('Archive branch exists on remote, creating local tracking branch...', 'Info');
-    git(['fetch', 'origin', config.archiveBranch]);
-    git(['branch', config.archiveBranch, `origin/${config.archiveBranch}`]);
-    writeStatus('Archive branch tracking remote', 'Success');
-    return;
-  }
-
-  writeStatus('Creating archive branch (first-time setup)...', 'Info');
-
-  try {
-    git(['checkout', '--orphan', config.archiveBranch]);
-
-    // Clear the staging area (orphan branch inherits staged files from previous branch)
-    git(['rm', '-rf', '--cached', '.']);
-
-    const readmeContent = `# Scratch Archive\n\nArchived projects from ${config.projectName}.\nUse main branch for active projects.`;
-    writeFileSync(join(SCRATCH_DIR, 'README.md'), readmeContent, 'utf-8');
-
-    git(['add', 'README.md']);
-    git(['commit', '-m', sanitizeCommitMessage('Initialize archive branch')]);
-    // Force-checkout: `git rm --cached .` unstaged main's files but left them
-    // in the working tree as untracked. A plain `checkout main` refuses to
-    // overwrite untracked files — but these ARE main's files (the orphan
-    // checkout preserved the working tree), so -f is safe and idempotent.
-    git(['checkout', '-f', 'main']);
-    git(['push', '-u', 'origin', config.archiveBranch]);
-
-    writeStatus('Archive branch created', 'Success');
-  } catch (error) {
-    // Cleanup: force return to main. Same reasoning as above — if we got
-    // partway through, we may be stranded on the orphan branch with main's
-    // files as untracked, and a non-force checkout will also fail.
-    gitSilent(['checkout', '-f', 'main']);
-    throw new Error(`Failed to create archive branch: ${error.message}`);
-  }
-}
-
-/**
- * Sync archive branch with remote
- */
-async function syncArchiveBranch(config) {
-  writeStatus('Fetching latest from remote...', 'Info');
-  git(['fetch', 'origin']);
-
-  // Check if archive branch exists locally
-  const archiveExists = gitSilent(['branch', '--list', config.archiveBranch]);
-  if (!archiveExists.stdout) {
-    return; // No local archive branch yet
-  }
-
-  // Check if remote archive exists
-  const remoteArchiveExists = gitSilent(['ls-remote', '--heads', 'origin', config.archiveBranch]);
-  if (!remoteArchiveExists.stdout) {
-    return; // No remote archive branch
-  }
-
-  // Get current branch to restore later
-  const currentBranch = gitSilent(['branch', '--show-current']).stdout;
-
-  // Check if local archive is behind remote
-  const behindCount = gitSilent([
-    'rev-list',
-    '--count',
-    `${config.archiveBranch}..origin/${config.archiveBranch}`,
-  ]);
-
-  const behindCountNum = parseInt(behindCount.stdout, 10);
-  if (behindCount.success && !isNaN(behindCountNum) && behindCountNum > 0 && behindCountNum < Number.MAX_SAFE_INTEGER) {
-    writeStatus(
-      `Archive branch is ${behindCount.stdout} commit(s) behind remote, syncing...`,
-      'Info'
-    );
-
-    git(['checkout', config.archiveBranch]);
-
-    try {
-      // Try fast-forward first
-      const ffResult = gitSilent(['merge', '--ff-only', `origin/${config.archiveBranch}`]);
-      if (ffResult.success) {
-        writeStatus('Archive branch synced (fast-forward)', 'Success');
-      } else {
-        // Try automatic merge
-        writeStatus('Fast-forward not possible, attempting auto-merge...', 'Info');
-        const mergeResult = gitSilent(['merge', `origin/${config.archiveBranch}`, '--no-edit']);
-        if (!mergeResult.success) {
-          // Check for conflicts
-          const conflictCheck = gitSilent(['diff', '--name-only', '--diff-filter=U']);
-          if (conflictCheck.stdout) {
-            gitSilent(['merge', '--abort']);
-            throw new Error(
-              `Merge conflict in archive branch. Manual resolution required.\nConflicting files: ${conflictCheck.stdout}`
-            );
-          }
-          throw new Error(`Failed to sync archive branch: ${mergeResult.stderr}`);
-        }
-        writeStatus('Archive branch synced (auto-merge)', 'Success');
-      }
-    } finally {
-      // Return to original branch
-      if (currentBranch && currentBranch !== config.archiveBranch) {
-        gitSilent(['checkout', currentBranch]);
-      }
-    }
-  } else {
-    writeStatus('Archive branch is up to date', 'Info');
-  }
-}
-
-/**
- * Save command - commit folder to main branch
+ * Save command - commit folder to the checked-out branch
  */
 async function cmdSave(folder, config) {
   validateFolderName(folder);
@@ -611,171 +536,282 @@ async function cmdSave(folder, config) {
     }
   }
 
-  writeStatus(`Saving '${folder}' to main branch...`, 'Info');
-
-  const commitMessage = sanitizeCommitMessage(`Save: ${folder}`);
-
-  git(['add', `${folder}/`]);
-  git(['commit', '-m', commitMessage]);
-  git(['push', 'origin', 'main']);
+  const branch = git(['branch', '--show-current']) || '(detached)';
+  let status;
+  const lane = laneBranch();
+  if (lane) {
+    status = await saveOnLane(folder, branch, lane);
+  } else {
+    writeStatus(`Saving '${folder}' to ${branch}...`, 'Info');
+    git(['add', `${folder}/`]);
+    git(['commit', '-q', '-m', sanitizeCommitMessage(`Save: ${folder}`), '--', `${folder}/`]);
+    const pushNote = branch === 'main' ? "the push is the user's" : "the lane's plain push carries it";
+    status = `Committed on local ${branch}, not pushed; ${pushNote}`;
+  }
 
   console.log('');
   writeStatus('Folder saved successfully', 'Success');
   console.log('');
   console.log(`  Folder: ${folder}`);
-  console.log('  Branch: main');
-  console.log('  Status: Committed and pushed');
+  console.log(`  Branch: ${branch}`);
+  console.log(`  Status: ${status}`);
   console.log('');
   console.log('  Folder remains active (visible to agents).');
   console.log(`  To archive when done: scratch archive ${folder}`);
 }
 
 /**
- * Archive command - move folder to archive branch
+ * On a lane (lane-methodology § Claim): scratch/ holds an L-{lane}/README.md whose branch: is the
+ * parent repo's checked-out branch. Returns that branch, or null off a lane.
  */
-async function cmdArchive(folder, config) {
-  validateFolderName(folder);
-  checkScratchRepo();
-  checkFolderExists(folder);
-  await initializeArchiveBranch(config);
-  await syncArchiveBranch(config);
-
-  const state = getFolderState(folder);
-  writeStatus(`Archiving '${folder}' (${state})...`, 'Info');
-
-  const archiveCommitMsg = sanitizeCommitMessage(`Archive: ${folder}`);
-  const removeCommitMsg = sanitizeCommitMessage(`Archived ${folder} to archive branch`);
-
-  let tempDir = null;
-  let archiveSucceeded = false;
-
-  try {
-    if (state === 'uncommitted') {
-      // Path A: Uncommitted folder - TRANSACTIONAL approach
-      // Order: copy -> commit to archive -> push archive -> THEN delete from main
-
-      // Use random UUID for unique temp directory
-      tempDir = join(tmpdir(), `scratch-archive-${folder}-${randomUUID()}`);
-
-      // Step 1: Copy folder to temp (backup)
-      cpSync(join(SCRATCH_DIR, folder), tempDir, { recursive: true });
-      writeStatus('Backup created', 'Info');
-
-      // Step 2: Switch to archive branch and add folder
-      git(['checkout', config.archiveBranch]);
-      cpSync(tempDir, join(SCRATCH_DIR, folder), { recursive: true });
-      git(['add', `${folder}/`]);
-      git(['commit', '-m', archiveCommitMsg]);
-
-      // Step 3: Push archive branch BEFORE deleting from main
-      git(['push', 'origin', config.archiveBranch]);
-      writeStatus('Archived to remote', 'Info');
-
-      // Step 4: NOW safe to switch back to main
-      git(['checkout', 'main']);
-      // Git checkout removes the folder (it's tracked on archive, not on main)
-      const folderPath = join(SCRATCH_DIR, folder);
-      if (existsSync(folderPath)) {
-        rmSync(folderPath, { recursive: true, force: true });
-        writeStatus('Untracked folder removed from working tree', 'Info');
-      } else {
-        writeStatus('Folder cleaned up by git checkout', 'Info');
-      }
-      // Note: No push needed - folder was never tracked on main (uncommitted)
-    } else {
-      // Path B: Committed folder - TRANSACTIONAL approach
-      // Order: copy to archive -> push archive -> THEN remove from main
-
-      // Step 1: Switch to archive and copy folder from main
-      git(['checkout', config.archiveBranch]);
-
-      // Check if folder already exists on archive branch
-      const existsOnArchive = gitSilent(['ls-tree', '--name-only', config.archiveBranch, folder]);
-      if (existsOnArchive.stdout) {
-        writeStatus('Folder already exists on archive branch, skipping archive step', 'Info');
-      } else {
-        git(['checkout', 'main', '--', `${folder}/`]);
-        git(['add', `${folder}/`]);
-        git(['commit', '-m', archiveCommitMsg]);
-
-        // Push archive BEFORE removing from main
-        git(['push', 'origin', config.archiveBranch]);
-        writeStatus('Archived to remote', 'Info');
-      }
-
-      // Step 2: NOW safe to remove from main
-      git(['checkout', 'main']);
-      git(['rm', '-r', `${folder}/`]);
-      git(['commit', '-m', removeCommitMsg]);
-      git(['push', 'origin', 'main']);
-    }
-
-    archiveSucceeded = true;
-
-    console.log('');
-    writeStatus('Folder archived successfully', 'Success');
-    console.log('');
-    console.log(`  Folder: ${folder}`);
-    console.log(`  Source: ${state}`);
-    console.log('  Action: Archived to archive branch');
-    console.log('');
-    console.log('  Main branch: Folder removed (agents cannot see)');
-    console.log('  Archive branch: Folder preserved (for reference)');
-    console.log('');
-    console.log('  To view archived: scratch archived');
-  } catch (error) {
-    writeStatus(`Archive operation failed: ${error.message}`, 'Error');
-
-    // Attempt recovery: return to main branch
-    writeStatus('Attempting recovery...', 'Warning');
-    const currentBranch = gitSilent(['branch', '--show-current']).stdout;
-    if (currentBranch !== 'main') {
-      const checkoutResult = gitSilent(['checkout', 'main']);
-      if (checkoutResult.success) {
-        writeStatus('Returned to main branch', 'Info');
-      } else {
-        writeStatus('Could not return to main branch. Manual intervention required.', 'Error');
-        writeStatus(`Current branch: ${currentBranch}`, 'Error');
-        console.log('  Run: git -C scratch checkout main --force');
-      }
-    } else {
-      writeStatus('Already on main branch', 'Info');
-    }
-
-    // Check for uncommitted changes
-    const statusCheck = gitSilent(['status', '--porcelain']);
-    if (statusCheck.stdout) {
-      writeStatus('Repository has uncommitted changes:', 'Warning');
-      statusCheck.stdout.split('\n').forEach((line) => console.log(`    ${line}`));
-      console.log('  Review with: git -C scratch status');
-    }
-
-    process.exit(1);
-  } finally {
-    // Clean up temp directory
-    if (tempDir && existsSync(tempDir)) {
-      if (archiveSucceeded) {
-        try {
-          rmSync(tempDir, { recursive: true, force: true });
-        } catch {
-          writeStatus(`Could not delete temp backup: ${tempDir}`, 'Warning');
-        }
-      } else {
-        writeStatus(`Backup preserved at: ${tempDir}`, 'Warning');
-        console.log('  You can manually recover your files from this location.');
-      }
-    }
-  }
+function laneBranch() {
+  const parentBranch = gitSilent(['branch', '--show-current'], { cwd: dirname(SCRATCH_DIR) }).stdout;
+  if (!parentBranch) return null;
+  const onLane = getFolders().filter((name) => name.startsWith('L-')).some((name) => {
+    const record = join(SCRATCH_DIR, name, 'README.md');
+    if (!existsSync(record)) return false;
+    const match = readFileSync(record, 'utf-8').match(/^branch:[ \t]*(\S+)[ \t]*$/m);
+    return match !== null && match[1] === parentBranch;
+  });
+  return onLane ? parentBranch : null;
 }
 
 /**
- * List command - show active folders on main branch
+ * Save on a lane, lane-methodology § Scratch commit's mechanical steps: fetch, catch-up merge of
+ * main and origin/main, the folder's path-scoped commit, then a plain push of the lane branch.
+ * The secret screen is the agent's, before this runs (protocols/save.md). Returns the Status line.
+ */
+async function saveOnLane(folder, branch, lane) {
+  // A lane save pushes the checked-out branch, so it must be the lane's and never a base.
+  if (branch !== lane) {
+    refuse(`Scratch repo is on ${branch}, not the lane branch ${lane}. Nothing committed. Run: git -C scratch switch ${lane}`);
+  }
+  writeStatus(`Saving '${folder}' to lane branch ${branch}...`, 'Info');
+
+  const hasOrigin = gitSilent(['remote', 'get-url', 'origin']).success;
+  if (hasOrigin) {
+    const fetched = await netGit(['fetch', '-q', 'origin']);
+    if (!fetched.success) refuse(`git fetch origin failed: ${fetched.stderr}`);
+  }
+
+  const behind = ['main', 'origin/main'].filter((base) =>
+    gitSilent(['rev-parse', '--verify', '-q', `${base}^{commit}`]).success &&
+    !gitSilent(['merge-base', '--is-ancestor', base, 'HEAD']).success);
+  // git merge refuses while the index differs from HEAD, and staged paths are another session's to commit.
+  const staged = gitSilent(['diff', '--cached', '--name-only', '--', '.', `:!${folder}/`]).stdout.split('\n').filter(Boolean);
+  if (behind.length && staged.length) {
+    refuse(
+      `Staged paths outside '${folder}' block the catch-up merge of ${behind.join(' and ')}: ${staged.join(', ')}. ` +
+      `Nothing committed. Once they are committed or unstaged, save again by protocols/save.md: scratch save ${folder}`
+    );
+  }
+  // The folder's own staged paths are the save's to commit, and the add below stages it whole again.
+  if (behind.length) git(['reset', '-q', '--', `${folder}/`]);
+  for (const base of behind) {
+    const merged = gitSilent(['merge', '--no-edit', base]);
+    if (merged.success) continue;
+    const conflicts = gitSilent(['diff', '--name-only', '--diff-filter=U']).stdout.split('\n').filter(Boolean);
+    if (!conflicts.length) refuse(`Catch-up merge of ${base} into ${branch} failed: ${merged.stderr || merged.stdout}`);
+    gitSilent(['merge', '--abort']);
+    refuse(
+      `Catch-up merge of ${base} into ${branch} conflicts in: ${conflicts.join(', ')}. Merge aborted, nothing committed. ` +
+      `Resolve it by lane-methodology § Git rules, catch-up merge, then save again by protocols/save.md: scratch save ${folder}`
+    );
+  }
+
+  git(['add', '--', `${folder}/`]);
+  git(['commit', '-q', '-m', sanitizeCommitMessage(`chore(scratch): save ${folder}`), '--', `${folder}/`]);
+  const commit = git(['rev-parse', '--short', 'HEAD']);
+  writeStatus(`Committed ${commit} on ${branch}`, 'Info');
+
+  if (hasOrigin) {
+    const pushed = await netGit(['push', '-q', 'origin', branch]);
+    if (!pushed.success) {
+      refuse(`Push of ${branch} to origin was rejected; commit ${commit} stays on local ${branch}.\n${pushed.stderr}`);
+    }
+  }
+
+  return hasOrigin ? `Committed ${commit} and pushed to origin/${branch}` : `Committed ${commit}; no origin, nothing pushed`;
+}
+
+/**
+ * Print a one-line refusal naming the cause and the next command, then exit 1
+ */
+function refuse(message) {
+  writeStatus(message, 'Error');
+  process.exit(1);
+}
+
+/**
+ * Archive command - move a committed folder from the checked-out branch to the
+ * archive branch.
+ *
+ * Never switches branches: the archive commit is built from objects and refs,
+ * so no file outside the folder and no index entry outside it is touched.
+ * With no origin the archive branch is built locally and nothing is pushed.
+ */
+async function cmdArchive(folder, config, force) {
+  validateFolderName(folder);
+  checkScratchRepo();
+  checkFolderExists(folder);
+
+  const branch = config.archiveBranch;
+  const remoteBranchRef = `refs/remotes/origin/${branch}`;
+  const localBranchRef = `refs/heads/${branch}`;
+
+  // Phase 1: preflight. Only remote-tracking refs change before it passes.
+  const currentBranch = git(['branch', '--show-current']);
+  if (!currentBranch) {
+    refuse('Scratch repo is on a detached HEAD. Run: git -C scratch switch <branch>');
+  }
+
+  const statusLines = git(['status', '--porcelain', '-z', '--ignored', '--', `${folder}/`]).split('\0').filter(Boolean);
+  const ignored = statusLines.filter((line) => line.startsWith('!! ')).map((line) => line.slice(3));
+  const folderTree = gitSilent(['rev-parse', '--verify', '-q', `HEAD:${folder}`]).stdout;
+  if (statusLines.length > ignored.length || !folderTree) {
+    refuse(
+      `Folder '${folder}' holds work ${currentBranch} does not (uncommitted, untracked, or modified files). ` +
+      `Save it by protocols/save.md, which screens for secrets on a lane only: scratch save ${folder}`
+    );
+  }
+  if (ignored.length && !force) {
+    refuse(
+      `Folder '${folder}' holds git-ignored files: ${ignored.join(', ')}. ` +
+      `Delete them, or git -C scratch add -f them and save by protocols/save.md, which screens for secrets on a lane only: scratch save ${folder}. ` +
+      `Or run: scratch archive ${folder} --force to delete them with the folder`
+    );
+  }
+
+  const originUrl = gitSilent(['remote', 'get-url', 'origin']);
+  const hasOrigin = originUrl.success;
+  // A lane branch has no upstream until its first push; it is then compared with nothing.
+  const upstream = gitSilent(['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}']).stdout;
+  const upstreamName = upstream.startsWith('origin/') ? upstream.slice('origin/'.length) : null;
+  let remoteHas = () => false;
+  if (hasOrigin) {
+    const remoteHeads = await netGit(['ls-remote', '--heads', 'origin', ...(upstreamName ? [upstreamName] : []), branch]);
+    if (!remoteHeads.success) {
+      refuse(
+        `Cannot reach origin (${originUrl.stdout}): ${remoteHeads.stderr || 'network error'}. ` +
+        'Refusing to archive — would diverge from remote.'
+      );
+    }
+    remoteHas = (name) => remoteHeads.stdout.split('\n').some((line) => line.endsWith(`\trefs/heads/${name}`));
+
+    const refspecs = [upstreamName, branch]
+      .filter((name) => name && remoteHas(name))
+      .map((name) => `+refs/heads/${name}:refs/remotes/origin/${name}`);
+    if (refspecs.length) {
+      writeStatus('Fetching latest from origin...', 'Info');
+      const fetched = await netGit(['fetch', '-q', 'origin', ...refspecs]);
+      if (!fetched.success) refuse(`git fetch origin failed: ${fetched.stderr}`);
+    }
+  }
+
+  const originUpstream = upstreamName && remoteHas(upstreamName) ? git(['rev-parse', `refs/remotes/${upstream}`]) : null;
+  if (originUpstream && git(['rev-list', '--count', `HEAD..${originUpstream}`]) !== '0') {
+    refuse(`Local ${currentBranch} is behind or diverged from ${upstream}. Run: git -C scratch pull --no-rebase`);
+  }
+
+  const originArchive = remoteHas(branch) ? git(['rev-parse', remoteBranchRef]) : null;
+  const localArchive = gitSilent(['rev-parse', '--verify', '-q', localBranchRef]).stdout || null;
+  if (hasOrigin && localArchive) {
+    const localOnly = originArchive
+      ? git(['rev-list', '--count', `${originArchive}..${localArchive}`])
+      : git(['rev-list', '--count', localArchive]);
+    if (localOnly !== '0') {
+      refuse(
+        `Local ${branch} holds ${localOnly} commit(s) origin/${branch} lacks; the push is the user's. ` +
+        `Once origin/${branch} has them, run: scratch archive ${folder}`
+      );
+    }
+  }
+
+  // With no origin, the local archive branch is the one to build on.
+  const baseArchive = hasOrigin ? originArchive : localArchive;
+  const archiveName = hasOrigin ? `origin/${branch}` : branch;
+  const archivedTree = baseArchive
+    ? gitSilent(['rev-parse', '--verify', '-q', `${baseArchive}:${folder}`]).stdout
+    : '';
+  if (archivedTree && archivedTree !== folderTree) {
+    refuse(
+      `${archiveName} already holds '${folder}' with tree ${archivedTree}; ${currentBranch} holds tree ${folderTree}. ` +
+      `Rename the folder on ${currentBranch} and run: scratch archive <new-name>`
+    );
+  }
+
+  // Phase 2: publish the archive commit.
+  let archiveCommit = baseArchive;
+  if (archivedTree) {
+    writeStatus(`'${folder}' is already on ${archiveName}; skipping the archive push`, 'Info');
+  } else {
+    writeStatus(`Archiving '${folder}' to ${branch}...`, 'Info');
+    const entries = baseArchive
+      ? git(['ls-tree', '-z', baseArchive]).split('\0').filter(Boolean)
+      : [];
+    entries.push(`040000 tree ${folderTree}\t${folder}`);
+    const rootTree = git(['mktree', '-z'], { input: `${entries.join('\0')}\0` });
+    const parentArgs = baseArchive ? ['-p', baseArchive] : [];
+    archiveCommit = git([
+      'commit-tree', rootTree, ...parentArgs, '-m', sanitizeCommitMessage(`Archive: ${folder}`),
+    ]);
+
+    if (hasOrigin) {
+      const push = await netGit(['push', 'origin', `${archiveCommit}:refs/heads/${branch}`]);
+      if (!push.success) {
+        refuse(
+          `Push to origin/${branch} was rejected; ${currentBranch} is untouched. ` +
+          `Run: scratch archive ${folder}\n${push.stderr}`
+        );
+      }
+      writeStatus(`Archived to origin/${branch}`, 'Info');
+    }
+  }
+
+  const moved = gitSilent(['update-ref', localBranchRef, archiveCommit, localArchive || '']);
+  if (!moved.success) {
+    refuse(
+      `'${folder}' is on origin/${branch}, but local ${branch} moved during the run. ` +
+      `Run: scratch archive ${folder}`
+    );
+  }
+  if (hasOrigin) git(['update-ref', remoteBranchRef, archiveCommit]);
+
+  // Phase 3: remove from the checked-out branch, committing only the folder's paths so anything
+  // another session has staged stays staged. Ignored paths go first, by the exact
+  // list preflight took: once git rm deletes a folder-level .gitignore, git no
+  // longer sees them as ignored, and git rm prunes only directories it emptied.
+  if (ignored.length) {
+    writeStatus(`Deleting git-ignored files (--force): ${ignored.join(', ')}`, 'Warning');
+    ignored.forEach((path) => rmSync(join(SCRATCH_DIR, path), { recursive: true, force: true }));
+  }
+  git(['rm', '-r', '-q', '--', `${folder}/`]);
+  git([
+    'commit', '-q', '-m', sanitizeCommitMessage(`Archived ${folder} to ${branch} branch`), '--', `${folder}/`,
+  ]);
+
+  const pushNote = currentBranch === 'main' ? "the push is the user's" : "the lane's plain push carries it";
+  writeStatus(`Local ${currentBranch} holds unpushed commits, the removal commit among them; ${pushNote}`, 'Info');
+
+  console.log('');
+  writeStatus('Folder archived successfully', 'Success');
+  console.log('');
+  console.log(`  Folder: ${folder}`);
+  console.log(`  Archive branch: ${branch} at ${archiveCommit.slice(0, 7)}`);
+  console.log(`  Branch: ${currentBranch} (folder removed, agents cannot see it; not pushed)`);
+  console.log('');
+  console.log('  To view archived: scratch archived');
+}
+
+/**
+ * List command - show active folders on the checked-out branch
  */
 async function cmdList() {
   checkScratchRepo();
 
   console.log('');
-  console.log(`${colors.cyan}Active folders in scratch/ (main branch):${colors.reset}`);
+  const branch = git(['branch', '--show-current']) || '(detached)';
+  console.log(`${colors.cyan}Active folders in scratch/ (${branch}):${colors.reset}`);
   console.log('');
 
   const folders = getFolders();
@@ -853,12 +889,17 @@ function showHelp() {
   console.log('  scratch COMMAND [folder]');
   console.log('');
   console.log(`${colors.yellow}Commands:${colors.reset}`);
-  console.log('  save FOLDER       Commit folder to main branch (keep working)');
+  console.log('  save FOLDER       Commit folder to the checked-out branch (keep working);');
+  console.log('                    on a lane, catch up from main first and push the lane branch');
   console.log('  archive FOLDER    Move folder to archive branch (hide from agents)');
-  console.log('  list              Show active folders on main branch');
+  console.log('    --force         Delete the folder\'s git-ignored files instead of refusing');
+  console.log('  list              Show active folders on the checked-out branch');
   console.log('  archived          Show archived folders');
   console.log('  config            Show current configuration');
   console.log('  help              Show this help');
+  console.log('');
+  console.log(`${colors.yellow}Environment:${colors.reset}`);
+  console.log('  SCRATCH_NET_TIMEOUT  Seconds each fetch, push or ls-remote may run (default 60)');
   console.log('');
   console.log(`${colors.yellow}Examples:${colors.reset}`);
   console.log('  scratch save my-feature       # Save work in progress');
@@ -896,7 +937,8 @@ async function main() {
 
   const args = process.argv.slice(2);
   const command = args[0] || 'help';
-  const folder = args[1];
+  const force = args.includes('--force');
+  const folder = args.slice(1).find((arg) => arg !== '--force');
 
   // Help doesn't need config
   if (command === 'help' || command === '--help' || command === '-h') {
@@ -921,7 +963,7 @@ async function main() {
         writeStatus('Folder name required. Usage: scratch archive FOLDER', 'Error');
         process.exit(1);
       }
-      await cmdArchive(folder, config);
+      await cmdArchive(folder, config, force);
       break;
 
     case 'list':

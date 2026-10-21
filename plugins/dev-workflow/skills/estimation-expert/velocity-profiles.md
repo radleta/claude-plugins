@@ -9,8 +9,8 @@ Estimation accuracy depends on calibrated velocity data. The skill ships with a 
 
 ## Profile Loading Order
 
-1. `profiles/personal.md` (your calibrated data — not published, gitignored from marketplace)
-2. `profiles/default.md` (shipped example — used when no personal profile exists)
+1. `profiles/personal.md` (your calibrated data — excluded from the marketplace package)
+2. The Default Profile table below (used when no personal profile exists)
 
 If a personal profile exists, it overrides the default entirely.
 
@@ -30,4 +30,4 @@ This represents a developer running 6-8 parallel Claude sessions. Traditional "1
 
 ## Creating Your Personal Profile
 
-Create `profiles/personal.md` with the same table format above, filled with YOUR actual completed work from a representative week. Re-calibrate monthly as your workflow evolves. See [Personal Velocity Baseline](profiles/personal.md) for the current calibrated data.
+Create `profiles/personal.md` with the same table format above, filled with YOUR actual completed work from a representative week. When to re-calibrate is set in [Recalibration](recalibration.md). See [Personal Velocity Baseline](profiles/personal.md) for the current calibrated data.

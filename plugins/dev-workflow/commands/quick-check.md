@@ -1,8 +1,12 @@
 ---
 description: Fast pre-commit sanity check on staged changes — catches secrets, debug artifacts, and TODOs quickly
-argument-hint: [additional context]
+disable-model-invocation: true
+argument-hint: "[additional context]"
 context: fork
+model: claude-opus-5-5
+effort: low
 allowed-tools: Read, Glob, Grep, Bash(git *)
+disallowed-tools: Edit, Write
 ---
 
 <role>

@@ -1,8 +1,12 @@
 ---
 description: Review staged or branch changes for quality, security, and completeness before committing
-argument-hint: [staged | branch] [additional context]
+disable-model-invocation: true
+argument-hint: "[staged | branch] [additional context]"
 context: fork
+model: claude-opus-5-5
+effort: high
 allowed-tools: Read, Glob, Grep, Bash(git *)
+disallowed-tools: Edit, Write
 ---
 
 <role>

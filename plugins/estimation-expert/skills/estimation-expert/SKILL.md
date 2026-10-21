@@ -1,34 +1,36 @@
 ---
 name: estimation-expert
 description: "Calibrated effort estimation for AI-augmented development — classifies work by type, accounts for parallel Claude sessions (6-8), CDD front-loading, and discovery risk. Use when estimating how long something will take, planning sprint scope, sizing milestones, predicting completion dates, or when asked 'how long will this take' — even for quick tasks or rough guesses."
+wiki: true
 ---
 
-<role>
-  <identity>Calibrated effort estimation expert for AI-augmented development workflows</identity>
-  <purpose>Produce realistic effort estimates by classifying remaining work, applying velocity data from completed work, and accounting for the user's specific development patterns (parallel Claude sessions, CDD methodology, discovery risk)</purpose>
-  <expertise>
-    <area>Work type classification (mechanical, CDD-wired, integration, investigation, creative)</area>
-    <area>AI-augmented velocity calibration from git history</area>
-    <area>Parallelism analysis for multi-Claude session workflows</area>
-    <area>Discovery risk assessment from plan revision patterns</area>
-  </expertise>
-  <scope>
-    <in-scope>
-      <item>Effort estimation for milestones, features, tasks, and projects</item>
-      <item>Velocity calibration from completed work patterns</item>
-      <item>Work type classification for remaining items</item>
-      <item>Sprint/week planning based on capacity</item>
-      <item>Time-to-completion projections</item>
-    </in-scope>
-    <out-of-scope>
-      <item>Calendar scheduling (meetings, deadlines) — separate concern</item>
-      <item>Resource allocation across teams — this is for a solo developer + AI</item>
-    </out-of-scope>
-  </scope>
-</role>
+Produce realistic effort estimates by classifying remaining work, applying velocity data from
+completed work, and accounting for the user's specific development patterns (parallel Claude
+sessions, CDD methodology, discovery risk).
+
+**Covers:** Work type classification (mechanical, CDD-wired, infrastructure, integration,
+investigation, creative); AI-augmented velocity calibration from git history; Parallelism analysis
+for multi-Claude session workflows; Discovery risk assessment from plan revision patterns.
+
+**In scope:**
+- Effort estimation for milestones, features, tasks, and projects
+- Velocity calibration from completed work patterns
+- Work type classification for remaining items
+- Sprint/week planning based on capacity
+- Time-to-completion projections
+
+**Out of scope:**
+- Calendar scheduling (meetings, deadlines) — separate concern
+- Resource allocation across teams — this is for a solo developer + AI
+
+**No install, no tooling.** The formula, the profiles and the checklists are prose, so they work
+anywhere Claude runs — Claude Cowork or any packaged copy included. Calibrating velocity from git
+history is the sharpest input where a repository is at hand; without one, use the default velocity
+profile, which needs no repository.
 
 ## Pages
 
+<!-- BEGIN:PAGES -->
 - [How the User Works](how-user-works.md) — How the user runs 6-8 parallel Claude sessions and what that means for velocity and parallelism
 - [Work Type Classification](work-type-classification.md) — Classification of work into 6 types with velocity multipliers and parallelizability ratings
 - [Estimation Formula](estimation-formula.md) — The core estimation formula: base hours × type multiplier ÷ parallelism factor × discovery risk ÷ hours per day
@@ -40,7 +42,7 @@ description: "Calibrated effort estimation for AI-augmented development — clas
 - [Recalibration](recalibration.md) — When and how to recalibrate the velocity baseline: weekly during project-update, after workflow changes, or when estimates diverge >30% from actuals
 - [Anti-Patterns](anti-patterns.md) — 6 anti-patterns to avoid: no type classification, ignoring discovery risk, equal Claude session assumption, no critical path, single number estimates, and CDD box-counting
 - [Personal Velocity Baseline](profiles/personal.md) — Personal velocity baseline with weekly calibration data: multipliers by work type, discovery risk multipliers, and velocity tiers from observed work
+<!-- END:PAGES -->
 
 ## Meta
-- [Operations Log](log.md) — Timestamped wiki operations log (ingest, lint, query filings)
 - [Schema](schema.md) — Wiki conventions and page-type definitions

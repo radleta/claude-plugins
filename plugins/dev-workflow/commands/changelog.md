@@ -1,8 +1,11 @@
 ---
 description: Generate changelog entries from git history between two refs, organized by change type
-argument-hint: [from-ref] [to-ref]
+argument-hint: "[from-ref] [to-ref]"
 context: fork
-allowed-tools: Read, Glob, Grep, Bash(git *)
+model: claude-opus-5-5
+effort: medium
+allowed-tools: Read, Glob, Grep, Bash(git *), Skill(human-voice), Agent
+disallowed-tools: Edit, Write
 ---
 
 <role>
@@ -41,10 +44,12 @@ Latest tag:
    - **Documentation** — docs: commits
    - **Other** — chore:, test:, style:, ci: commits
 
-4. For each entry:
-   - Write a user-facing description (not the raw commit message)
-   - Focus on what changed from the user's perspective
-   - Include the commit hash for reference
+4. A changelog is `Tier 2` text: load `human-voice` and follow its routing, and write the text yourself when that skill is not installed.
+   A dispatch carries the Output Format below as its `Shape:` and no `Out:` part, so the drafter returns the changelog as text and writes no file.
+   Whoever writes it, each entry:
+   - Is a user-facing description (not the raw commit message)
+   - Says what changed from the user's perspective
+   - Includes the commit hash for reference
 
 ## Output Format
 
@@ -68,5 +73,7 @@ Latest tag:
 ```
 
 Omit sections with no entries. Keep descriptions concise but clear.
+
+A drafter's `Audit:`, `Kept:` and `Ungrounded:` lines, and a `## Needs structure review` block you could not answer, go after the changelog, outside this format.
 
 $ARGUMENTS

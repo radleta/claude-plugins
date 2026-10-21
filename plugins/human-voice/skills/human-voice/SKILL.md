@@ -1,175 +1,137 @@
 ---
 name: human-voice
-description: >-
-  Rewrite text to read as human and strip AI tells — puffery, hollow symmetry ("not
-  just X, but Y"), filler transitions, em-dash overuse, fake warmth, robotic structure.
-  Use WHENEVER text is attributed to a person or meant to persuade or connect: emails
-  sent on someone's behalf, replies, messages, social/LinkedIn posts, cover letters,
-  bios, blog/marketing/fundraising copy. Reach for it even when not asked to "humanize"
-  and even when the draft looks fine — detected AI-ness destroys credibility in anything
-  a person signs.
-cowork: true
+description: "Gate for text a person will read: sets its tier and how it gets drafted free of AI tells — puffery, hollow symmetry, filler transitions, em-dash overuse, fake warmth. Use before writing an email, reply, post, cover letter, bio or marketing copy, or a README, PR description, user doc, changelog or stakeholder update — even when not asked to \"humanize\" and you could write it yourself."
+distilled-from: https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing
+distilled-on: 2026-07-07
 ---
 
 # Human Voice
 
-AI text has a smell. Readers can't always name it, but they feel it — and the moment
-they sense a machine wrote something a person was supposed to write, they discount the
-whole thing. A heartfelt email reads as a form letter. A cover letter reads as low
-effort. A blog post loses its authority. The damage isn't the words themselves; it's
-the **broken attribution** — the reader expected a person and got a pattern.
+Text a person will read is written by a drafter: a sub-agent that holds the scrub rules and
+none of this session's habits. This page classifies the text, routes it to the drafter, and
+states the prompt the drafter takes and what it returns. The rules themselves are in
+[references/scrub.md](references/scrub.md), which the drafter and its reviewer read. Two
+more pages serve a reader of that page and nobody else:
+[references/signs-catalog.md](references/signs-catalog.md) when a tell needs its detection
+cues and fixes, and [references/examples.md](references/examples.md) when a rewrite needs a
+before and after at its tier.
 
-This skill does two things: it decides **how hard to scrub** based on what detection
-would cost, then it gives you a workflow to actually scrub. The decision matters as
-much as the technique — scrubbing affect-free reference docs is wasted effort, and
-over-correcting can make consistent technical writing worse.
+## Classify the tier
 
-## Step 1 — Classify the tier (the gate)
-
-Ask one question before touching anything: **if the reader realized AI wrote this,
-would the text lose value?**
+Ask one question: **if the reader realized AI wrote this, would the text lose value?**
 
 | Tier | The cost of detection | Scrub intensity | What lands here |
 |------|----------------------|-----------------|-----------------|
-| **1 — Scrub hard** | Trust, connection, or persuasive force collapses | Maximum | Email/messages sent as the user; replies to real people; social & LinkedIn posts; cover letters; bios; **blog posts, marketing, fundraising, opinion — anything meant to move or persuade** |
-| **2 — Light scrub** | Mild — reads as a bit generic, but still useful | Remove the worst tells; don't agonize | Tutorials, how-to guides, general informational prose, narrative READMEs |
-| **3 — Leave it** | None — nobody cares who wrote it | Skip the scrub | API docs, code comments, commit messages, specs, config docs, structured reference |
+| **1 — Scrub hard** | Trust, connection, or persuasive force collapses | Maximum | Email and messages sent as the user; replies to real people; social and LinkedIn posts; cover letters; bios; blog posts, marketing, fundraising, opinion: anything meant to move or persuade |
+| **2 — Light scrub** | Mild: reads as a bit generic, but still useful | Remove the worst tells | Tutorials, how-to guides, user docs, narrative READMEs, PR descriptions, stakeholder updates, changelogs, general informational prose |
+| **3 — Leave it** | None: nobody cares who wrote it | None | API reference, code comments, commit messages, specs, config docs, structured reference |
 
-**The key correction most people get wrong:** the trigger is *emotional and persuasive
-weight*, not just authorship. A blog post isn't "documentation you can let AI-isms leak
-into" — it's persuasion, and the instant a reader smells AI slop it stops persuading.
-So anything carrying personal voice, emotion, or an attempt to convince belongs in
-**Tier 1**, even when it's a public "product" rather than a private message.
+The trigger is emotional and persuasive weight, not authorship alone: a blog post is a
+public product and still `Tier 1`, because it stops persuading once it reads as generated.
+Unsure between two tiers, go up one.
 
-Tier 3 is genuinely safe to leave alone: when the reader only wants correct, scannable
-information and doesn't care about voice, the AI patterns (parallel structure, clear
-headings, consistent phrasing) are fine — even helpful. Don't burn effort there.
+`Tier 3` text is yours to write, and the rest of this page does not apply to it.
 
-If you're unsure between tiers, go up one. Under-scrubbing attributed text is the
-expensive mistake.
+## Route the draft
 
-## Step 2 — Surface the mechanical tells
+Two kinds of reader skip this section, because they are already past it: one sent here by
+[references/drafter.md](references/drafter.md) or
+[references/structure-audit.md](references/structure-audit.md), and an agent whose own
+instructions send it straight to a page under `references/`.
 
-Write the draft first; don't self-censor mid-sentence. Then scan it for the
-regex-catchable tells: filler words (delve, leverage, robust, tapestry), scaffolding
-phrases ("it's important to note", "worth noting"), negative parallelism, em-dash
-overuse, curly quotes, emoji, title-case headings, transition openers, and chatbot
-artifacts ("Certainly!", "I hope this helps").
+Everyone else with `Tier 1` or `Tier 2` text to write takes the first rung that matches:
 
-**The bundled `ai-lint` tool automates this scan, but it's an optional accelerator — the
-skill works fully without it.** Pick whichever fits your environment:
+1. **An agent whose name ends in `human-voice-drafter` is in your dispatch tool's list.**
+   Dispatch it with the prompt below. A drafter that returns that it could not find its
+   page counts as no such agent.
+2. **You have a dispatch tool (Agent, Task) and no such agent.** Dispatch a
+   `general-purpose` agent with the same prompt, opened by one line: `Read {absolute path
+   of this skill's references/drafter.md} in full first; it is your whole definition for
+   this task.` When it returns that it could not open the page, take rung 3. A caller
+   whose own instructions name the agents it may dispatch does what those instructions
+   say here, in place of this rung.
+3. **You have no dispatch tool.**
+   - A sub-agent reads [references/drafter.md](references/drafter.md) and drafts by it.
+   - A top-level session asks its user first, and writes nothing until the answer: "No
+     drafting agent is available here, so I would write this myself, and the draft would be
+     shaped by this session's output style and its other rules. Go ahead?" On a yes it
+     reads [references/drafter.md](references/drafter.md) and drafts by it. On a no it
+     writes nothing.
 
-1. **CLI on PATH** (installed via `init-repo.sh --user-install`):
-   ```bash
-   ai-lint draft.md          # or: cat draft.md | ai-lint
-   ai-lint --json draft.md   # structured output for programmatic gating
-   ```
-2. **No install — e.g. Claude Cowork or any packaged copy.** The `scripts/` files ship
-   inside this skill folder, so run them directly with node (use this skill's base
-   directory, given to you when the skill loaded):
-   ```bash
-   node "<skill-dir>/scripts/ai-lint.mjs" draft.md
-   ```
-3. **No tooling at all (no node).** Do the scan yourself: read
-   [references/signs-catalog.md](references/signs-catalog.md) and check the draft against
-   every item marked 🔧. The catalog lists exactly what the linter checks, so a careful
-   manual pass reaches the same result — it just takes more attention.
+## The dispatch prompt
 
-Each tool prints the tell with a line/column and a concrete fix, and exits `1` when
-anything is found (so it can gate a workflow). However you scan, fix what it surfaces.
+Labeled parts and nothing else. The drafter has no conversation behind it, so everything it
+needs is in these parts.
 
-**A clean scan is necessary, not sufficient.** It only catches the obvious mechanical
-tells, never the judgment-level ones in Step 3. Don't stop here.
+```
+Tier: 1 | 2
+Reader: {who reads it}
+Channel: {email, PR description, README, LinkedIn post, ...}
+Shape: {length and parts wanted}
+Sources: {file paths, or the facts pasted in}
+Voice: {path to a voice file, or the rules pasted in}   # optional
+Out: {file to write}                                    # optional
+Revise: {draft path or pasted draft}                    # optional; with exactly one of the two below
+Change: {your own change}
+Findings: {a reviewer's return, unedited}
+```
 
-## Step 3 — Revise for the tells a regex can't catch
+- `Voice:` goes in when the text is sent as a person and your instructions name that
+  person's voice file or state their style. Omitted, the drafter falls back on its own default.
+- `Out:` omitted, or not writable, the draft comes back as the body of the return.
+- `Revise:` with `Change:` is a new draft and gets its own cold read. `Revise:` with
+  `Findings:` applies a reviewer's findings and dispatches no reviewer.
 
-These are what actually make text feel human. Read the draft as the recipient and fix:
+## The return
 
-- **Hollow symmetry.** AI loves balanced constructions that sound profound and say
-  nothing: "It's not just a tool, it's a philosophy." "More than a product — a promise."
-  Collapse them into one direct claim.
-- **The rule of three.** Three parallel adjectives or clauses, endlessly: "fast,
-  reliable, and scalable." One real detail beats three vague ones.
-- **Manufactured warmth.** "I'm thrilled to share…", "I'd love to help you…" when no
-  actual feeling is behind it. Match the real emotional register — often that's neutral.
-- **Throat-clearing.** Openings that delay the point: "In today's fast-paced world…",
-  "When it comes to X…". Start at the actual first sentence.
-- **Over-hedging and over-explaining.** AI restates, qualifies, and summarizes. A person
-  says it once and trusts the reader. Cut the recap paragraph.
-- **Even rhythm.** AI sentences are all medium-length and evenly punctuated. Humans vary:
-  a long winding sentence, then a short one. Break the metronome.
-- **Asserted instead of shown.** "vibrant," "rich," "meticulous" tell the reader what to
-  feel. Replace with the concrete detail that earns the feeling — or cut it.
-- **Generic specifics.** Real human writing has texture: a name, a number, a moment, an
-  aside. If any sentence could appear in anyone's draft about anything, it's filler.
-- **Synonym cycling.** AI renames the same thing to avoid repeating a word — "the tool…
-  the platform… the solution… the system." Pick one name and keep it; the variation reads
-  as evasive, not elegant.
-- **Diff-anchored phrasing.** Describing what *changed* instead of what *is*: "The update
-  lets users export" → "Users can export." Common even in otherwise-clean reference docs,
-  so fix it in any tier.
-- **Staccato drama.** A run of clipped fragments to fake intensity: "No fluff. No filler.
-  Just results." One short sentence lands; a stack of them is the tell. (The flip side of
-  even rhythm — vary, don't swing to the other extreme.)
-- **Aphorism formulas.** Manufactured profundity: "X is the Y of Z," "not a tool but a
-  mirror," "the currency of trust." Delete, or replace with a concrete claim.
-- **Fronted participials.** "Leveraging X, the team…", "Having done X, we…" stacked
-  through the text (AI uses these 2–5× as often as people). Recast as plain
-  subject-verb sentences.
+```
+Draft: {path, or the draft itself when no file was written}
+Audit: {the reviewer's last return, unedited; absent with the block below}
+Kept: {tell} "{quoted text}" — {reason}          # one line per finding not applied
+Ungrounded: {what the sources did not support}    # or "none"
+## Needs structure review                         # only when a cold read was due and none ran
+Load the human-voice skill and follow its rule for this block, or pass the block up unchanged.
+{the dispatch prompt, part for part, with Out: or the draft itself}
+```
 
-**Structural audit — the reshuffle test.** Could you swap two body paragraphs without
-breaking the logic? If yes, the piece is a pile of co-equal points, not an argument —
-AI's default shape. Give it a spine: each paragraph should depend on the one before it.
+**Show the draft as written**, with its `Audit:`, its `Kept:` lines, and its `Ungrounded:`
+line when that is not `none`. The draft is the drafter's: a change you or the user want
+goes back as a new dispatch with `Revise:` and `Change:`.
 
-Then apply the **read-aloud test**: would a person actually *say* this out loud to the
-recipient? If a phrase only survives on paper, it's an AI tell. Rewrite it the way you'd
-say it. AI also *avoids* semicolons and parentheses — a well-placed one of either reads
-distinctly human, so add them where they fit.
+## A `## Needs structure review` block
 
-**Then self-critique — don't skip this.** Reread the result and ask plainly: *what here
-still reads as AI?* Name the two or three worst offenders specifically, then fix exactly
-those. This short adversarial pass catches what a single editing sweep misses.
+The block means the draft has had no cold read, because its drafter could not dispatch one.
+Whoever receives it, at any layer:
 
-**Hard constraint: transform style, never fabricate content.** Humanizing changes *how*
-text reads, using only facts already in the draft or the user's input. Never invent an
-anecdote, statistic, quote, or "I remember when…" to make text feel personal — especially
-in anything sent as a real person. A human-sounding fabrication is far worse than honest
-AI phrasing.
+1. **With a dispatch tool:** dispatch the reviewer, an agent whose name ends in
+   `human-voice-reviewer`, or with no such agent a `general-purpose` agent whose prompt
+   opens with `Read {absolute path of this skill's references/structure-audit.md} in full
+   first; it is your whole definition for this task.` (a caller whose own instructions
+   name the agents it may dispatch does what they say in place of that second form). Its
+   prompt is four labeled parts and nothing else, taken from the block: `Draft:`, `Tier:`,
+   `Channel:`, and `Recipient:` (the block's `Reader:`). A named reviewer that returns that it could not find its page
+   counts as no such agent. A `general-purpose` reviewer that returns that it could not
+   open the page leaves you with no dispatch tool: step 4.
+2. A return with no table row and no `fail` line is the draft's `Audit:`; show the draft.
+   Otherwise dispatch the drafter again with the block's parts plus `Revise:` (the draft)
+   and `Findings:` (the reviewer's return, unedited). That pass returns the findings as its
+   `Audit:` and no block.
+3. After that `Revise:` pass, dispatch the reviewer once more on the revised draft, and
+   send a return with any table row or any `fail` line back the same way. Never a third
+   review of one draft.
+4. **With no dispatch tool:** pass the block up unchanged, at the end of your own return.
 
-For full detail on every tell, with detection cues and fixes, see
-[references/signs-catalog.md](references/signs-catalog.md). For before/after rewrites at
-each tier, see [references/examples.md](references/examples.md).
+## Setup
 
-## Step 4 — Match the person's actual voice (Tier 1)
-
-Removing AI-isms makes text *neutral*; it doesn't make it *theirs*. For anything sent as
-a specific person, go further:
-
-- If you have samples of how they write (prior emails, messages, their CLAUDE.md style
-  notes), mirror their sentence length, formality, greetings, and sign-offs.
-- Honor stated style rules. For example, this user (see global CLAUDE.md) wants: succinct
-  but polite, no "Dear"/"I hope this finds you well" openings, no closing phrase before
-  the signature, occasional fillers like "well" or "you know," sign off as "Richard."
-- When you have no samples, default to plain, direct, and slightly informal — that reads
-  as human far more reliably than polished-and-balanced does.
-
-## What "done" looks like
-
-- Tier classified, and effort matched to it (you didn't over-scrub a Tier 3 doc or
-  under-scrub a Tier 1 one).
-- `ai-lint` reports no findings — or only ones you've consciously kept for a reason.
-- The Step 3 judgment pass is done: no hollow symmetry, no manufactured warmth, varied
-  rhythm, concrete over asserted.
-- For Tier 1: the voice plausibly belongs to the named human, not to "an assistant."
-
-## Setup (optional)
-
-`ai-lint` is an optional accelerator, not a dependency — Step 2 covers running it without
-an install, or skipping it entirely.
+`ai-lint` is the linter the drafter runs. It is an accelerator, not a dependency:
+[references/scrub.md](references/scrub.md) Step 2 covers running it without an install, or
+scanning by hand with no tooling at all.
 
 - **Installed CLI:** the skill's `scripts/install.sh` writes a `~/.local/bin/ai-lint`
-  walker wrapper; the repo's `./init-repo.sh --user-install` sweeps it in.
+  walker wrapper.
 - **No install (Claude Cowork or any packaged copy of this skill):** the `scripts/` files
   ship inside the skill folder, so `node "<skill-dir>/scripts/ai-lint.mjs"` works wherever
-  node is available — nothing to install.
-- **Tests:** `node --test '.claude/skills/human-voice/scripts/*.test.mjs'`
+  node is available. A packaged copy carries no agents, so a draft there takes rung 2 or 3.
+- **POSIX wrapper:** `scripts/ai-lint.sh` is the thin bash wrapper the installer points
+  `~/.local/bin/ai-lint` at; it forwards arguments to `ai-lint.mjs`.
+- **Tests:** from the skill folder, `node --test 'scripts/*.test.mjs'`

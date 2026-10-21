@@ -72,21 +72,30 @@ if [[ "$_DO_CHECK" != true ]]; then
 fi
 
 # --- Install CLI wrapper (local-prefer walker) ---
-# _install_wrapper — write a local-prefer walker wrapper to ~/.local/bin/<name>
-# Inline helper (not shared): each install.sh is self-contained per plugin encapsulation rules.
-# Pattern reference: .claude/skills/wiki-memory/scripts/install.sh _install_wrapper()
-
-mkdir -p "$BIN_DIR"
-
-_install_wrapper() {
-  local cmd_name="$1"
-  local target_rel_path="$2"  # relative from repo root
-  local runner="$3"            # node or bash
-  local baked_abs_path="$4"   # absolute path baked at install time
-  local wrapper="$BIN_DIR/$cmd_name"
-
-  local desired
-  desired="$(cat <<WALKER
+# _cmd_shim_body — the Windows .cmd companion for a bash wrapper.
+#
+# Why this exists: the bash wrapper has no extension and is not executable to
+# Windows, so cmd.exe cannot resolve it. Anything spawning the command from
+# Node with `shell: true` therefore fails on Windows, whatever shell launched
+# it -- Node uses ComSpec. A globally npm-installed CLI never hits this because
+# `npm install -g` generates .cmd and .ps1 shims automatically; a hand-rolled
+# wrapper has to supply that piece itself.
+#
+# Why it delegates rather than reimplementing: the bash wrapper's value is the
+# local-prefer walk up the directory tree, and writing that walk a second time
+# in batch would mean two implementations to keep in step for the one behavior
+# that matters. Delegating keeps exactly one. The cost is a hard dependency on
+# bash for Windows-native callers, which is already true of every .sh in the
+# repos this serves.
+# _wrapper_body — the bash wrapper's text, for both the writer and the drift
+# check. It lives in one place because those two compare against it: a second
+# copy edited alone does not fail loudly, it makes --check report [OK] on a
+# wrapper that no longer matches what the installer would write.
+_wrapper_body() {
+  local target_rel_path="$1"
+  local runner="$2"
+  local baked_abs_path="$3"
+  cat <<WALKER
 #!/usr/bin/env bash
 # Local-prefer wrapper. Walks up from CWD looking for a project-local install
 # of this script; falls back to the baked absolute path when none is found.
@@ -103,7 +112,34 @@ while [ -n "\$dir" ]; do
 done
 exec ${runner} "${baked_abs_path}" "\$@"
 WALKER
-)"
+}
+
+_cmd_shim_body() {
+  local cmd_name="$1"
+  cat <<CMDSHIM
+@ECHO off
+REM Windows companion to the bash wrapper of the same name. Delegates rather
+REM than reimplementing the local-prefer walk, so there is one implementation
+REM of it. Written by scratch-memory/scripts/install.sh -- do not hand-edit.
+bash "%~dp0${cmd_name}" %*
+CMDSHIM
+}
+
+# _install_wrapper — write a local-prefer walker wrapper to ~/.local/bin/<name>
+# Inline helper (not shared): each install.sh is self-contained per plugin encapsulation rules.
+# Pattern reference: .claude/skills/wiki-memory/scripts/install.sh _install_wrapper()
+
+mkdir -p "$BIN_DIR"
+
+_install_wrapper() {
+  local cmd_name="$1"
+  local target_rel_path="$2"  # relative from repo root
+  local runner="$3"            # node or bash
+  local baked_abs_path="$4"   # absolute path baked at install time
+  local wrapper="$BIN_DIR/$cmd_name"
+
+  local desired
+  desired="$(_wrapper_body "$target_rel_path" "$runner" "$baked_abs_path")"
 
   if [[ -f "$wrapper" ]] && [[ "$(cat "$wrapper")" = "$desired" ]]; then
     echo "  $cmd_name: already correct"
@@ -123,6 +159,36 @@ WALKER
   fi
 }
 
+# _install_cmd_shim — converge the Windows .cmd companion, independently of the
+# bash wrapper. Deliberately NOT folded into _install_wrapper: that function
+# returns early when the bash wrapper is already correct, which is the state of
+# every machine that installed before this shim existed. Sharing that early
+# return would mean the .cmd is only ever written when the wrapper also happens
+# to change -- so it would never appear on exactly the machines that need it.
+_install_cmd_shim() {
+  local cmd_name="$1"
+  local cmd_shim="$BIN_DIR/$cmd_name.cmd"
+
+  local desired
+  desired="$(_cmd_shim_body "$cmd_name")"
+
+  if [[ -f "$cmd_shim" ]] && [[ "$(cat "$cmd_shim")" = "$desired" ]]; then
+    echo "  $cmd_name.cmd: already correct"
+    return 0
+  fi
+
+  local existed=false
+  [[ -e "$cmd_shim" ]] && existed=true
+
+  printf '%s\n' "$desired" > "$cmd_shim"
+
+  if [[ "$existed" == true ]]; then
+    echo "  $cmd_name.cmd: updated"
+  else
+    echo "  $cmd_name.cmd: created"
+  fi
+}
+
 # _check_wrapper — report drift status of a local-prefer walker wrapper (read-only)
 # Output: one line with [OK], [DRIFT], [MISSING], or [OTHER] prefix tag.
 # Inline helper (not shared): each install.sh is self-contained per plugin encapsulation rules.
@@ -134,24 +200,16 @@ _check_wrapper() {
   local wrapper="$BIN_DIR/$cmd_name"
 
   local desired
-  desired="$(cat <<WALKER
-#!/usr/bin/env bash
-# Local-prefer wrapper. Walks up from CWD looking for a project-local install
-# of this script; falls back to the baked absolute path when none is found.
-# Pattern reference: .claude/skills/wiki-memory/scripts/install.sh _install_wrapper()
-TARGET_REL_PATH="${target_rel_path}"
-dir=\$(pwd)
-while [ -n "\$dir" ]; do
-  if [ -f "\$dir/\$TARGET_REL_PATH" ]; then
-    exec ${runner} "\$dir/\$TARGET_REL_PATH" "\$@"
+  desired="$(_wrapper_body "$target_rel_path" "$runner" "$baked_abs_path")"
+
+  local cmd_shim="$BIN_DIR/$cmd_name.cmd"
+  if [ ! -e "$cmd_shim" ]; then
+    echo "[MISSING] $cmd_name.cmd: no Windows companion at ~/.local/bin/$cmd_name.cmd"
+  elif [ "$(cat "$cmd_shim" 2>/dev/null || true)" = "$(_cmd_shim_body "$cmd_name")" ]; then
+    echo "[OK] $cmd_name.cmd: correct"
+  else
+    echo "[DRIFT] $cmd_name.cmd: present but does not match the generated shim"
   fi
-  parent=\$(dirname "\$dir")
-  [ "\$parent" = "\$dir" ] && break
-  dir=\$parent
-done
-exec ${runner} "${baked_abs_path}" "\$@"
-WALKER
-)"
 
   if [ ! -e "$wrapper" ]; then
     echo "[MISSING] $cmd_name: not installed at ~/.local/bin/$cmd_name"
@@ -192,6 +250,8 @@ _install_wrapper \
   ".claude/skills/scratch-memory/scripts/scratch-memory.mjs" \
   "node" \
   "$CLI_SRC"
+
+_install_cmd_shim "scratch-memory"
 
 # --- Ensure server.mjs is executable (not strictly required since it's invoked via `node`, but avoids surprises) ---
 

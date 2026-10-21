@@ -64,19 +64,49 @@ Usage:
   ${CMD} --version, -v                     Show version
 
 Verb groups:
-  handoff    commit, path, template, validate, list — manage HANDOFF.md
-  pickup     Transfer a prior session's folder to the current session
-  register   Add, remove, status for scratch-memory MCP
+  handoff          commit, path, validate, list — manage HANDOFF.md
+  pickup           Transfer a prior session's folder to the current session
+  register         Add, remove, status for scratch-memory MCP
+  cat-sessions     Assemble/inspect session log files newest-first with char budget
+  rewrite-pointer  Rewrite the thin HANDOFF.md pointer from the assembled session log and close ledger
+  tasks            list, lint, schema, version, done — workstream task backlog, issues-corpus frontmatter lint, and the task close
+  session          lint, mark-groomed, radius, close, mark-event-groomed — workstream checks, the groom.yaml marker, the event groom's rows, closes and marks
+  epics            frontier, graph — ready spikes and the whole member graph of an epic in the scratch/issues/ corpus
+  wrap             collect — gather a workstream's decisions, lessons, open questions, open tasks and stray files for /wrap-up
+  repos            add, remove, suppress, list, resolve, owner — registered repos (see: repos --help)
+  issue            write, close, mark-groomed, mark-refreshed — write, close and mark issues in a repo's scratch/issues/ (see: issue --help)
 
 Pickup subcommands:
-  pickup <session> [--json]               Transfer prior session folder to current session
+  pickup <from-session-id> --to-session-id <to-session-id> [--json]   Transfer prior session folder to current session
 
 Handoff subcommands:
-  handoff commit [ID] [--json]            Validate strict + regenerate frontmatter
+  handoff commit [ID] [--json]            No-op for v3 pointers; legacy folders redirect to rewrite-pointer
   handoff path [ID]                       Print absolute path to HANDOFF.md
-  handoff template                        Print fresh 10-section template body
-  handoff validate [ID] [--loose] [--json] Schema validation (--loose for hook use)
+  handoff validate [ID] [--loose] [--json] Schema validation (v3 strict; --loose for hook use)
   handoff list [--limit N] [--json]       List recent handoffs sorted by last_updated
+
+Tasks subcommands:
+  list <session-dir>   Print the '## Tasks' block for a workstream
+  lint <path>          Lint a file or directory (schema auto-detected from the path)
+  schema [--json]      Print the issues vocabularies as JSON
+  version              Print the task methodology version
+  done <session-dir> <task-id> --note <text>   Set a task to done, stamp updated:, append the dated note
+
+Session subcommands:
+  lint <session-dir>          Check tasks/ and groom.yaml against the task methodology
+  mark-groomed <session-dir>  Write groom.yaml at the current methodology version
+  radius <session-dir> [--json] [--cap N]   Print the rows an event's new evidence reaches (read-only)
+  close <session-dir> <q-id> --kind … --cite … --quote-file <path|-> --event … --run …   Append a close to groom-closes.md, regenerate HANDOFF.md
+  mark-event-groomed <session-dir> --code <sha> --scratch <sha> --session <file> [--remainder …]   Store an event groom's marks in groom.yaml
+
+Issue subcommands:
+  write < fields.json                Write an issue from stdin JSON
+  close <slug> --status <s> --resolution-file <path|->   Close an issue: Summary, Resolution, status in one write
+  mark-groomed <slug>...             Append the dated Groomed: <sha> bullet to each issue's ## Notes
+  mark-refreshed <slug>...           Append the dated Refreshed: <sha> bullet to each issue's ## Notes
+
+Wrap subcommands:
+  collect <workstream-dir>    Write <workstream-dir>/wrap/items.json and print its path
 
 Exit codes:
   0  success
@@ -133,6 +163,46 @@ async function main() {
     }
     case 'register': {
       const mod = await import('./register.mjs');
+      await mod.dispatch(remaining);
+      break;
+    }
+    case 'cat-sessions': {
+      const mod = await import('./cat-sessions.mjs');
+      await mod.dispatch(remaining);
+      break;
+    }
+    case 'rewrite-pointer': {
+      const mod = await import('./rewrite-pointer.mjs');
+      await mod.dispatch(remaining);
+      break;
+    }
+    case 'tasks': {
+      const mod = await import('./tasks.mjs');
+      await mod.dispatch(remaining);
+      break;
+    }
+    case 'session': {
+      const mod = await import('./session.mjs');
+      await mod.dispatch(remaining);
+      break;
+    }
+    case 'epics': {
+      const mod = await import('./epics.mjs');
+      await mod.dispatch(remaining);
+      break;
+    }
+    case 'wrap': {
+      const mod = await import('./wrap.mjs');
+      await mod.dispatch(remaining);
+      break;
+    }
+    case 'issue': {
+      const mod = await import('./issues.mjs');
+      await mod.dispatch(remaining);
+      break;
+    }
+    case 'repos': {
+      const mod = await import('./repos.mjs');
       await mod.dispatch(remaining);
       break;
     }

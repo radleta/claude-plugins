@@ -1,5 +1,7 @@
 # Detailed Checklists for Code-Change Skill
 
+Contents: 1. Pre-Change Investigation Checklist · 2. Code Quality Checklist · 3. Testing Checklist · 4. Documentation Checklist · 5. CHANGELOG Checklist · 6. Post-Change Validation Checklist · Checklist Usage Notes
+
 This document provides the complete, detailed checklists that will be included in the CHECKLISTS.md file of the code-change skill.
 
 ---
@@ -127,7 +129,7 @@ This document provides the complete, detailed checklists that will be included i
 ### Code Comments
 - [ ] **Complex logic explained** - Non-obvious code has comments explaining WHY
 - [ ] **Public APIs documented** - Functions/classes intended for use by others are documented
-- [ ] **Output completeness verified** - Load the completeness-expert skill for banned patterns and cross-check protocol. No truncation patterns, no deferred work, no placeholder code.
+- [ ] **Output verified** - Evidence per the completeness-expert skill's verification table; stub, deferral and truncation patterns are `completeness-verification`'s, which `completeness-verifier` runs.
 - [ ] **Comments are current** - No outdated comments that don't match code
 - [ ] **No commented-out code** - Removed, not commented (use version control instead)
 - [ ] **Comments add value** - Don't state the obvious: `// increment i` is useless
@@ -374,7 +376,7 @@ This document provides the complete, detailed checklists that will be included i
 
 ### How to Use These Checklists
 
-1. **Pre-Change Investigation** - ALWAYS run this FIRST before making changes
+1. **Pre-Change Investigation** - run this first, before making changes
 2. **Code Quality** - Reference during and after coding
 3. **Testing** - Use when writing tests
 4. **Documentation** - Use when updating docs
@@ -395,7 +397,6 @@ Not every item applies to every change:
 - Bug fix might not need CHANGELOG entry if very minor
 - Internal refactoring might not need README updates
 - Use professional judgment
-- When in doubt, err on the side of completeness
 
 ---
 

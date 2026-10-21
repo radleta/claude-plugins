@@ -1,7 +1,11 @@
 ---
 description: Create a well-named feature branch from a description, enforcing naming conventions
+disable-model-invocation: true
 argument-hint: <description of what you'll work on>
 context: fork
+model: claude-opus-5-5
+effort: medium
+background: false
 ---
 
 <role>

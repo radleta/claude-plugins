@@ -1,4 +1,5 @@
 ---
+page-kind: procedure
 tags: [estimation-expert/qa]
 summary: "12-item pre-presentation checklist covering work classification, parallelism, critical path, formula application, and velocity sanity check"
 ---

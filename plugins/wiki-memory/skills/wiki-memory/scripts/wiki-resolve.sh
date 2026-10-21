@@ -105,7 +105,7 @@ walk_dir="${PWD%/}"
 while [[ -n "$walk_dir" ]]; do
   candidate="$walk_dir/.wiki-memory/$domain"
   if [[ -d "$candidate" && -f "$candidate/index.md" ]]; then
-    printf "WARN: wiki '%s' resolved via legacy %s/%s/ — migrate to skill-as-wiki layout under .claude/skills/%s/ (see /wiki-memory migrate)\n" \
+    printf "WARN: wiki '%s' resolved via legacy %s/%s/ — migrate to skill-as-wiki layout under .claude/skills/%s/ (move it under .claude/skills/)\n" \
       "$domain" ".wiki-memory" "$domain" "$domain" >&2
     echo "<!-- wiki: $candidate/ -->"
     cat "$candidate/index.md"
@@ -151,7 +151,7 @@ while [[ "$walk_dir" != "/" && "$walk_dir" != "." ]]; do
 done
 
 if [[ -n "$walk_found" ]]; then
-  printf "WARN: wiki '%s' resolved via legacy %s/%s/ — migrate to skill-as-wiki layout under .claude/skills/%s/ (see /wiki-memory migrate)\n" \
+  printf "WARN: wiki '%s' resolved via legacy %s/%s/ — migrate to skill-as-wiki layout under .claude/skills/%s/ (move it under .claude/skills/)\n" \
     "$domain" ".wiki-memory" "$domain" "$domain" >&2
   echo "<!-- wiki: $walk_found/ -->"
   cat "$walk_found/index.md"
@@ -176,7 +176,7 @@ case "$script_dir" in
 esac
 
 if [[ -n "$plugin_found" ]]; then
-  printf "WARN: wiki '%s' resolved via legacy %s/%s/ — migrate to skill-as-wiki layout under .claude/skills/%s/ (see /wiki-memory migrate)\n" \
+  printf "WARN: wiki '%s' resolved via legacy %s/%s/ — migrate to skill-as-wiki layout under .claude/skills/%s/ (move it under .claude/skills/)\n" \
     "$domain" "wikis" "$domain" "$domain" >&2
   echo "<!-- wiki: $plugin_found/ -->"
   cat "$plugin_found/index.md"

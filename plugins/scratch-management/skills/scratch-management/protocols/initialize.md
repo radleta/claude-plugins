@@ -7,11 +7,10 @@
     <prereq>User provided a git remote URL</prereq>
   </prerequisites>
 
-  <critical-warning>
-    PRESERVE ALL EXISTING FILES in scratch/.
-    The git init command does NOT delete files.
-    All existing folders and files MUST be included in the initial commit.
-  </critical-warning>
+  <existing-files>
+    Every existing file in scratch/ stays: `git init` deletes nothing, and the initial commit
+    includes every existing folder and file.
+  </existing-files>
 
   <execution>
     <step order="1">
@@ -20,7 +19,7 @@
       <if-not-found>
         <command>mkdir scratch</command>
       </if-not-found>
-      <observe>Note any existing files/folders - these MUST be preserved</observe>
+      <observe>Note any existing files/folders - these are preserved</observe>
     </step>
 
     <step order="2">
@@ -59,7 +58,7 @@
         <command>git -C scratch commit -m "Initial commit: existing scratch files"</command>
       </if-has-changes>
       <if-empty>
-        <action>Create placeholder to enable push</action>
+        <action>Create placeholder for the initial commit</action>
         <command>echo "# Scratch" > scratch/README.md</command>
         <command>git -C scratch add README.md</command>
         <command>git -C scratch commit -m "Initialize scratch repo"</command>
@@ -67,12 +66,11 @@
     </step>
 
     <step order="7">
-      <action>Push to remote</action>
-      <command>git -C scratch push -u origin main</command>
-      <if-fails-branch-name>
-        <command>git -C scratch branch -M main</command>
-        <command>git -C scratch push -u origin main</command>
-      </if-fails-branch-name>
+      <action>Name the branch main and point it at origin/main without pushing</action>
+      <command>git -C scratch branch -M main</command>
+      <command>git -C scratch config branch.main.remote origin</command>
+      <command>git -C scratch config branch.main.merge refs/heads/main</command>
+      <observe>The commit stays local: the first push is the user's</observe>
     </step>
 
     <step order="8">
@@ -86,7 +84,7 @@
   <on-success>
     Report to user:
     "Scratch initialized with remote {GIT_URL}.
-    All existing files preserved and committed.
+    All existing files preserved and committed on local main; the first push is the user's.
 
     Folders preserved:
     - {list each folder that was in scratch/}"
@@ -95,7 +93,6 @@
   <on-failure>
     Common issues:
     - Remote already exists: git -C scratch remote remove origin, then retry
-    - Push rejected: Remote may have existing content, check if empty repo
     - Permission denied: Check SSH keys or HTTPS credentials
   </on-failure>
 </protocol>

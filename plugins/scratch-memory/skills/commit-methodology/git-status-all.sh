@@ -1,0 +1,244 @@
+#!/usr/bin/env bash
+# git-status-all.sh — Gather git state across all repos defined in .subrepos
+#
+# Usage: git-status-all
+# Requires: .subrepos file in cwd (one directory per line, # comments allowed)
+#
+# Output (paths under $(git rev-parse --git-dir)/):
+#   commit-all-summary.txt          — per-repo status overview
+#   commit-all-diffs/{name}.diff    — full diff per dirty repo (sectioned format)
+#   stdout: inline summary for quick triage
+
+set -euo pipefail
+
+# Help and argument validation
+case "${1:-}" in
+  -h|--help)
+    echo "Usage: git-status-all"
+    echo ""
+    echo "Gather git state across all repos defined in .subrepos."
+    echo "Requires a .subrepos file in the current directory."
+    echo ""
+    echo "Output (written under \$(git rev-parse --git-dir)/):"
+    echo "  commit-all-summary.txt        — per-repo status overview"
+    echo "  commit-all-diffs/{name}.diff  — full diff per dirty repo"
+    exit 0
+    ;;
+  -*)
+    echo "ERROR: unknown option: $1" >&2
+    echo "Usage: git-status-all" >&2
+    exit 1
+    ;;
+esac
+
+if [ $# -gt 0 ]; then
+  echo "ERROR: unexpected arguments: $*" >&2
+  echo "Usage: git-status-all" >&2
+  exit 1
+fi
+
+SUBREPOS_FILE=".subrepos"
+
+# --- Validate ---
+
+if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  echo "ERROR: not a git repository" >&2
+  exit 1
+fi
+
+if [ ! -f "$SUBREPOS_FILE" ]; then
+  echo "ERROR: No .subrepos file found. Create one with sub-repo directories, one per line." >&2
+  exit 1
+fi
+
+# Resolve the per-worktree git directory so this works in both normal repos and worktrees
+# (in a worktree .git is a FILE, not a directory, so .git/... writes fail)
+GIT_DIR=$(git rev-parse --git-dir)
+SUMMARY_FILE="$GIT_DIR/commit-all-summary.txt"
+DIFF_DIR="$GIT_DIR/commit-all-diffs"
+
+# --- Parse .subrepos ---
+
+REPOS=()
+while IFS= read -r line || [ -n "$line" ]; do
+  # Strip comments
+  line="${line%%#*}"
+  # Trim leading/trailing whitespace
+  line="$(echo "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+  [ -z "$line" ] && continue
+  # Expand a leading ~ so .subrepos can name repos outside the parent tree
+  line="${line/#\~/$HOME}"
+  # Strip trailing slash for consistency
+  line="${line%/}"
+  REPOS+=("$line")
+done < "$SUBREPOS_FILE"
+
+# Promote scratch to first position if present
+ORDERED_REPOS=()
+HAS_SCRATCH=false
+for repo in "${REPOS[@]}"; do
+  if [ "$repo" = "scratch" ]; then
+    HAS_SCRATCH=true
+  else
+    ORDERED_REPOS+=("$repo")
+  fi
+done
+if [ "$HAS_SCRATCH" = true ]; then
+  ORDERED_REPOS=("scratch" "${ORDERED_REPOS[@]}")
+fi
+
+# Main repo is always last (implicit)
+ORDERED_REPOS+=(".")
+
+# --- Clean previous output ---
+
+rm -rf "$DIFF_DIR"
+mkdir -p "$DIFF_DIR"
+> "$SUMMARY_FILE"
+
+# --- Gather state per repo ---
+
+DIRTY_COUNT=0
+CLEAN_COUNT=0
+SKIP_COUNT=0
+INLINE_SUMMARY=""
+
+# A repo path is not usable as a filename: an external path carries slashes and may
+# carry spaces. Keep the path verbatim for `git -C` and slugify it for the diff file.
+slugify() {
+  local s="${1#"$HOME"/}"
+  s=$(printf '%s' "$s" | tr -c 'A-Za-z0-9._-' '-')
+  printf '%s' "$s" | sed 's/-\{2,\}/-/g; s/^-//; s/-$//'
+}
+
+gather_repo_state() {
+  local repo_path="$1"
+  local repo_name="$2"
+  local repo_slug="$3"
+  local diff_file="$DIFF_DIR/$repo_slug.diff"
+
+  # Check if repo exists
+  if [ ! -d "$repo_path" ]; then
+    echo "=== REPO: $repo_name ($repo_path/) ===" >> "$SUMMARY_FILE"
+    echo "Status: not initialized" >> "$SUMMARY_FILE"
+    echo "" >> "$SUMMARY_FILE"
+    INLINE_SUMMARY+="  $repo_name: not initialized"$'\n'
+    SKIP_COUNT=$((SKIP_COUNT + 1))
+    return
+  fi
+
+  # Check if it's a git repo
+  if ! git -C "$repo_path" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    echo "=== REPO: $repo_name ($repo_path/) ===" >> "$SUMMARY_FILE"
+    echo "Status: not a git repo" >> "$SUMMARY_FILE"
+    echo "" >> "$SUMMARY_FILE"
+    INLINE_SUMMARY+="  $repo_name: not a git repo"$'\n'
+    SKIP_COUNT=$((SKIP_COUNT + 1))
+    return
+  fi
+
+  # Gather state
+  local branch
+  branch=$(git -C "$repo_path" branch --show-current 2>/dev/null || echo "detached")
+
+  local staged_shortstat
+  staged_shortstat=$(git -C "$repo_path" diff --cached --shortstat 2>/dev/null || true)
+
+  local unstaged_shortstat
+  unstaged_shortstat=$(git -C "$repo_path" diff --shortstat 2>/dev/null || true)
+
+  local untracked_count
+  untracked_count=$(git -C "$repo_path" ls-files --others --exclude-standard 2>/dev/null | wc -l)
+  untracked_count=$((untracked_count + 0))  # ensure integer
+
+  local is_dirty=false
+  if [ -n "$staged_shortstat" ] || [ -n "$unstaged_shortstat" ] || [ "$untracked_count" -gt 0 ]; then
+    is_dirty=true
+  fi
+
+  # Write summary section
+  {
+    echo "=== REPO: $repo_name ($repo_path/) ==="
+    echo "Branch: $branch"
+    if [ "$is_dirty" = true ]; then
+      echo "Status: dirty"
+      [ -n "$staged_shortstat" ] && echo "Staged: $staged_shortstat"
+      [ -n "$unstaged_shortstat" ] && echo "Unstaged: $unstaged_shortstat"
+      [ "$untracked_count" -gt 0 ] && echo "Untracked: $untracked_count files"
+    else
+      echo "Status: clean"
+    fi
+    echo ""
+  } >> "$SUMMARY_FILE"
+
+  # Write per-repo diff file (only if dirty)
+  if [ "$is_dirty" = true ]; then
+    {
+      echo "=== SNAPSHOT ==="
+      echo "Repo: $repo_path"
+      echo "Captured: $(date -u '+%Y-%m-%dT%H:%M:%SZ') — BEFORE /commit-all stages anything."
+      echo "ADVISORY ONLY. Everything below reports the pre-staging tree, so STAGED_* is"
+      echo "normally empty and the DIFF section omits untracked files entirely. A repo whose"
+      echo "changes are all new files shows an empty DIFF. Never write a commit message from"
+      echo "this file — run 'git-state -C <repo>' after staging to get the real changeset."
+
+      echo ""
+      echo "=== STATUS ==="
+      git -C "$repo_path" status
+
+      echo ""
+      echo "=== STAGED_STAT ==="
+      git -C "$repo_path" diff --cached --stat || true
+
+      echo ""
+      echo "=== STAGED_SHORTSTAT ==="
+      echo "$staged_shortstat"
+
+      echo ""
+      echo "=== STAGED_FILES ==="
+      git -C "$repo_path" diff --cached --name-only || true
+
+      echo ""
+      echo "=== UNSTAGED_STAT ==="
+      git -C "$repo_path" diff --stat || true
+
+      echo ""
+      echo "=== UNSTAGED_FILES ==="
+      git -C "$repo_path" diff --name-only || true
+      git -C "$repo_path" ls-files --others --exclude-standard || true
+
+      echo ""
+      echo "=== RECENT_COMMITS ==="
+      git -C "$repo_path" log --oneline --format='%h %s' -10 || true
+
+      echo ""
+      echo "=== DIFF ==="
+      # Combined: staged + unstaged
+      git -C "$repo_path" diff --cached || true
+      git -C "$repo_path" diff || true
+    } > "$diff_file"
+
+    DIRTY_COUNT=$((DIRTY_COUNT + 1))
+    INLINE_SUMMARY+="  $repo_name: dirty ($branch)"$'\n'
+  else
+    CLEAN_COUNT=$((CLEAN_COUNT + 1))
+    INLINE_SUMMARY+="  $repo_name: clean ($branch)"$'\n'
+  fi
+}
+
+for repo in "${ORDERED_REPOS[@]}"; do
+  if [ "$repo" = "." ]; then
+    gather_repo_state "." "main" "main"
+  else
+    gather_repo_state "$repo" "$repo" "$(slugify "$repo")"
+  fi
+done
+
+# --- Stdout summary ---
+
+echo "Repos: $DIRTY_COUNT dirty, $CLEAN_COUNT clean, $SKIP_COUNT skipped"
+echo "$INLINE_SUMMARY"
+echo "Summary: $SUMMARY_FILE"
+if [ "$DIRTY_COUNT" -gt 0 ]; then
+  echo "Diffs: $DIFF_DIR/"
+fi

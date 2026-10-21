@@ -1,9 +1,13 @@
 ---
 description: Deep codebase exploration delegated to the Explore agent in an isolated context, keeping main conversation clean
+disable-model-invocation: true
 argument-hint: <question about the codebase>
 context: fork
+model: claude-opus-5-5
+effort: medium
 agent: Explore
 allowed-tools: Read, Glob, Grep
+disallowed-tools: Edit, Write
 ---
 
 Perform a very thorough exploration of the codebase to answer the following question:

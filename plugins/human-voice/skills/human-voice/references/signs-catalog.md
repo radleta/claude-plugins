@@ -1,5 +1,7 @@
 # Signs of AI Writing — Catalog
 
+Contents: Contents · 1. Filler vocabulary · 2. Puffery and promotional tone · 3. Editorializing and vague attribution · 4. Sentence-structure tells · 5. Transitions and conjunctions · 6. Paragraph and section structure · 7. Formatting tells · 8. Chatbot and assistant artifacts
+
 Detection cues paired with fixes, distilled from
 [Wikipedia:Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing)
 and filtered to the tells that actually change how text reads (the Wikipedia-specific
@@ -9,6 +11,9 @@ scope here).
 **Read this the right way:** no single tell proves AI authorship, and a human may use
 any of these. What's diagnostic is **density** — clusters of these in one passage. Scrub
 the clusters first.
+
+Tells drift as models are retuned — "delve" is already fading from newer models. Last
+audited: 2026-07. Re-audit this catalog against current-model output when models change.
 
 The `ai-lint` tool catches the items marked 🔧 automatically — but it's optional. If it
 isn't available (e.g. in Claude Cowork), scan for the 🔧 items yourself against this
@@ -51,6 +56,11 @@ Words that show up far more in AI text than human text. They're not banned — t
 | myriad, plethora, diverse array | "many", or give a number |
 | elevate, enhance, enduring, groundbreaking, renowned | plain verb; cut hype |
 | utilize, embark, commence, synergy, holistic, actionable, impactful, learnings | use, start, start, benefit, whole, usable, the impact, lessons |
+| deep dive | "close look", or just cover it |
+| game-changer / unlock (the full, the power, your potential, new) | say what changed / name the concrete benefit |
+| reach out, circle back, touch base | "write", "call", "meet"; say when you will reply |
+| at your earliest convenience | name a date, or cut |
+| just following up, just bumping this | say what you need and by when |
 
 **Prefer the plain (Anglo-Saxon) word over the Latinate one** — AI leans formal/Latinate:
 utilize→use, commence→start, subsequently→then, prior to→before, sufficient→enough,
@@ -58,7 +68,7 @@ approximately→about, numerous→many, in order to→to, due to the fact that�
 ability to→can. 🔧 (most caught)
 
 **Yellow words — one use is fine, repetition is the tell:** comprehensive, significant,
-essential, fundamental, dynamic, innovative. Keep at most one per piece. 🔧 (flagged on the
+essential, fundamental, dynamic, innovative, solutions, align. Keep at most one per piece. 🔧 (flagged on the
 2nd occurrence)
 
 ## 2. Puffery and promotional tone
@@ -74,6 +84,7 @@ The "travel brochure" and "press release" registers. The text *sells* instead of
 | "rich cultural heritage", "rich history" | Name the specific events/people |
 | "commitment to excellence / sustainability / quality" | Show the action, not the slogan |
 | "seamlessly connecting…", "dependable, value-driven…" | Describe what it does concretely |
+| "In an era where… / In a world where…" | Cut the throat-clearing; start at the point |
 
 Rule of thumb: if a sentence would fit unchanged in an advertisement, it's puffery.
 
@@ -110,6 +121,7 @@ The most recognizable AI fingerprints. Several are 🔧 caught by `ai-lint`.
 | "it's not just X, it's Y" | State what it *is* |
 | "not a mirror but a portal", "not X, but rather Y" | Lead with the positive; drop the setup |
 | "X rather than Y" (as faux-insight) | Say the point directly |
+| "isn't just X. It's Y." / "doesn't just X — it's Y" | State what it is (🔧 now caught) |
 
 **Rule of three** (needs judgment) — three parallel items, compulsively:
 
@@ -149,6 +161,16 @@ The most recognizable AI fingerprints. Several are 🔧 caught by `ai-lint`.
 |-----|-----|
 | "X is the Y of Z", "not a tool but a mirror", "the currency/architecture/language of…" | Delete, or make a concrete claim |
 
+**Colon-fronted clauses** 🔧 (density, not any single instance) — a colon inside body
+prose introducing the explanation, distinct from the "X: Why Y Matters" *heading*
+formula in §7:
+
+| Cue | Fix |
+|-----|-----|
+| "The useful bit for us: part-time consultants bill the same median." | Make it two sentences, or one with a comma |
+| "On us being related: bring it up yourself." | Recast — "On us being related, bring it up yourself" |
+| Several paragraphs in one document all fronting a clause this way | One is fine; a repeat is a template — vary the punctuation |
+
 **Staccato drama** (the inverse of even rhythm):
 
 | Cue | Fix |
@@ -179,6 +201,8 @@ by `ai-lint`.
 | Infomercial hooks | "The catch?", "The kicker?", "Sound familiar?" (as standalone teasers) | Cut the teaser; state it |
 | Faux-candor openers | "Here's the thing", "Let's be honest", "Real talk", "Honestly?" (as standalone hooks) | Just be direct |
 | Treadmill restatement | "In other words", "Put simply", "To put it another way", "Essentially," then the same point | Say it once, well |
+| Rhetorical-question transitions | "So what does this mean?", "Why does this matter?" | Cut; state the point |
+| Labeled announcement | "One housekeeping item: our address is…", "A quick note — …", "One caveat. …" (a label that runs on into prose; a label before a list is structure) | Delete the label; say the thing |
 
 ## 6. Paragraph and section structure
 
@@ -191,12 +215,20 @@ Larger patterns — judgment-level, not regex-catchable.
 | **Restatement:** intro says it, body says it, conclusion says it again | Say it once |
 | **Forced "broader significance" endings** on every section | Remove; let facts stand |
 | **Even, templated section sizing** — every section the same shape and length | Let importance set the length |
-| **Reshuffle test:** body paragraphs can be swapped without breaking the logic | Give it a spine — each paragraph should depend on the one before it |
+| **Bag of co-equal points:** body paragraphs with no dependency chain between them | Give it a spine — each paragraph should depend on the one before it; the reshuffle test in [structure-audit.md](structure-audit.md) checks it |
 | **Diff-anchored writing:** narrating the change — "The update allows users to X" | Describe what *is*: "Users can X" |
 | **Fragmented header:** a heading, then a one-line paragraph that restates the heading before real content | Cut the restatement; start the content |
+| **Template message:** it could go to a different recipient with two words changed | Add the fact only this recipient shares, or send the shorter honest version |
+| **Compliment opener:** a first line praising the recipient or their work | Delete it; start on the point |
+| **More than one ask** in a message that asks for something | One ask, small and specific; send the other later |
+| **Over-long message** | Cut whole parts first: the opener, the credentials paragraph, the closing summary |
+| **Parenthesis doing a dash's job** in `Tier 1` text (em dashes are checked by 🔧 `--tier 1`) | End the sentence or use a comma; a real aside keeps its parentheses |
 
-The **reshuffle test** is the single most useful structural check: human prose has a
-dependency chain; AI produces a bag of co-equal points.
+Of these, the bag of co-equal points is the most telling: human prose has a dependency
+chain, and AI produces a pile of points. The pass/fail check for it is the reshuffle test in
+[structure-audit.md](structure-audit.md).
+
+## 7. Formatting tells
 
 🔧 Mostly caught by `ai-lint`. Especially damaging in attributed prose (Tier 1), where
 heavy markdown screams "generated."
@@ -205,11 +237,12 @@ heavy markdown screams "generated."
 |-----|-----|
 | Mechanical **bolding** of every key term | Bold only genuine emphasis |
 | Inline-header bullets: "• **Thing:** description" used as the default structure | Use prose for prose; reserve lists for genuine enumerations |
-| Excessive **em-dashes** connecting clauses | Swap some for commas, periods, parentheses |
+| Excessive **em-dashes** connecting clauses | Swap some for commas or periods. `Tier 1` text takes none: `ai-lint --tier 1` reports each one |
 | **Curly quotes / apostrophes** (' ' " ") from generation | Straight quotes, unless the channel needs typographic ones |
 | **Emoji** in professional or attributed prose | Remove |
 | **Title Case Headings** ("Impact Of Technology And Growth") | Sentence case, unless house style is Title Case |
 | Lists where flowing prose is expected (e.g. an email body) | Write it as sentences |
+| Colon headline formula: "X: Why Y Matters" | Say the point as the title (🔧 caught) |
 
 ## 8. Chatbot and assistant artifacts
 
@@ -227,3 +260,5 @@ that's supposed to be the user's. Never ship these in attributed text.
 | Placeholder text: "[insert name here]", "This section would discuss…" | Fill it in or remove |
 | Sycophancy: "You're absolutely right", "Of course!" | Delete |
 | Servile offers: "Would you like me to…", "Happy to help" | Delete, or make a specific ask |
+| "Thrilled to announce…", "Excited to share…", "Delighted to…" | Manufactured warmth — match the real register (🔧 caught) |
+| Email openers: "I hope this email finds you well", "I hope you're doing well", "I wanted to reach out", "I came across your company and", "I've been following your work", "Quick question for you", "I'll keep this brief", "I know you're busy, so" | Delete; start with the point (🔧 caught) |

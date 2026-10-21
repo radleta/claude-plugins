@@ -1,6 +1,6 @@
 ---
 description: Create conventional commit with security checks, smart staging triage, and proper formatting
-argument-hint: [additional context]
+argument-hint: "[additional context]"
 ---
 
 Launch the **commit-worker** agent via the Agent tool, providing a summary of the session (files changed, why, key decisions) as the prompt. Do not run any git commands yourself.

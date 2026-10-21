@@ -15,6 +15,7 @@ case "${1:-}" in
     echo "Creates symlinks at ~/.local/bin/ for commit-methodology scripts:"
     echo "  git-state       — git state snapshot script"
     echo "  git-status-all  — multi-repo status script"
+    echo "  git-sync-all    — multi-repo switch to develop/main script"
     echo ""
     echo "Options:"
     echo "  --check   Report drift status of installed symlinks (read-only, exits 0 always)"
@@ -94,6 +95,7 @@ require_elevation() {
 declare -A SCRIPTS=(
   ["git-state.sh"]="git-state"
   ["git-status-all.sh"]="git-status-all"
+  ["git-sync-all.sh"]="git-sync-all"
 )
 
 # --- Check mode: report drift status of each symlink (read-only) ---

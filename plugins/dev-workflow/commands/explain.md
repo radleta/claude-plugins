@@ -1,5 +1,6 @@
 ---
 description: Explain code, architecture, or design decisions with full conversation context for follow-up discussion
+disable-model-invocation: true
 argument-hint: <file path, function name, or concept to explain>
 ---
 

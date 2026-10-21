@@ -1,13 +1,12 @@
 ---
 name: test-verification
-description: "Test quality verification methodology with 10 detection categories (7 core + 3 spec-artifact), assertion analysis, and AI-specific shallow test detection. Use when reviewing tests for meaningfulness, missing edge cases, assertion quality, or mock correctness — even for small test files."
+description: "Test quality verification methodology with 7 detection categories, assertion analysis, and AI-specific shallow test detection. Use when reviewing tests for meaningfulness, missing edge cases, assertion quality, or mock correctness — even for small test files."
 ---
 
 # Test Verification Methodology
 
 ## AI Awareness
 
-AI-generated tests often look complete but miss critical verification:
 - AI tends to write tests that pass but don't actually verify behavior
 - Tests may have assertions that never fail (always true)
 - AI often tests happy path only, missing edge cases
@@ -16,21 +15,21 @@ AI-generated tests often look complete but miss critical verification:
 
 ## Detection Categories
 
-**shallow-tests** (CRITICAL): Tests that exist but don't meaningfully verify behavior
+**shallow-tests**: Tests that exist but don't meaningfully verify behavior
 - Test function with no expect/assert calls
 - Trivial assertions: `expect(true).toBe(true)`, `assert True`, `assertEquals(1, 1)`
 - Existence-only checks: `expect(result).toBeDefined()`, `assertNotNull(result)`
 - Type-only checks: `expect(typeof result).toBe('object')`
 - Length-only checks: `expect(result.length).toBeGreaterThan(0)`
 
-**missing-assertions** (CRITICAL): Tests that call code but don't verify outcomes
+**missing-assertions**: Tests that call code but don't verify outcomes
 - Function called but return value not checked
 - State mutation but no verification of new state
 - Async operation but no await or callback verification
 - Error scenario but no error type/message verification
 - Side effect expected but not verified
 
-**happy-path-only** (HIGH): Tests that only cover success scenarios
+**happy-path-only**: Tests that only cover success scenarios
 - No tests for null/undefined inputs
 - No tests for empty arrays/strings
 - No tests for boundary values (0, -1, MAX_INT)
@@ -38,21 +37,21 @@ AI-generated tests often look complete but miss critical verification:
 - No tests for network/IO failures
 - No tests for concurrent access scenarios
 
-**mock-issues** (HIGH): Mocks that don't reflect real system behavior
+**mock-issues**: Mocks that don't reflect real system behavior
 - Mock always returns success (never errors)
 - Mock returns hardcoded values that won't vary
 - Mock doesn't verify it was called correctly
 - Mock implementation differs from real implementation contract
 - Too many mocks (testing mocks, not code)
 
-**coverage-gaps** (HIGH): Important code paths not covered by tests
+**coverage-gaps**: Important code paths not covered by tests
 - Public functions without any tests
 - Error handling branches not tested
 - Conditional branches not fully covered
 - Integration points not tested
 - Configuration variations not tested
 
-**test-smells** (MEDIUM): Patterns indicating potential test quality issues
+**test-smells**: Patterns indicating potential test quality issues
 - Test name doesn't describe what's being tested
 - Multiple unrelated assertions in one test
 - Test depends on other tests (order-dependent)
@@ -61,27 +60,11 @@ AI-generated tests often look complete but miss critical verification:
 - Commented-out tests or assertions
 - Test file significantly smaller than source file
 
-**test-convention-violations** (HIGH): Tests that don't follow project conventions
+**test-convention-violations**: Tests that don't follow project conventions
 - Test file naming doesn't follow project convention (from CLAUDE.md or existing patterns)
 - Test directory structure doesn't match project layout
 - Test framework doesn't match what project documents specify
 - Test setup/teardown doesn't follow project patterns
-
-**example-coverage** (HIGH): Test suite omits spec Concrete Examples
-- Each `✓` Concrete Example in spec maps to an explicit test case using the exact input/output values (not paraphrased)
-- Each `✗` Concrete Example maps to an exception/error test case
-- Conditional: runs only when spec has `**Examples:**` blocks in `## Components`
-- Anti-pattern: test suite covers happy paths but omits error examples from spec
-
-**invariant-tests** (MEDIUM): Spec invariants have no test coverage
-- Each testable invariant has at least one property-style or assertion test that would catch a violation
-- Conditional: runs only when `## Invariants` is present and non-empty (not `_None — …_`)
-- Anti-pattern: invariants in comments with no test that would fail if the invariant were violated
-
-**state-matrix-coverage** (HIGH): Test suite skips State Matrix rows
-- Each (state × event) row in the State Matrix is exercised by at least one test verifying the resulting state and side effects
-- Conditional: runs only when spec has `## State & Transition Matrix`
-- Anti-pattern: tests cover only happy-path transitions, leaving error/retry/re-entry rows untested
 
 ## Out of Scope
 
@@ -110,7 +93,17 @@ AI-generated tests often look complete but miss critical verification:
 
 ### Step 3: Verdict
 
-Determine APPROVED or ISSUES_FOUND with detailed findings.
+Label every finding (below). `ISSUES_FOUND` when any `would-ship-bug` or `real-minor` finding
+stands; `APPROVED` otherwise.
+
+## Labels
+
+Label each finding by its consequence on the `reviewer-contract` scale; each finding carries a
+location, a verbatim quote of the test or source line, and that consequence.
+
+- `would-ship-bug` — the suite passes over a defect present now: a test asserting the wrong expected value, a mock that hides a failure the real system produces, an error path that is broken and untested
+- `real-minor` — nothing is broken yet, but a regression in the covered behavior would pass unnoticed: a shallow or missing assertion, happy-path-only coverage, an uncovered branch, a project test convention broken
+- `nit` — a test smell that weakens nothing, such as a vague test name
 
 ## Output Format
 
@@ -141,66 +134,18 @@ Determine APPROVED or ISSUES_FOUND with detailed findings.
 **Good Test Patterns Found:**
 - [Pattern]: [Where observed and why it's good]
 
-**Issues Found:**
-- [Issue]: [file:line] - [Description]
+## Issues
+- [label] [category] [file:line] — "[verbatim quote]" — [consequence] — Fix: [specific test to add or change]
 
----
+## Non-blocking findings
+- nit [category] [file:line] — "[verbatim quote]" — [why it is polish]
 
-### Detailed Findings (if ISSUES_FOUND)
+## Dimensions Checked
+- shallow-tests — [clean | n findings | not evaluable — reason]
+- ... one line per category
 
-**Shallow Tests:**
-| Test File | Test Name | Issue | Recommendation |
-|-----------|-----------|-------|----------------|
-| [file] | [test name] | [What's wrong] | [How to fix] |
-
-**Missing Assertions:**
-| Test File | Test Name | Code Called | Missing Verification |
-|-----------|-----------|-------------|---------------------|
-| [file] | [test] | [function/method] | [What should be checked] |
-
-**Happy Path Only:**
-| Test File | Function Tested | Missing Scenarios |
-|-----------|-----------------|-------------------|
-| [file] | [function] | [null, empty, error, boundary] |
-
-**Mock Issues:**
-| Test File | Mock | Issue | Fix |
-|-----------|------|-------|-----|
-| [file] | [mock name] | [What's wrong] | [How to fix] |
-
-**Coverage Gaps:**
-| Source File | Untested Code | Impact |
-|-------------|---------------|--------|
-| [file:line] | [function/branch] | [Why it matters] |
-
-**Test Smells:**
-| Test File | Smell | Severity | Recommendation |
-|-----------|-------|----------|----------------|
-| [file] | [smell type] | [high/medium/low] | [How to address] |
-
----
-
-### Recommendations
-
-**Critical (must add/fix):**
-1. [Specific test to add/fix with file reference]
-
-**High Priority (should add/fix):**
-1. [Specific test to add/fix]
-
-**Medium Priority (consider):**
-1. [Improvement suggestion]
-
----
-
-### Summary
-
-**Overall Assessment:**
-[Detailed paragraph explaining test quality status]
-
-**Test Quality Score:** [X/10]
-**Issues to Resolve:** [count] critical, [count] high, [count] medium
-**Recommendation:** [PROCEED to security review / FIX test issues first]
+## Undecided
+[only when something qualifies under reviewer-contract clause 6]
 ```
 
 ## Examples
@@ -217,31 +162,22 @@ Determine APPROVED or ISSUES_FOUND with detailed findings.
 **Coverage Status:**
 | Source File | Test File | Has Tests | Meaningful |
 |-------------|-----------|-----------|------------|
-| src/utils/validator.ts | src/utils/validator.test.ts |  |  |
-| src/api/handler.ts | src/api/handler.test.ts |  |  |
+| src/utils/validator.ts | src/utils/validator.test.ts | yes | partly |
+| src/api/handler.ts | src/api/handler.test.ts | yes | no |
 
-### Detailed Findings
+## Issues
+- real-minor [shallow-tests] handler.test.ts:14 — "expect(result).toBeDefined()" — a handler returning the wrong status or body still passes — Fix: assert the response body, status and headers
+- real-minor [missing-assertions] handler.test.ts:22 — "processData(input);" — the return value is never checked, so a broken transform ships green — Fix: assert the processed output for a known input
+- real-minor [happy-path-only] validator.test.ts:8 — "expect(validateEmail('a@b.co')).toBe(true)" — null, empty and malformed inputs are untested, so a crash on empty input passes — Fix: add cases for null, "" and "a@"
 
-**Shallow Tests:**
-| Test File | Test Name | Issue | Recommendation |
-|-----------|-----------|-------|----------------|
-| handler.test.ts | "should handle request" | Only checks result is defined | Verify response body, status, headers |
+## Non-blocking findings
+none
 
-**Happy Path Only:**
-| Test File | Function Tested | Missing Scenarios |
-|-----------|-----------------|-------------------|
-| validator.test.ts | validateEmail() | null input, empty string, malformed emails |
-
-**Missing Assertions:**
-| Test File | Test Name | Code Called | Missing Verification |
-|-----------|-----------|-------------|---------------------|
-| handler.test.ts | "should process data" | processData() | Return value never checked |
-
-### Summary
-
-**Test Quality Score:** 4/10
-**Issues to Resolve:** 2 critical, 3 high, 1 medium
-**Recommendation:** FIX test issues first
+## Dimensions Checked
+- shallow-tests — 1 finding
+- missing-assertions — 1 finding
+- happy-path-only — 1 finding
+- mock-issues, coverage-gaps, test-smells, test-convention-violations — clean
 ```
 
 ### APPROVED Example
@@ -258,11 +194,14 @@ Determine APPROVED or ISSUES_FOUND with detailed findings.
 - Edge case coverage: Tests for null, empty, invalid, and expired tokens
 - Error scenarios: All error paths tested with specific error messages
 - Mock verification: Mocks verify they're called with correct parameters
-- Clear test names: Names describe exact scenario being tested
 
-### Summary
+## Issues
+none
 
-**Test Quality Score:** 9/10
-**Issues to Resolve:** 0 critical, 0 high, 0 medium
-**Recommendation:** PROCEED to security review
+## Non-blocking findings
+- nit [test-smells] login.test.ts:41 — "it('works', ...)" — the name does not say which scenario it covers — Fix: "rejects an expired refresh token"
+
+## Dimensions Checked
+- shallow-tests, missing-assertions, happy-path-only, mock-issues, coverage-gaps, test-convention-violations — clean
+- test-smells — 1 finding
 ```

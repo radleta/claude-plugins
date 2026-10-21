@@ -1,37 +1,42 @@
 ---
 name: code-verification
-description: "Unified code quality and requirements verification with 13 detection categories (10 core + 3 spec-artifact), traceability matrix, and AI-specific pattern detection. Use when reviewing code changes for quality issues, convention violations, over-engineering, requirements coverage, or plan-decision conformance — even for small diffs."
+description: "Code quality and requirements verification: 13 detection categories, traceability against idea.md's Contracts & Acceptance, and almost-right logic detection. Use when reviewing code changes for quality, convention violations, over-engineering, requirements coverage, or decision conformance — even for small or markdown-only diffs."
 ---
 
 # Code Verification Methodology
 
-## AI Awareness
+## Contract
 
-AI-generated code has specific, predictable failure patterns:
-- 66% of developers spend more time fixing "almost right" AI code than saved (Stack Overflow 2025)
-- AI PRs have 1.7x more issues than human-only PRs (CodeRabbit Dec 2025)
-- AI is "nearsighted" — often loses context of full requirements
-- AI code is often "almost right" but subtly flawed
-- AI tends to add unnecessary complexity and indirection
-- AI may implement adjacent features but miss what was actually asked
+This skill supplies the *categories* — what to look for. The `reviewer-contract`
+skill supplies the *conduct* — kill-mandate framing, quote-plus-consequence
+findings, the `would-ship-bug | real-minor | nit` severity scale, clean context,
+the mandatory dimensions-checked-clean list, and the undeliverable-vs-undecided
+split. Load both. Where this skill and the reviewer contract appear to differ on
+how a finding is reported, the reviewer contract wins.
+
+**Binding document.** The authority on what the changes had to achieve is
+`idea.md` — its `## Contracts & Acceptance` section for behavior and its
+`## Decisions` for the choices the implementation must not contradict: numbered
+`D{n}.` lines, or a table's rows in an `idea.md` written before the line form.
+There is no separate spec document.
 
 ## Detection Categories
 
 ### Requirements Categories
 
-**missing-requirements** (CRITICAL): Requirements stated but not implemented
+**missing-requirements**: Requirements stated but not implemented
 - Each explicit requirement has corresponding implementation
 - Each acceptance criterion is satisfied
 - All user stories/tasks are addressed
 - No requirements were "forgotten" during implementation
 
-**context-drift** (CRITICAL): Implementation diverged from original intent
+**context-drift**: Implementation diverged from original intent
 - Implementation matches what user actually asked for
 - No assumptions that change the scope
 - No "improvements" that weren't requested
 - Terminology matches user's terminology
 
-**partial-implementation** (HIGH): Features only partially implemented
+**partial-implementation**: Features only partially implemented
 - Each feature is fully functional, not just scaffolded
 - Edge cases mentioned in requirements are handled
 - Error scenarios mentioned are implemented
@@ -41,14 +46,14 @@ AI-generated code has specific, predictable failure patterns:
 - No components that implement only the first case and comment "repeat for remaining"
 - No files that end abruptly without completing all declared exports/functions
 
-**scope-creep** (MEDIUM): Implementation exceeds stated requirements
+**scope-creep**: Implementation exceeds stated requirements
 - No unrequested features added
 - No "nice to have" additions without user consent
 - Complexity matches requirement complexity
 
 ### Quality Categories
 
-**almost-right-patterns** (CRITICAL): Code that looks correct but has subtle logical flaws
+**almost-right-patterns**: Code that looks correct but has subtle logical flaws
 - Off-by-one errors in loops and array access
 - Incorrect boundary conditions
 - Wrong comparison operators (< vs <=, == vs ===)
@@ -57,7 +62,7 @@ AI-generated code has specific, predictable failure patterns:
 - Incorrect error propagation
 - Swallowed exceptions: `catch` blocks that discard exception details (bare `catch`, `catch (Exception)` without logging, `catch (Exception ex)` that only uses `ex.Message` without logging the full exception). Every catch that doesn't re-throw MUST log the full exception object via the project's logging framework (e.g., `ILogger`, `console.error`, `logging.exception`) so stack traces reach observability tools (Application Insights, Sentry, etc.). Using only `ex.Message` in a return string is NOT sufficient — the stack trace and inner exceptions are lost.
 
-**over-engineering** (HIGH): Unnecessary complexity that should be simplified
+**over-engineering**: Unnecessary complexity that should be simplified
 - Abstractions without clear benefit
 - Unnecessary wrapper classes/functions
 - Premature optimization
@@ -65,7 +70,7 @@ AI-generated code has specific, predictable failure patterns:
 - Unnecessary design patterns
 - Configuration options that aren't needed
 
-**convention-violations** (HIGH): Code that doesn't follow project patterns or CLAUDE.md conventions
+**convention-violations**: Code that doesn't follow project patterns or CLAUDE.md conventions
 - File naming doesn't match project convention
 - File location doesn't match project structure
 - Code style doesn't match existing patterns
@@ -73,7 +78,7 @@ AI-generated code has specific, predictable failure patterns:
 - Error handling style inconsistent with project
 - Build/test/lint commands don't match documented commands
 
-**code-smells** (MEDIUM): Patterns indicating potential problems
+**code-smells**: Patterns indicating potential problems
 - Functions too long (>50 lines)
 - Too many parameters (>5)
 - Deep nesting (>3 levels)
@@ -81,42 +86,47 @@ AI-generated code has specific, predictable failure patterns:
 - Magic numbers/strings without constants
 - Commented-out code (should be deleted)
 
-### codebase-alignment (HIGH)
+### codebase-alignment
 Code that creates parallel implementations of existing functionality.
 New files, functions, or classes that duplicate what already exists in the codebase.
 Backwards compatibility shims (old interface preserved alongside new) without
-an approved decision in the plan's decision table.
+an approved decision in the plan's `## Decisions`.
 Extension by copy-paste rather than by modifying the original.
 
-### plan-decision-conformance (HIGH)
-Code that contradicts decisions recorded in the plan's decision table.
-**When active:** Only when a plan with decisions exists (REVIEW_DEPTH = light, plan path provided). Read `decisions.md` or `decisions/` from the plan path.
+### decision-conformance
+Code that contradicts a decision recorded in `idea.md`'s `## Decisions`, a line or a legacy table row.
+**When active:** whenever the dispatch supplies a binding document. Read that document's `## Decisions`: each `D{n}.` line, or each row of a legacy table, is one decision.
 
 Checklist:
-- Each plan decision's "Choice" is reflected in the implementation — code doesn't contradict the selected option
+- Each decision's choice (the line's `X`, or a legacy row's Decision cell) is reflected in the implementation — code doesn't contradict the ruling
 - Data models match decision specifications (types, field names, storage formats match what decisions describe)
 - Architectural approach matches decisions (extend vs create, which file to modify, integration pattern)
-- No implementation of a rejected alternative (code implements Option B when decision chose Option A)
+- No implementation of a rejected alternative (code implements the approach a decision's `not Y` ruled against)
 
 **Scope boundary:** Does NOT check structural completeness (completeness-verifier's job). Only checks: given that the code exists, does it match what the decisions said to build?
 
-### Spec Artifact Categories
+### Contract Artifact Categories
 
-**contract-conformance** (HIGH): Method implementation violates its spec contract
-- Every method with a `requires` clause has corresponding input validation that rejects violating inputs — not silently proceeds
-- Every `ensures` clause is achievable from every valid input path — trace all paths through the method
-- Thrown exception types match `throws` clauses exactly — no catching a declared exception and re-throwing as generic
-- Anti-pattern: reading the `requires` clause and implementing only the happy path
+These three apply against `idea.md`'s `## Contracts & Acceptance` section — the
+interface contracts between ownership units and the acceptance outcomes stated
+there. Skip a category when the binding document states nothing of that kind,
+and say so in `## Dimensions Checked` rather than omitting the line.
 
-**invariant-preservation** (HIGH): Spec invariants have no enforcement in code
-- Each spec invariant has at least one enforcement point (runtime assertion, guard clause, or documented structural enforcement)
+**contract-conformance**: Implementation violates an interface contract the binding document declares
+- Every declared boundary (module seam, CLI/API shape, data format, file layout) matches what the code actually produces or consumes
+- Where a contract states a precondition, the code rejects violating input rather than silently proceeding
+- Where a contract states a resulting state, that state is reachable from every valid input path — trace the paths
+- Anti-pattern: reading the contract and implementing only the happy path
+
+**invariant-preservation**: A stated invariant has no enforcement in code
+- Each invariant the binding document asserts has at least one enforcement point (runtime check, guard clause, or documented structural enforcement)
 - For security-relevant invariants, verify absence-of-violation across all relevant call sites
-- Anti-pattern: invariants that appear in comments but have no executable enforcement
+- Anti-pattern: invariants that appear in comments or in the design document but have no executable enforcement
 
-**example-trace** (HIGH): Code produces different output than spec examples state
-- For each `✓` Concrete Example in spec, code produces the stated output for the stated input
-- For each `✗` Concrete Example, code throws the stated exception type (not different exception, not success return)
-- Anti-pattern: code satisfying prose description but producing different value than the example
+**acceptance-trace**: Code does not produce what an Acceptance Outcome states
+- For each acceptance outcome expressed as a real-input observable behavior, the code produces the stated behavior for the stated input
+- For each stated failure path, the code fails the stated way (right exit code, right error, right state) — not a different failure, not a silent success
+- Anti-pattern: code satisfying the prose description of an outcome while producing a different observable result
 
 ## Out of Scope
 
@@ -126,162 +136,44 @@ Checklist:
 
 ## Workflow
 
-### Step 1: Gather Context (SINGLE PASS)
+### Step 1: Gather Context
 
-1. Read project instruction files (CLAUDE.md, .claude/CLAUDE.md, .claude/rules/*.md, README.md) to extract project conventions, coding standards, file naming rules, and build/test/lint commands. Use documented patterns as the authority.
-2. Read session context (provided in task prompt): what was implemented, which files changed, why, and any plan path or acceptance criteria. If a plan path is mentioned, read the plan for structured requirements.
-3. List all files created or modified (from session context)
-4. Read all changed files (SINGLE PASS — these reads serve both requirements and quality analysis)
-5. Identify project conventions (from instruction files first, supplemented by examining existing code near changed files)
-6. Extract all requirements from context (plan steps, conversation summary, acceptance criteria)
+Project conventions come from the instruction files (CLAUDE.md, .claude/CLAUDE.md,
+.claude/rules/*.md, README.md) first, then from existing code near the changed files; documented
+patterns are the authority. Requirements come from the binding document, read directly — never
+a summary of it, and never the session transcript (reviewer contract, clause 4). Read every
+changed file the dispatch names once; those reads serve both analyses below.
 
-### Step 2: Requirements Analysis
+### Step 2: Requirements and Quality Analysis
 
-1. If a plan path with decisions is provided, read `decisions.md` or `decisions/` for plan-decision-conformance checks
-2. For each requirement: find corresponding implementation
-3. For each acceptance criterion: verify it's satisfied
-4. Check for context drift (implementation vs intent)
-5. Check for scope creep (extra features)
+**Done when:** every requirement, acceptance outcome and `## Decisions` line or row in the binding
+document has been traced to its implementation, and every changed file has been checked against
+each detection category above.
 
-### Step 3: Quality Analysis (using already-read files)
+### Step 3: Unified Verdict
 
-1. Check for "almost right" patterns (subtle logic errors)
-2. Check for over-engineering and unnecessary complexity
-3. Check for convention violations against both project instruction files and existing code patterns
-4. Check for code smells
-5. Codebase alignment: check for parallel implementations, duplicate patterns, unauthorized backwards compatibility
+Label every finding `would-ship-bug`, `real-minor`, or `nit` per the reviewer
+contract's severity scale, then set status: `FINDINGS` when at least one
+`would-ship-bug` or `real-minor` fired, `APPROVED` otherwise — a verdict
+carrying only nits is APPROVED, and nits are recorded rather than iterated on.
 
-### Step 4: Unified Verdict
+Write the `## Dimensions Checked` list either way. On an APPROVED verdict it is
+the only evidence the review was performed; a clean verdict without it is a
+rubber stamp.
 
-Determine APPROVED or ISSUES_FOUND with combined report.
-
-**Key principle:** Read files ONCE. Analyze TWICE (requirements + quality). Report ONCE.
+Emit no grade, score, or percentage.
 
 ## Output Format
 
-```
-## Code Verification Report
+The literal headings and the MCP `role`/`status` values are owned by the
+dispatching agent's `<verdict-body-structure>`. The mandatory content is owned by
+the `reviewer-contract` skill: every finding carries a location, a verbatim quote,
+a concrete consequence, and exactly one severity label; every verdict carries a
+`## Dimensions Checked` list; anything the changes deliberately leave open goes
+under `## Undecided` rather than being reported as a finding.
 
-**VERDICT: [APPROVED|ISSUES_FOUND]**
-
----
-
-### Scope Summary
-**Files examined:**
-[List of files reviewed]
-
-**Project conventions identified:**
-[Key conventions discovered from existing code]
-
----
-
-### Requirements Coverage
-
-**Traceability Matrix:**
-
-| # | Requirement | Status | Implementation | Notes |
-|---|-------------|--------|----------------|-------|
-| 1 | [Requirement] | ✅ MET / ❌ NOT MET / ⚠️ PARTIAL | [file:function] | [Details] |
-
-**Context Drift:** [None detected / Details of drift]
-**Scope Creep:** [None detected / Details of unrequested additions]
-
----
-
-### Code Quality
-
-**✅ Good Patterns Found:**
-- [Pattern]: [Where observed and why it's good]
-
-**❌ Issues Found:**
-
-**Almost-Right Patterns:**
-| File | Line | Code | Issue | Fix |
-|------|------|------|-------|-----|
-
-**Over-Engineering:**
-| File | Line | Pattern | Issue | Simplification |
-|------|------|---------|-------|----------------|
-
-**Convention Violations:**
-| File | Line | Violation | Convention | Fix |
-|------|------|-----------|-----------|-----|
-
-**Code Smells:**
-| File | Line | Smell | Severity | Recommendation |
-|------|------|-------|----------|----------------|
-
----
-
-### Recommendations
-
-**Critical (must fix):**
-1. [Specific action with file:line]
-
-**High Priority (should fix):**
-1. [Specific action with file:line]
-
-**Medium Priority (consider):**
-1. [Specific action with file:line]
-
----
-
-### Summary
-
-**Overall Assessment:**
-[Detailed paragraph explaining both requirements status and code quality]
-
-**Requirements Coverage:** [X of Y] requirements met ([Z%])
-**Quality Issues:** [count] critical, [count] high, [count] medium
-**Recommendation:** [PROCEED to security review / ADDRESS issues first]
-```
-
-## Examples
-
-### ISSUES_FOUND Example
-
-```
-## Code Verification Report
-
-**VERDICT: ISSUES_FOUND**
-
-### Requirements Coverage
-
-| # | Requirement | Status | Implementation | Notes |
-|---|-------------|--------|----------------|-------|
-| 1 | Profile with avatar, name, bio | ✅ MET | UserProfile.tsx:15-45 | All fields present |
-| 2 | Edit mode toggle | ✅ MET | UserProfile.tsx:8 | useState for editMode |
-| 3 | Validate bio length | ❌ NOT MET | Not found | No validation exists |
-| 4 | Save to backend API | ⚠️ PARTIAL | UserProfile.tsx:52 | Local only, no API call |
-
-### Code Quality
-
-**Over-Engineering:**
-| File | Line | Pattern | Issue | Simplification |
-|------|------|---------|-------|----------------|
-| src/utils/validator.ts | 15 | `AbstractValidatorFactory` | Factory pattern for single validator | Use direct function |
-
-**Requirements Coverage:** 2 of 4 met (50%)
-**Quality Issues:** 0 critical, 2 high, 0 medium
-**Recommendation:** ADDRESS issues first
-```
-
-### APPROVED Example
-
-```
-## Code Verification Report
-
-**VERDICT: APPROVED**
-
-### Requirements Coverage
-
-| # | Requirement | Status | Implementation | Notes |
-|---|-------------|--------|----------------|-------|
-| 1 | User authentication | ✅ MET | src/auth.ts:authenticate() | JWT-based |
-| 2 | Rate limiting | ✅ MET | src/middleware/rateLimit.ts | 100 req/min |
-| 3 | Session management | ✅ MET | src/auth.ts:createSession() | 24hr expiry |
-
-**Requirements Coverage:** 3 of 3 met (100%)
-**Quality Issues:** 0 critical, 0 high, 0 medium
-**Recommendation:** PROCEED to security review
-```
+Traceability is reported per requirement (requirement → implementation location →
+met / not-met / partial). Quality findings are grouped by detection category
+(almost-right, over-engineering, convention-violations, code-smells,
+codebase-alignment, decision-conformance, and the three contract-artifact
+categories) with `file:line` citations.

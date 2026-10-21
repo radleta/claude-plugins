@@ -5,7 +5,7 @@
 
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync, statSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import { normalize as winNormalize } from 'node:path/win32';
 import { platform } from 'node:process';
@@ -57,7 +57,7 @@ Usage:
   ${CMD} remove                    Unregister from this project
   ${CMD} status                    Show current registration
   ${CMD} check [--user]            Check drift of MCP registration (default: local; --user: user scope)
-  ${CMD} install-hooks [--user|--project]   Install PostToolUse validation hook (opt-in)
+  ${CMD} install-hooks [--user|--project]   Install PostToolUse validation hooks (opt-in)
   ${CMD} --help                    Show this help
 
 Scope: local (default) stores entry in ~/.claude.json for this project only.
@@ -124,20 +124,36 @@ Exit codes:
 // --- Absolute path to the hook script (stays in-place, per P4) ---
 const HOOK_SCRIPT = join(__dirname, 'hooks', 'handoff-validate.sh');
 
+// --- Absolute path to the scratch-lint hook script; installed under its own
+// PostToolUse matcher group ("Edit|Write|MultiEdit") — see D3. ---
+const LINT_HOOK_SCRIPT = join(__dirname, 'hooks', 'scratch-lint.sh');
+
 // --- install-hooks help ---
 
 function printInstallHooksHelp(out = process.stdout) {
   out.write(`Usage: ${CMD} install-hooks [--user|--project] [--help]
 
-Install the PostToolUse validation hook into a settings.json file (opt-in).
+Install two PostToolUse validation hooks into a settings.json file (opt-in),
+each in its own matcher group:
+
+  handoff-validate.sh   matcher: Edit|Write
+    Fires on Edit or Write events that touch scratch/S-*/HANDOFF.md.
+    Runs: scratch-memory handoff validate --loose <session-id>
+
+  scratch-lint.sh       matcher: Edit|Write|MultiEdit
+    Fires on Edit, Write, or MultiEdit events that touch
+    scratch/S-*/tasks/*.md or scratch/issues/*.md.
+    Runs: scratch-memory tasks lint <file_path>
 
 Flags:
   --user      Write into ~/.claude/settings.json (default)
   --project   Write into .claude/settings.json in the project root (git-walk)
   --help      Show this help
 
-The hook fires on Edit or Write events that touch scratch/S-*/HANDOFF.md.
-It runs: scratch-memory handoff validate --loose <session-id>
+Each hook is installed idempotently (deduped by exact command string) into
+its own matcher group; other matcher-group entries (e.g. from other tools)
+are never replaced, only appended to. One settings.json write covers both
+hooks per invocation.
 
 Exit codes:
   0  created, updated, or already correct
@@ -324,10 +340,35 @@ function normalizeHookPath(p) {
 }
 
 function cmdInstallHooks(scope) {
-  // Resolve the absolute path to the hook script (resolves at install time, not run time)
-  const hookScriptRaw = resolve(HOOK_SCRIPT);
-  const hookScript = normalizeHookPath(hookScriptRaw);
-  const hookCommand = `bash "${hookScript}"`;
+  // Local helper: install one hook's command into its matcher group inside
+  // the given PostToolUse array — find-or-create the group, dedup by exact
+  // command string, append if not yet present (never replace the array).
+  // Mutates `postToolUse` in place; does not write to disk and never exits
+  // cmdInstallHooks, so the loop below can process a second (or third)
+  // descriptor unconditionally instead of being cut off the way the
+  // pre-refactor single-hook version was. Returns a status string so the
+  // loop can report per-hook and decide whether a write is needed at all.
+  function installHookDescriptor(postToolUse, matcher, hookCommand) {
+    const desiredEntry = { type: 'command', command: hookCommand, timeout: 10 };
+
+    const groupIdx = postToolUse.findIndex(g => g.matcher === matcher);
+
+    if (groupIdx === -1) {
+      postToolUse.push({ matcher, hooks: [desiredEntry] });
+      return 'created';
+    }
+
+    const group = postToolUse[groupIdx];
+    if (!Array.isArray(group.hooks)) group.hooks = [];
+
+    // Dedup by command string
+    if (group.hooks.some(h => h.command === hookCommand)) {
+      return 'already-present';
+    }
+
+    group.hooks.push(desiredEntry);
+    return 'appended';
+  }
 
   // Resolve target settings.json path
   let settingsPath;
@@ -357,9 +398,6 @@ function cmdInstallHooks(scope) {
     settingsPath = join(homedir(), '.claude', 'settings.json');
   }
 
-  // Informational: report hook script source location (per scripts-expert Status Reporting)
-  process.stderr.write(`  hook script: ${hookScriptRaw}\n`);
-
   // Capture whether the file existed BEFORE we read or create it, so status reporting
   // can accurately distinguish created (new file) from updated (pre-existing file mutated).
   const existedOnDisk = existsSync(settingsPath);
@@ -376,50 +414,61 @@ function cmdInstallHooks(scope) {
     }
   }
 
-  // Desired matcher group
-  const MATCHER = 'Edit|Write';
-  const desiredEntry = { type: 'command', command: hookCommand, timeout: 10 };
-
   // Ensure hooks and hooks.PostToolUse exist
   if (!settings.hooks) settings.hooks = {};
   if (!settings.hooks.PostToolUse) settings.hooks.PostToolUse = [];
 
   const postToolUse = settings.hooks.PostToolUse;
 
-  // Find existing matcher group with matcher === MATCHER
-  const groupIdx = postToolUse.findIndex(g => g.matcher === MATCHER);
+  // Desired matcher groups — handoff-validate.sh keeps its existing matcher
+  // unwidened (D3); scratch-lint.sh gets its own "Edit|Write|MultiEdit" group
+  // since it also needs to fire on MultiEdit.
+  const MATCHER = 'Edit|Write';
+  const descriptors = [
+    { matcher: MATCHER, script: HOOK_SCRIPT },
+    { matcher: 'Edit|Write|MultiEdit', script: LINT_HOOK_SCRIPT },
+  ];
 
-  if (groupIdx === -1) {
-    // Case (a): settings.json did not exist on disk — file is being created.
-    // Case (b): file pre-existed but had no group for this matcher — file is being updated.
-    postToolUse.push({ matcher: MATCHER, hooks: [desiredEntry] });
-    writeSettingsAtomic(settingsPath, settings);
-    process.stdout.write(`Hooks installed: ${hookScriptRaw}\n`);
-    if (existedOnDisk) {
-      process.stderr.write(`  updated: ${settingsPath} (added PostToolUse matcher group for "${MATCHER}")\n`);
-    } else {
-      process.stderr.write(`  created: ${settingsPath} (added PostToolUse matcher group for "${MATCHER}")\n`);
+  // Install each hook descriptor into its own matcher group. Both descriptors
+  // are visited unconditionally on this one loop, so neither can be silently
+  // skipped the way the pre-refactor version's two early exits (:403, :415)
+  // would have skipped a second hook appended after them.
+  let anyChanged = false;
+  for (const { matcher, script } of descriptors) {
+    // Resolve the absolute path to the hook script (resolves at install time, not run time)
+    const hookScriptRaw = resolve(script);
+    const hookScript = normalizeHookPath(hookScriptRaw);
+    const hookCommand = `bash "${hookScript}"`;
+
+    // Informational: report hook script source location (per scripts-expert Status Reporting)
+    process.stderr.write(`  hook script: ${hookScriptRaw}\n`);
+
+    const result = installHookDescriptor(postToolUse, matcher, hookCommand);
+
+    if (result === 'already-present') {
+      process.stderr.write(`  already correct: ${settingsPath}\n`);
+      continue;
     }
-    return;
+
+    anyChanged = true;
+    process.stdout.write(`Hooks installed: ${hookScriptRaw}\n`);
+    if (result === 'created') {
+      if (existedOnDisk) {
+        process.stderr.write(`  updated: ${settingsPath} (added PostToolUse matcher group for "${matcher}")\n`);
+      } else {
+        process.stderr.write(`  created: ${settingsPath} (added PostToolUse matcher group for "${matcher}")\n`);
+      }
+    } else {
+      // result === 'appended'
+      process.stderr.write(`  updated: ${settingsPath} (appended hook to existing "${matcher}" matcher group)\n`);
+    }
   }
 
-  // Case (c) or (d): existing group with same matcher
-  const group = postToolUse[groupIdx];
-  if (!Array.isArray(group.hooks)) group.hooks = [];
-
-  // Dedup by command string
-  const alreadyPresent = group.hooks.some(h => h.command === hookCommand);
-  if (alreadyPresent) {
-    // Case (d): already correct — idempotent, no write
-    process.stderr.write(`  already correct: ${settingsPath}\n`);
-    return;
+  // Single write for both descriptors — skip entirely when both were already
+  // present, preserving the pre-refactor no-write-when-idempotent behaviour.
+  if (anyChanged) {
+    writeSettingsAtomic(settingsPath, settings);
   }
-
-  // Case (c): same matcher group, hook not yet present — append
-  group.hooks.push(desiredEntry);
-  writeSettingsAtomic(settingsPath, settings);
-  process.stdout.write(`Hooks installed: ${hookScriptRaw}\n`);
-  process.stderr.write(`  updated: ${settingsPath} (appended hook to existing "${MATCHER}" matcher group)\n`);
 }
 
 // Atomic write via temp+rename (D8)
@@ -573,3 +622,16 @@ export async function dispatch(argv) {
 }
 
 export default dispatch;
+
+// ---------------------------------------------------------------------------
+// Entry-point guard — forward to dispatch() on direct invocation (`node
+// register.mjs <subcommand> ...`), not just when imported by
+// scratch-memory.mjs. Without this, direct invocation silently exits 0 with
+// no output (issue: verb-modules-silent-noop-direct-invocation).
+// ---------------------------------------------------------------------------
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  dispatch(process.argv.slice(2)).catch(err => {
+    process.stderr.write(`${err.stack ?? err.message}\n`);
+    process.exit(2);
+  });
+}

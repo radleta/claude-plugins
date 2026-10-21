@@ -4,38 +4,25 @@ description: "Plan progress update methodology for marking completed work in pla
 user-invocable: false
 ---
 
-<role>
-  <identity>Plan progress updater</identity>
+Cross-reference completed work against a plan's checklists and progress table, marking finished
+items and noting partial progress directly in the plan files on disk.
 
-  <purpose>
-    Cross-reference completed work against a plan's checklists and progress
-    table, marking finished items and noting partial progress directly in the
-    plan files on disk.
-  </purpose>
+**In scope:**
+- Updating markdown checkboxes in step files (- [ ] → - [x])
+- Updating the README.md progress table (pending → completed/in-progress)
+- Noting partial progress on in-progress items
+- Reporting what was updated
 
-  <scope>
-    <in-scope>
-      <item>Updating markdown checkboxes in step files (- [ ] → - [x])</item>
-      <item>Updating the README.md progress table (pending → completed/in-progress)</item>
-      <item>Noting partial progress on in-progress items</item>
-      <item>Reporting what was updated</item>
-    </in-scope>
-
-    <out-of-scope>
-      <item>Creating new plan items or steps</item>
-      <item>Deleting or reordering steps</item>
-      <item>Modifying step descriptions beyond progress markers</item>
-    </out-of-scope>
-  </scope>
-</role>
+**Out of scope:**
+- Creating new plan items or steps
+- Deleting or reordering steps
+- Modifying step descriptions beyond progress markers
 
 <rules>
-  <rule priority="critical">Update the PLAN FILES ON DISK, not Claude's internal TaskList</rule>
-  <rule priority="critical">Only update items DIRECTLY related to work that was performed</rule>
-  <rule priority="critical">Do NOT create new steps or plan items — this is an update step, not a planning step</rule>
-  <rule priority="high">Only mark a checkbox done if ALL of its requirements were met</rule>
-  <rule priority="high">For partially completed items, note what was done but leave the checkbox unchecked</rule>
-  <rule priority="high">If no plan path can be found, report clearly and skip</rule>
+  Edit the plan files on disk, not the session's TaskList: the files are what the next session reads.
+  Touch only items the reported work bears on, and add no steps or items; this is an update, not a
+  planning pass. Check a box only when every requirement under it was met; for partial work, note
+  what was done and leave the box unchecked. With no plan path found, say so and stop.
 </rules>
 
 <workflow type="sequential">
@@ -43,9 +30,9 @@ user-invocable: false
     <description>Find the plan directory</description>
 
     <actions>
-      <action priority="critical">Parse the prompt for the plan path (e.g., scratch/my-feature/) and work summary</action>
-      <action priority="high">If no path provided, scan scratch/ for the most recently modified plan directory</action>
-      <action priority="critical">Verify the path contains a README.md — if not, report "no plan found" and stop</action>
+      <action>Parse the prompt for the plan path (e.g., scratch/my-feature/) and work summary</action>
+      <action>If no path provided, scan scratch/ for the most recently modified plan directory</action>
+      <action>Verify the path contains a README.md — if not, report "no plan found" and stop</action>
     </actions>
   </step>
 
@@ -53,9 +40,9 @@ user-invocable: false
     <description>Read the plan's current state</description>
 
     <actions>
-      <action priority="critical">Read the README.md to find the progress table</action>
-      <action priority="critical">Use Glob to find all step files (steps/*.md)</action>
-      <action priority="critical">Read each step file to find checkboxes (- [ ] and - [x])</action>
+      <action>Read the README.md to find the progress table</action>
+      <action>Use Glob to find all step files (steps/*.md)</action>
+      <action>Read each step file to find checkboxes (- [ ] and - [x])</action>
     </actions>
   </step>
 
@@ -63,10 +50,10 @@ user-invocable: false
     <description>Match completed work against plan items</description>
 
     <actions>
-      <action priority="critical">Review the completed work summary from the prompt</action>
-      <action priority="critical">For each step: determine if the work fully or partially satisfies it</action>
-      <action priority="high">For each checkbox within steps: determine if it was completed</action>
-      <action priority="high">Categorize each item as: fully-completed, partially-completed, or unrelated</action>
+      <action>Review the completed work summary from the prompt</action>
+      <action>For each step: determine if the work fully or partially satisfies it</action>
+      <action>For each checkbox within steps: determine if it was completed</action>
+      <action>Categorize each item as: fully-completed, partially-completed, or unrelated</action>
     </actions>
   </step>
 
@@ -74,10 +61,10 @@ user-invocable: false
     <description>Edit the plan files to reflect progress</description>
 
     <actions>
-      <action priority="critical">In step files: change `- [ ]` to `- [x]` for completed checkboxes using Edit tool</action>
-      <action priority="critical">In README.md: update the progress table status column (pending → completed or in-progress)</action>
-      <action priority="high">For partially-completed steps: add a brief progress note (e.g., "in-progress — 3 of 5 actions done")</action>
-      <action priority="high">Do NOT modify any other content in the files</action>
+      <action>In step files: change `- [ ]` to `- [x]` for completed checkboxes using Edit tool</action>
+      <action>In README.md: update the progress table status column (pending → completed or in-progress)</action>
+      <action>For partially-completed steps: add a brief progress note (e.g., "in-progress — 3 of 5 actions done")</action>
+      <action>Do NOT modify any other content in the files</action>
     </actions>
   </step>
 
@@ -85,8 +72,8 @@ user-invocable: false
     <description>Report all updates made</description>
 
     <actions>
-      <action priority="high">List all changes made</action>
-      <action priority="high">Summarize overall plan progress</action>
+      <action>List all changes made</action>
+      <action>Summarize overall plan progress</action>
     </actions>
   </step>
 </workflow>

@@ -1,5 +1,7 @@
 # PR Writer Examples
 
+Contents: Table of Contents · Simple PR Examples (Minimal Template) · Complete PR Examples · Title Examples · Description Examples · Breaking Change Examples · Testing Documentation Examples · Bad PR Examples (Anti-patterns) · Key Takeaways
+
 This file contains real-world examples of pull requests following best practices, as well as anti-patterns to avoid.
 
 ## Table of Contents

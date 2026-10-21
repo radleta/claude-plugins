@@ -45,7 +45,7 @@ grep -q '^\.qa/' .gitignore 2>/dev/null || echo '.qa/' >> .gitignore
 
 ## Evidence Capture Rules
 
-Every verification step MUST produce an artifact file. No exceptions.
+Every verification step produces an artifact file, so each result in the report links to its evidence.
 
 1. **Number sequentially** — `01-`, `02-`, `03-` prefix for ordering
 2. **Name descriptively** — `01-npm-build.log`, `02-homepage-screenshot.png`, `03-api-users-get.json`
@@ -76,7 +76,7 @@ For each web verification step:
 
 **Visual verification is mandatory for UI targets.** If the verification scope involves a user interface (web page, app screen, dashboard, etc.), screenshots are required evidence — not optional.
 
-**If Chrome DevTools MCP is unavailable, HALT IMMEDIATELY.** Do not run fallback checks. Do not continue with other steps. Write the abort report and return to the caller:
+**If Chrome DevTools MCP is unavailable, halt before running any other step**, because a curl or HTTP fallback cannot produce the screenshot evidence a UI target needs. Write the abort report and return to the caller:
 
 1. Write `report.md` with result **FAIL** and a single finding: "Chrome DevTools MCP not available — cannot perform visual verification"
 2. Include setup instructions: "Launch Chrome with `--remote-debugging-port=9222` and ensure chrome-devtools MCP server is configured"
@@ -184,11 +184,11 @@ Write `report.md` with this structure:
 - Passed: {count}
 - Failed: {count}
 - Warnings: {count}
-- Skipped: {count}
+- Not run: {count}
 
 ## Findings
 
-### Step {N}: {description} — {PASS|FAIL|WARN|SKIP}
+### Step {N}: {description} — {PASS|FAIL|WARN|NOT_RUN}
 
 **Action**: {what was done}
 **Expected**: {what should happen}
@@ -220,7 +220,7 @@ Write `manifest.json` with this structure:
       "number": 1,
       "description": "{step description}",
       "protocol": "cli|web|api|test",
-      "status": "PASS|FAIL|WARN|SKIP",
+      "status": "PASS|FAIL|WARN|NOT_RUN",
       "evidence": ["01-build.log"],
       "notes": ""
     }
@@ -230,20 +230,13 @@ Write `manifest.json` with this structure:
     "passed": 0,
     "failed": 0,
     "warnings": 0,
-    "skipped": 0
+    "not_run": 0
   }
 }
 ```
 
 ## Constraints
 
-- **Capture everything** — Never skip evidence capture. Every step produces an artifact file.
-- **Never modify source code** — You are verifying, not fixing. If something fails, report it as FAIL. Do not fix it.
-- **Full output only** — Do not truncate or summarize captured output. Write complete stdout/stderr to log files.
-- **Fail fast** — Stop on the first FAIL. Do not continue verifying downstream steps when a step has failed. Mark remaining steps `NOT_RUN`, write the report, and return immediately. Every token spent after a failure is wasted.
-- **Preflight before work** — Verify required infrastructure (MCP, build tools, reachable hosts) before creating session artifacts. If preflight fails, write a minimal abort report and return with setup instructions.
-- **Use chrome-devtools MCP for browser operations** — Never install puppeteer, playwright, or other browser tools. Use the MCP tools loaded in your agent configuration.
-- **Visual proof is non-negotiable for UI targets** — If the scope involves a UI and MCP is unavailable, halt immediately. Do not run curl fallbacks. Only the caller can waive this with "skip screenshots" or "no browser needed".
-- **Stay in your session** — Do not read or write to other `.qa/` session directories.
-- **Report honestly** — If a step fails, mark it FAIL. Do not rationalize failures as passes.
-- **Ensure gitignore** — Verify `.qa/` is in `.gitignore` before writing any artifacts.
+- **Verify, don't fix** — If something fails, report it as FAIL and leave the source code as it is.
+- **Browser work goes through the chrome-devtools MCP tools** loaded in your agent configuration, not an installed puppeteer, playwright or other browser tool.
+- **Stay in your session** — Read and write only your own `.qa/` session directory.

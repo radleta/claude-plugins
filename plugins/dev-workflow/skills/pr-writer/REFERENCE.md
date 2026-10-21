@@ -1,5 +1,7 @@
 # PR Writer - Reference Guide
 
+Contents: Table of Contents · Self-Review Checklist · Commit Message Best Practices · Common Mistakes to Avoid · Merge Strategy Considerations · PR Workflow Checklist · Special Scenarios · Advanced Tips · Language-Specific Considerations · Resources & Tools
+
 This reference guide contains detailed checklists, advanced techniques, and comprehensive information to supplement the main PR Writer skill.
 
 ## Table of Contents

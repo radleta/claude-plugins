@@ -1,5 +1,7 @@
 # Project Investigation Guide
 
+Contents: Investigation Principles · Investigation Checklist · Investigation Process · Investigation Report Template · Investigation Best Practices · When Investigation is Complete · Investigation Red Flags · Project Types & Common Patterns · Summary
+
 Before making any code changes, understand the project context through systematic investigation. This guide provides **what to investigate**, not how - use your judgment and tools to gather the information.
 
 ---

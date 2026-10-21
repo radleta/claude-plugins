@@ -1,8 +1,12 @@
 ---
 description: Summarize current branch changes vs base — the "where was I?" command for returning to work
-argument-hint: [base-branch]
+disable-model-invocation: true
+argument-hint: "[base-branch]"
 context: fork
+model: claude-opus-5-5
+effort: medium
 allowed-tools: Read, Glob, Grep, Bash(git *)
+disallowed-tools: Edit, Write
 ---
 
 <role>

@@ -1,5 +1,7 @@
 # Human Voice — Before / After Examples
 
+Contents: Tier 1 — Email sent on the user's behalf (scrub hard) · Tier 1 — Blog post intro (still scrub hard — it persuades) · Tier 1 — Cold outreach (the two-words test) · Tier 2 — How-to guide (light scrub) · Tier 3 — API reference (leave it)
+
 Concrete rewrites at each tier. Notice that the *amount* of rewriting tracks the tier:
 Tier 1 gets fully re-voiced, Tier 3 is mostly left alone.
 
@@ -18,7 +20,7 @@ Tier 1 gets fully re-voiced, Tier 3 is mostly left alone.
 > Please feel free to let me know if you have any questions. I hope this helps!
 >
 > Best regards,
-> Richard
+> Sam
 
 **Why it fails:** assistant sign-offs ("I hope this finds you well", "feel free to",
 "I hope this helps"), filler words (robust, seamless, valuable insights), negative
@@ -35,10 +37,13 @@ A real recipient instantly senses a machine — and the warmth reads as fake.
 >
 > Want me to walk you through it on a call, or is the export enough?
 >
-> Richard
+> Sam
 
-(Honors the user's stated style: no "Dear", no "I hope this finds you well", no closing
-phrase before the signature, signs off as "Richard".)
+(Honors the sender's voice rules, passed as `Voice:`: no "Dear", no closing phrase before
+the signature, first name only. The email-opener tell is gone, and the message ends on one
+small ask. Also note the deliberate "…not just
+who opened": the negative-parallelism shape used once, anchored to a concrete contrast,
+reads human. A stack of them is the tell — density, not presence.)
 
 ## Tier 1 — Blog post intro (still scrub hard — it persuades)
 
@@ -59,7 +64,29 @@ detected AI-ness kills it. It belongs in Tier 1, not Tier 2.
 > what I'd do differently.
 
 (Replaced throat-clearing and filler with a specific claim, a number, and a promise of
-concrete payoff. That's what earns the next paragraph.)
+concrete payoff. That's what earns the next paragraph. The closing triple — "how we set
+it up, what broke, and what I'd do differently" — is a rule of three used once with three
+concrete, load-bearing items; that reads human. Three vague adjectives repeated across
+paragraphs is the tell.)
+
+## Tier 1 — Cold outreach (the two-words test)
+
+**Before:**
+
+> Hi Dana, I love what you're building at Northwind. We help companies like yours ship
+> faster. Would you be open to a call, and could you also loop in your head of platform?
+
+**Why it fails:** a compliment opener, a middle sentence that could go to any company with
+two words changed, and two asks.
+
+**After:**
+
+> Dana, your changelog says the March release slipped on the migration tooling. We wrote
+> the tool two of your competitors use for that step. Worth 15 minutes Thursday?
+
+(The opener is gone, the second sentence could only be sent to this reader, and one small
+ask is left. Every fact here came from the sources; with no such fact, the honest draft is
+the shorter one, and the drafter lists the missing hook under `Ungrounded:`.)
 
 ## Tier 2 — How-to guide (light scrub)
 

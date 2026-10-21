@@ -1,4 +1,5 @@
 ---
+page-kind: procedure
 tags: [estimation-expert/workflow]
 summary: "4-step sequential protocol: scope definition → work classification → velocity calibration → estimate production"
 ---

@@ -6,34 +6,30 @@ argument-hint: "<cadence> [anchor-date]"
 allowed-tools: ["Read", "Glob", "Grep", "Bash", "Write", "Edit", "Agent"]
 ---
 
-<role>
-  <identity>Business-oriented project update writer</identity>
-  <purpose>Generate engaging, non-technical stakeholder updates by synthesizing git history, release notes, and project context into readable progress reports</purpose>
-  <expertise>
-    <area>Git history analysis across multiple repos and branches</area>
-    <area>Technical-to-business translation</area>
-    <area>Stakeholder communication</area>
-  </expertise>
-  <scope>
-    <in-scope>
-      <item>Generating markdown update documents from git history</item>
-      <item>Multi-repo and multi-branch commit gathering</item>
-      <item>Updating the "What's Next" section in the context doc</item>
-    </in-scope>
-    <out-of-scope>
-      <item>Distribution (email, Slack) — separate concern</item>
-      <item>Technical release notes — use existing release workflows</item>
-    </out-of-scope>
-  </scope>
-</role>
+Generate engaging, non-technical stakeholder updates by synthesizing git history, release notes, and
+project context into readable progress reports.
+
+**Covers:** Git history analysis across multiple repos and branches; Technical-to-business
+translation; Stakeholder communication.
+
+**In scope:**
+- Generating markdown update documents from git history
+- Multi-repo and multi-branch commit gathering
+- Updating the "What's Next" section in the context doc
+
+**Out of scope:**
+- Distribution (email, Slack) — separate concern
+- Technical release notes — use existing release workflows
 
 # Project Update Skill
+
+A stakeholder update is `Tier 2` text: load `human-voice` and follow its routing, and write the text yourself when that skill is not installed.
 
 ## Context Doc Discovery
 
 Find the project context doc in this order:
 1. **Repo root**: `PROJECT_UPDATE.md` (check if it's a pointer — if it says "moved to", follow the path)
-2. **Sub-repo docs**: `akn-docs/PROJECT_UPDATE.md` or similar docs sub-repo
+2. **Sub-repo docs**: a project-specific docs sub-repo's `PROJECT_UPDATE.md` (e.g. `docs/PROJECT_UPDATE.md` — the sub-repo name varies per project; check `.subrepos` for candidates)
 3. **Argument override**: user passes path as second arg after cadence
 4. **CLAUDE.md reference**: look for a `project-update` or `PROJECT_UPDATE.md` reference
 
@@ -59,6 +55,9 @@ The context doc (`PROJECT_UPDATE.md`) defines everything project-specific:
 | monthly | Calendar month of anchor | path/to/updates/monthly/ | YYYY-MM-DD.md |
 
 ## Email Distribution
+**Optional — skip if the `email-draft` CLI (or your project's equivalent) isn't installed.** This
+section only applies if you want a Gmail draft generated automatically; omit it entirely to
+just write the update file.
 - **Profile**: `work` (sender@example.com)
 - **To**: recipient@example.com
 - **CC**: cc-recipient@example.com
@@ -104,6 +103,13 @@ Forward-looking priorities and upcoming milestones (not immediate tasks — thos
 - Priority 2
 
 ## Roadmap Image
+**Optional — skip if the `gemini-image` CLI (or your project's equivalent image-gen tool) isn't
+installed.** Omit this section entirely to generate updates without a roadmap image.
+
+A project that has the section and the CLI can still turn the image off: put `SUSPENDED` in this
+heading, dated, as in `## Roadmap Image — SUSPENDED YYYY-MM-DD`. Treat it as a skip: leave the
+recipe and every prior image in place, take no image action, skip review gate 2, and continue with
+the rest of step 5.
 - **Template**: path/to/roadmap-template.png (reference image for Gemini)
 - **Logo**: path/to/logo.png (brand anchor for Gemini)
 - **Style**: description of the visual style (e.g., chalk art chalkboard)
@@ -111,6 +117,10 @@ Forward-looking priorities and upcoming milestones (not immediate tasks — thos
 ## Estimation Calibration
 - **Companion doc**: path/to/ESTIMATION-CALIBRATION.md (process for tuning velocity each update cycle)
 - **Personal profile**: estimation-expert skill profiles/personal.md (cumulative velocity data)
+
+## Estimation Learning
+| Work type | Prior multiplier | Observed | Revised | Reasoning |
+|-----------|------------------|----------|---------|-----------|
 
 ## Tone & Style
 Description of desired tone and audience expectations.
@@ -180,17 +190,17 @@ These are **different sections** serving different purposes:
     <actions>
       <action>**Classify completed work**: Categorize every commit/feature from Step 2 by work type (mechanical, CDD-wired, infrastructure, integration, investigation, creative) using the estimation-expert skill taxonomy</action>
       <action>**Count effective weekdays**: Exclude weekends, holidays, and vacation days. Weekend commits are bonus — do not include in velocity baseline. All effort is attributed to weekdays.</action>
-      <action>**Estimate base hours**: For each completed work type, estimate how many hours a solo senior developer (no AI) would have taken</action>
-      <action>**Derive observed multipliers**: Divide actual days by base hours to get the real multiplier per work type. Compare against prior calibration (or estimation-expert defaults if first run).</action>
-      <action>**Flag divergences**: Any work type where observed multiplier differs >20% from prior calibration needs recalibration. Note root cause (e.g., "CDD front-loading compressed backend work", "HIGH risk resolved as LOW").</action>
-      <action>**Revise multipliers**: Update the Estimation Learning table in the context doc with: prior multiplier, observed, revised, and reasoning. Split difference between observed and prior — don't overfit to one week.</action>
+      <action>**Estimate base hours**: For each completed work type, estimate how many hours a solo senior developer (no AI) would have taken, and record its effective weekdays and its prior multiplier (the context doc's Estimation Learning table, or estimation-expert defaults on a first run)</action>
+      <action>**Run the arithmetic**: `node <skill-dir>/calibrate.mjs` with those rows as `completed` (`node calibrate.mjs --help` gives the input shape). It prints the observed multiplier per type (weekdays × 6 ÷ base hours, the estimation-expert velocity-profiles arithmetic), its divergence from the prior with `FLAG` past 20%, and the revised multiplier (the midpoint of prior and observed, so one week does not overfit)</action>
+      <action>**Explain each FLAG**: note its root cause (e.g., "CDD front-loading compressed backend work", "HIGH risk resolved as LOW")</action>
+      <action>**Record**: Update the Estimation Learning table in the context doc with prior, observed, revised, and reasoning</action>
       <action>**Classify remaining work**: Categorize every remaining item by work type, parallelizability, and discovery risk using the revised multipliers</action>
       <action>**Project forward velocity**: Choose the appropriate velocity tier based on remaining work mix:
         - Infrastructure-heavy: use highest observed velocity
         - Mixed: use midpoint between observed and default
         - Frontend/creative-heavy: use conservative estimate (serial work doesn't parallelize)
         - Investigation-heavy: use lowest tier</action>
-      <action>**Calculate timeline**: Apply revised multipliers to remaining work → work-days → calendar dates. Present optimistic/realistic/pessimistic range.</action>
+      <action>**Calculate timeline**: re-run `calibrate.mjs` with the remaining items (`base_hours`, `parallelism`, `risk`, and `multiplier` where the tier above departs from the revised value) and the next workday as `start`; it prints work-days and the realistic finish date, counting weekdays only. Present it with an optimistic and a pessimistic date beside it.</action>
       <action>**Update estimation-expert personal profile** if one exists — append this week's velocity data for ongoing calibration</action>
     </actions>
     <acceptance-criteria>
@@ -209,13 +219,13 @@ These are **different sections** serving different purposes:
       <action>Group commits by theme/area (not by repo or branch) — use business language</action>
       <action>Identify 3-5 top highlights (biggest wins, most exciting progress)</action>
       <action>Use the calibrated timeline from Step 3 for the Roadmap Overview section</action>
-      <action>Write each section following the Output Template below</action>
+      <action>Write each section following the template and writing guidelines in output-template.md</action>
       <action>Draw from release notes for richer detail where available</action>
       <action>Match the tone and style defined in the context doc</action>
     </actions>
     <quality-rules>
       <rule>Translate technical commits into business-language descriptions</rule>
-      <rule>Never hallucinate features — only describe what git history shows</rule>
+      <rule>Describe only what the git history and the configured sources show</rule>
       <rule>Group by theme (Billing, Search, Content) not by repo or branch</rule>
       <rule>Skip empty repos or periods with no activity gracefully</rule>
       <rule>Highlights should feel exciting — lead with the most impactful work</rule>
@@ -232,9 +242,9 @@ These are **different sections** serving different purposes:
       <action>Append to "Progress Log" — add dated entries for milestone-relevant changes this period (what advanced, what was decided, what's blocked)</action>
       <action>Update the "What's Next" section in PROJECT_UPDATE.md — remove completed items visible in git history, keep items still upcoming, suggest new items based on active branches</action>
       <action>**USER REVIEW GATE 1**: Present draft update to user for review — percentages, summaries, highlights, what's next. Incorporate feedback before proceeding.</action>
-      <action>If Roadmap Image config exists, generate updated image. If a companion doc (e.g., ROADMAP-IMAGE.md) is referenced, follow its recipe for tool, prompt template, and reference images.</action>
-      <action>**USER REVIEW GATE 2**: Show generated image to user. Iterate until approved.</action>
-      <action>If Email Distribution config exists in the context doc, add frontmatter (to, cc, subject) to the update file and offer to create a Gmail draft via email-draft CLI. Run from the output directory so inline images resolve correctly.</action>
+      <action>If Roadmap Image config exists AND the required image-gen CLI (e.g. `gemini-image`) is installed, generate updated image. If a companion doc (e.g., ROADMAP-IMAGE.md) is referenced, follow its recipe for tool, prompt template, and reference images. Skip this action entirely (optional) if the config section is absent, the CLI is absent, or the config section's heading contains `SUSPENDED`.</action>
+      <action>**USER REVIEW GATE 2**: Only when the prior action generated an image. Show it to the user and iterate until approved. Skip whenever that action was skipped.</action>
+      <action>If Email Distribution config exists in the context doc AND the `email-draft` CLI (or your project's equivalent) is installed, add frontmatter (to, cc, subject) to the update file and offer to create a Gmail draft via email-draft CLI. Run from the output directory so inline images resolve correctly. Skip this action entirely (optional) if either the config section or the CLI is absent.</action>
       <action>Report the output file path to the user</action>
     </actions>
   </step>
@@ -242,80 +252,4 @@ These are **different sections** serving different purposes:
 
 ## Output Template
 
-```markdown
----
-to: {from Email Distribution config}
-cc: {from Email Distribution config}
-subject: {Subject pattern from Email Distribution config}
----
-
-# {Project Name} — {Cadence} Update
-**Period**: {Start Date} – {End Date}
-**Author**: {Author}
-
-## Highlights
-- {Punchy one-liner about biggest win}
-- {Another exciting achievement}
-- {Third highlight}
-
-## What Got Done
-
-### {Area/Theme Name}
-{Business-language description of what changed and why it matters. 2-4 sentences per area.}
-
-### {Area/Theme Name}
-{Description}
-
-## Roadmap Overview
-{Optional — include if context doc references planning docs with a roadmap.
-Show milestone tables grouped by phase with current status.
-For inaugural updates, provide full context. For recurring updates, only show status changes.}
-
-## Active Projects
-
-Every project from the context doc's Active Projects table — even those with no activity this period.
-
-| Project | Progress | Status | This Period |
-|---------|----------|--------|-------------|
-| {Project Name} | {%} | {Current status} | {What happened, or "No activity" / "Unchanged"} |
-
-Use ▲ prefix for projects that advanced. Show "No activity" for quiet projects.
-Include sub-milestones indented with "—" for flagship products.
-This table gives stakeholders a single scan of everything in flight.
-
-## Velocity & Timeline
-{Include when calibration data exists from Step 3. Explain in plain language:
-- What the estimates predicted vs what actually happened
-- Why the timeline shifted (model correction, scope change, or both)
-- What's different about the remaining work
-- What to watch for next week
-Keep it accessible — the audience is business stakeholders, not engineers.
-Omit this section for the inaugural update (no prior data to compare).}
-
-## By The Numbers
-| Metric | Value |
-|--------|-------|
-| Commits | {N} |
-| Repos active | {N} of {Total} |
-| Files changed | {N} |
-| Lines of code | +{added} / -{removed} |
-
-## What's Next
-- {Strategic priority or upcoming milestone}
-- {Another forward-looking item}
-
-## Technical Notes
-{Deeper detail for anyone curious — specific systems changed, architecture decisions,
-infrastructure improvements. This section bridges business and technical audiences.}
-```
-
-## Writing Guidelines
-
-- **Highlights**: Lead with impact, not implementation. "Launched the billing system" not "Added 47 DynamoDB entities"
-- **What Got Done**: Business language, grouped by theme. A non-engineer should understand what changed and why it matters
-- **By The Numbers**: Raw stats that show effort and velocity. Include all repos and branches
-- **Active Projects**: Every project in the context doc's Active Projects table should appear — even if no commits landed this period. Update status from git history and plan files. Show "No activity" for quiet projects rather than omitting them. Use ▲ for projects that advanced. Include progress percentages for at-a-glance scanning
-- **What's Next**: Strategic priorities and upcoming milestones, not immediate tasks. Pulled from context doc
-- **Technical Notes**: For the curious — specific systems, tools, architecture. OK to be more technical here
-- **Tone**: Match the context doc's tone guidance. Default: informative, exciting, accessible
-- **Quiet periods**: If a week has few commits, still write the update — note what's in progress on branches, what's being planned
+The update file's template and the writing guidelines for each section are in [`output-template.md`](output-template.md); step 4 writes from it.

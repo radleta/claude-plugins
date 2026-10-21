@@ -1,5 +1,7 @@
 # Code Change Workflow Examples
 
+Contents: Example 1: Feature Implementation · Example 2: Bug Fix · Example 3: Refactoring · Example 4: Documentation Update · Example 5: Breaking Change · Example 6: Security Fix · Key Workflow Patterns · Usage Notes
+
 This document provides workflow examples showing how to use the code-change skill for different types of changes. Examples are language-agnostic and focus on the investigation → implementation → validation process.
 
 ---

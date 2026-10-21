@@ -3,25 +3,24 @@ name: scratch-management
 description: "Scratch folder lifecycle management using scratch.mjs script and archive branch workflow. Use when saving, archiving, initializing, or cleaning up scratch folders, managing agent context visibility, or hiding completed planning docs — even for simple single-folder operations."
 ---
 
-<role>
-  <identity>Scratch folder lifecycle executor using scratch.mjs script</identity>
-  <purpose>Execute scratch folder operations (save, archive, list, initialize) to keep agent context clean</purpose>
-  <scope>
-    <in-scope>Initialize, save, archive, list scratch folders</in-scope>
-    <out-of-scope>Creating folders (use mkdir), git ops outside scratch/</out-of-scope>
-  </scope>
-</role>
+Execute scratch folder operations (save, archive, list, initialize) to keep agent context clean.
+
+**In scope:** Initialize, save, archive, list scratch folders
+
+**Out of scope:** Creating folders (use mkdir), git ops outside scratch/
 
 ## Core Concept
 
 | Location | Visible to Agents |
 |----------|-------------------|
-| `scratch/` on `main` branch | **Yes** - agents glob/grep/read this |
+| `scratch/` on its checked-out branch (`main`, or a lane's `lane/{lane}`) | **Yes** - agents glob/grep/read this |
 | `scratch/` on `archive` branch | **No** - not in working tree |
 
 **Rule:** Archive completed folders to hide them from agents while preserving in git.
 
 **Session-scoped folders (`scratch/S-{slug-or-session-id}/`)**: Folders prefixed with `S-` are session-scoped handoff artifacts written by the `handoff-methodology` skill and the `scratch-memory handoff` CLI (via the `/handoff` slash command). The suffix is the session slug when the session has been named (e.g. `S-my-feature`) or the bare session UUID otherwise (e.g. `S-abc123`). They follow the same save/archive lifecycle as project-scoped folders. Agents that enumerate project-scoped work should filter out `S-*/` entries (they are per-session snapshots, not projects).
+
+**Lane records (`scratch/L-{lane}/`)**: Folders prefixed with `L-` hold one lane's record, `README.md`, written by `/begin-lane` and archived by `/end-lane` through `lane-methodology`. Treat them exactly as `S-*/` entries: not project work, and never a destination for anything else.
 
 ## Script Location
 
@@ -33,11 +32,16 @@ Usage: `scratch <command> [folder]`
 
 | Command | Syntax | Use When |
 |---------|--------|----------|
-| **save** | `scratch save FOLDER` | Checkpoint active work |
+| **save** | `scratch save FOLDER` | Checkpoint active work; on a lane it also catches up from `main` and pushes the lane branch |
 | **archive** | `scratch archive FOLDER` | Hide completed folder from agents |
-| **list** | `scratch list` | See active folders on main |
+| **list** | `scratch list` | See active folders on the checked-out branch |
 | **archived** | `scratch archived` | See archived folders |
 | **config** | `scratch config` | Check configuration |
+
+`save` on a lane and `archive` reach origin; each `fetch`, `push` and `ls-remote` runs for at most
+`SCRATCH_NET_TIMEOUT` seconds (default 60), and a stall ends with `ERROR: git {verb} timed out after {n}s`.
+These calls run with no terminal, so a custom `GIT_SSH_COMMAND` or `core.sshCommand` must not prompt:
+load its key into `ssh-agent` first.
 
 ## Request Pattern Matching
 
